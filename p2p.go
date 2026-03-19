@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sync"
 
@@ -50,7 +52,7 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 
 	// Set up mDNS discovery if enabled
 	if cfg.Network.EnableMDNS {
-		rendezvous := fmt.Sprintf("/inv/project/%s", cfg.Node.Project)
+		rendezvous := mdnsServiceName(cfg.Node.Project)
 		mdnsSvc := mdns.NewMdnsService(h, rendezvous, &mdnsNotifee{host: p2pHost})
 		if err := mdnsSvc.Start(); err != nil {
 			h.Close()
@@ -129,4 +131,13 @@ func (n *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	}
 	ctx := context.Background()
 	_ = n.host.host.Connect(ctx, pi)
+}
+
+// mdnsServiceName converts a project name into a valid DNS-SD service type.
+// DNS-SD service types must follow _name._udp format with 1-15 char service name.
+// We hash the project to ensure a short, valid, project-specific service name.
+func mdnsServiceName(project string) string {
+	h := sha256.Sum256([]byte(project))
+	short := hex.EncodeToString(h[:4]) // 8 hex chars
+	return fmt.Sprintf("_inv%s._udp", short)
 }

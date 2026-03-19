@@ -79,35 +79,80 @@ func (s *P2PDiscoverySuite) TestDirectConnect() {
 }
 
 // TestMDNSDiscovery verifies two hosts on the same project discover each other via mDNS.
-// Skipped in short mode and on platforms where multicast may not work (CI, containers).
+// Uses retry with fresh hosts because multicast can be disrupted by prior host activity.
 func (s *P2PDiscoverySuite) TestMDNSDiscovery() {
 	if testing.Short() {
 		s.T().Skip("skipping mDNS discovery in short mode")
 	}
 
 	project := fmt.Sprintf("mdns-proj-%d", time.Now().UnixNano())
-	hostA, _ := s.newHost("mdns-a", project, true)
-	hostB, _ := s.newHost("mdns-b", project, true)
 
-	// Poll until both hosts discover each other (up to 10 seconds)
-	deadline := time.After(10 * time.Second)
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
+	createMDNSHost := func(name string) (*P2PHost, *Store) {
+		tmpDir := s.T().TempDir()
+		ident, err := GenerateIdentity()
+		s.Require().NoError(err)
 
+		cfg := DefaultNodeConfig()
+		cfg.Node.Name = name
+		cfg.Node.Vertical = VerticalDev
+		cfg.Node.Project = project
+		cfg.Network.ListenPort = 0
+		cfg.Network.EnableDHT = false
+		cfg.Network.EnableMDNS = true
+
+		store, err := NewStore(tmpDir + "/test.db")
+		s.Require().NoError(err)
+
+		host, err := NewP2PHost(context.Background(), ident, cfg, store)
+		s.Require().NoError(err)
+
+		return host, store
+	}
+
+	const maxAttempts = 5
 	discovered := false
-	for !discovered {
-		select {
-		case <-deadline:
-			// mDNS may not work in all environments (containers, CI, restricted multicast)
-			s.T().Skip("mDNS discovery not available in this environment (timed out after 10s)")
-			return
-		case <-ticker.C:
-			if hostA.ConnectedPeerCount() >= 1 && hostB.ConnectedPeerCount() >= 1 {
-				discovered = true
+	var hostA, hostB *P2PHost
+
+	for attempt := 0; attempt < maxAttempts && !discovered; attempt++ {
+		if attempt > 0 {
+			time.Sleep(2 * time.Second)
+		}
+
+		hA, stA := createMDNSHost(fmt.Sprintf("mdns-a-%d", attempt))
+		hB, stB := createMDNSHost(fmt.Sprintf("mdns-b-%d", attempt))
+
+		deadline := time.After(5 * time.Second)
+		ticker := time.NewTicker(200 * time.Millisecond)
+
+	poll:
+		for {
+			select {
+			case <-deadline:
+				ticker.Stop()
+				hA.Close()
+				stA.Close()
+				hB.Close()
+				stB.Close()
+				break poll
+			case <-ticker.C:
+				if hA.ConnectedPeerCount() >= 1 && hB.ConnectedPeerCount() >= 1 {
+					discovered = true
+					hostA = hA
+					hostB = hB
+					s.T().Cleanup(func() {
+						hA.Close()
+						stA.Close()
+						hB.Close()
+						stB.Close()
+					})
+					ticker.Stop()
+					break poll
+				}
 			}
 		}
 	}
 
+	s.Require().True(discovered, "mDNS discovery failed after %d attempts", maxAttempts)
 	s.Contains(hostA.ConnectedPeers(), hostB.Host().ID())
 	s.Contains(hostB.ConnectedPeers(), hostA.Host().ID())
 }
