@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "inventory": {
+      "type": "stdio",
+      "command": "/Users/cuongtran/Desktop/repo/my-inventory/inv",
+      "args": ["mcp"]
+    }
+  }
+}

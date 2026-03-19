@@ -16,7 +16,7 @@ Built for the Constitution framework (`tini-works/const`).
 ### From source
 
 ```bash
-git clone https://github.com/cuongtran/my-inventory.git
+git clone https://github.com/tini-works/my-inventory.git
 cd my-inventory
 go build -o inv .
 ```
@@ -30,7 +30,7 @@ sudo mv inv /usr/local/bin/
 ### One-liner (build + install)
 
 ```bash
-go install github.com/cuongtran/my-inventory@latest
+go install github.com/tini-works/my-inventory@latest
 ```
 
 > Note: CGO must be enabled. If you get linker errors, run `CGO_ENABLED=1 go install ...`
@@ -82,11 +82,20 @@ Start the MCP server for use with Claude Code, Cursor, or any MCP-compatible cli
 inv mcp
 ```
 
-### Install to Claude Code
+### Setup with Claude Code
 
-**Option 1: CLI command (recommended)**
+The repo includes a `.mcp.json` that auto-configures the inventory MCP server. Just build and open Claude Code:
 
-For this project only:
+```bash
+go build -o inv .
+claude
+```
+
+Claude Code will detect `.mcp.json` and connect to the inventory server automatically. Run `/mcp` inside Claude Code to verify the server is active.
+
+### Alternative setup
+
+**CLI command (if `inv` is on your PATH):**
 
 ```bash
 claude mcp add --transport stdio --scope project inventory -- inv mcp
@@ -98,39 +107,12 @@ For all your projects (global):
 claude mcp add --transport stdio --scope user inventory -- inv mcp
 ```
 
-If `inv` is not in your PATH, use the full path:
-
-```bash
-claude mcp add --transport stdio --scope project inventory -- /usr/local/bin/inv mcp
-```
-
-**Option 2: Manual config**
-
-Create `.mcp.json` in the project root:
-
-```json
-{
-  "mcpServers": {
-    "inventory": {
-      "type": "stdio",
-      "command": "inv",
-      "args": ["mcp"],
-      "env": {}
-    }
-  }
-}
-```
-
-Or add to `~/.claude.json` for global access.
-
-**Verify it works:**
+**Verify:**
 
 ```bash
 claude mcp list              # List all configured servers
 claude mcp get inventory     # Check inventory server config
 ```
-
-Inside Claude Code, run `/mcp` to check the server status.
 
 ### Available MCP Tools
 
