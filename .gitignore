@@ -1,5 +1,11 @@
-# Binary
+# Binaries
 my-inventory
+inv
+
+# Database
+inventory.db
+inventory.db-shm
+inventory.db-wal
 
 # Screenshots / images (not source)
 *.png

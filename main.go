@@ -1037,9 +1037,14 @@ func printStartupBanner(cfg *NodeConfig, ident *NodeIdentity, host *P2PHost, out
 	if cfg.Network.EnableDHT {
 		dhtStatus = "enabled"
 	}
+	relayStatus := "disabled"
+	if cfg.Network.EnableRelay {
+		relayStatus = "enabled"
+	}
 	fmt.Fprintf(os.Stderr, "  MCP server: stdio (ready for Claude Code)\n")
 	fmt.Fprintf(os.Stderr, "  mDNS:       %s (LAN auto-discovery)\n", mdnsStatus)
 	fmt.Fprintf(os.Stderr, "  DHT:        %s (internet-wide discovery)\n", dhtStatus)
+	fmt.Fprintf(os.Stderr, "  Relay:      %s (NAT traversal + hole punching)\n", relayStatus)
 
 	peerCount := host.ConnectedPeerCount()
 	fmt.Fprintf(os.Stderr, "\n  Peers:      %d connected\n", peerCount)

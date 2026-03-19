@@ -8,9 +8,11 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/rs/zerolog/log"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
@@ -25,6 +27,7 @@ type P2PHost struct {
 	cache       *MessageCache
 	limiter     *PeerRateLimiter
 	mdnsService mdns.Service
+	dht         *dht.IpfsDHT
 	mu          sync.RWMutex
 }
 
@@ -34,6 +37,16 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 	opts := []libp2p.Option{
 		libp2p.Identity(ident.PrivKey),
 		libp2p.ListenAddrStrings(listenAddr),
+	}
+
+	// Enable relay client + hole punching for NAT traversal
+	if cfg.Network.EnableRelay {
+		opts = append(opts,
+			libp2p.EnableRelay(),
+			libp2p.EnableHolePunching(),
+			libp2p.NATPortMap(),
+			libp2p.EnableAutoNATv2(),
+		)
 	}
 
 	h, err := libp2p.New(opts...)
@@ -50,6 +63,28 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 		limiter:  NewPeerRateLimiter(cfg.Security.MaxMessageRate, cfg.Security.ThrottleDuration, cfg.Security.ThrottleDuration),
 	}
 
+	// Bootstrap DHT for peer discovery and relay finding
+	if cfg.Network.EnableDHT {
+		kademliaDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeAutoServer))
+		if err != nil {
+			h.Close()
+			return nil, fmt.Errorf("create DHT: %w", err)
+		}
+		if err := kademliaDHT.Bootstrap(ctx); err != nil {
+			h.Close()
+			return nil, fmt.Errorf("bootstrap DHT: %w", err)
+		}
+		p2pHost.dht = kademliaDHT
+
+		// Connect to IPFS bootstrap peers for DHT seeding
+		go p2pHost.connectBootstrapPeers(ctx)
+	}
+
+	// Connect to configured bootstrap peers
+	if len(cfg.Network.BootstrapPeers) > 0 {
+		go p2pHost.connectConfiguredPeers(ctx)
+	}
+
 	// Set up mDNS discovery if enabled
 	if cfg.Network.EnableMDNS {
 		rendezvous := mdnsServiceName(cfg.Node.Project)
@@ -64,9 +99,49 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 	return p2pHost, nil
 }
 
+// connectBootstrapPeers connects to the default IPFS DHT bootstrap nodes.
+func (p *P2PHost) connectBootstrapPeers(ctx context.Context) {
+	bootstrapPeers := dht.DefaultBootstrapPeers
+	for _, addr := range bootstrapPeers {
+		pi, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			continue
+		}
+		if err := p.host.Connect(ctx, *pi); err != nil {
+			log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("failed to connect to bootstrap peer")
+		} else {
+			log.Debug().Str("peer", pi.ID.String()).Msg("connected to bootstrap peer")
+		}
+	}
+}
+
+// connectConfiguredPeers connects to peers listed in the config.
+func (p *P2PHost) connectConfiguredPeers(ctx context.Context) {
+	for _, addrStr := range p.config.Network.BootstrapPeers {
+		addr, err := multiaddr.NewMultiaddr(addrStr)
+		if err != nil {
+			log.Warn().Err(err).Str("addr", addrStr).Msg("invalid bootstrap peer address")
+			continue
+		}
+		pi, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			log.Warn().Err(err).Str("addr", addrStr).Msg("failed to parse bootstrap peer")
+			continue
+		}
+		if err := p.host.Connect(ctx, *pi); err != nil {
+			log.Warn().Err(err).Str("peer", pi.ID.String()).Msg("failed to connect to configured peer")
+		} else {
+			log.Info().Str("peer", pi.ID.String()).Msg("connected to configured peer")
+		}
+	}
+}
+
 func (p *P2PHost) Close() error {
 	if p.mdnsService != nil {
 		p.mdnsService.Close()
+	}
+	if p.dht != nil {
+		p.dht.Close()
 	}
 	return p.host.Close()
 }

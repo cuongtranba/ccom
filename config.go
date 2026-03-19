@@ -34,6 +34,7 @@ type NodeConfigNetwork struct {
 	BootstrapPeers []string `yaml:"bootstrap_peers"`
 	EnableMDNS     bool     `yaml:"enable_mdns"`
 	EnableDHT      bool     `yaml:"enable_dht"`
+	EnableRelay    bool     `yaml:"enable_relay"`
 }
 
 type NodeConfigMembership struct {
@@ -92,6 +93,7 @@ func DefaultNodeConfig() *NodeConfig {
 			BootstrapPeers: []string{},
 			EnableMDNS:     true,
 			EnableDHT:      true,
+			EnableRelay:    true,
 		},
 		Security: NodeConfigSecurity{
 			MaxMessageRate:   100,
