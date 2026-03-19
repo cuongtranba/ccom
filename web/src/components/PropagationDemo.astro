@@ -1,0 +1,103 @@
+---
+---
+
+<div class="network-demo">
+  <canvas id="propagation-viz" width="550" height="550"></canvas>
+
+  <div class="demo-panel">
+    <div class="demo-buttons">
+      <button class="demo-btn" data-action="verify">verify all</button>
+      <button class="demo-btn" data-action="change">PM changes story</button>
+      <button class="demo-btn" data-action="reverify">re-verify chain</button>
+      <button class="demo-btn" data-action="reset">reset</button>
+    </div>
+    <pre class="demo-terminal" id="demo-output"><span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>
+<span class="out">ID        NAME              VERTICAL  OWNER
+0fb8353f  Dev Inventory     dev       cuong
+de061a81  PM Inventory      pm        duke
+5447c4b6  Design Inventory  design    may</span>
+
+<span class="prompt">$</span> <span class="cmd">inv item list --node 0fb8353f</span>
+<span class="out">ID        KIND      TITLE                    STATUS</span>
+<span class="out">e8def515  api-spec  API-001: POST /check-in  </span><span class="s-proven">proven</span>
+<span class="out">c65ae3eb  adr       ADR-001: WebSocket sync  </span><span class="s-proven">proven</span>
+
+<span class="prompt">$</span> <span class="cmd">_</span></pre>
+  </div>
+</div>
+
+<script>
+  import '../scripts/propagation-demo.ts';
+</script>
+
+<style>
+  .network-demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2rem, 4vw, 5rem);
+    align-items: start;
+    margin-top: 3rem;
+  }
+
+  #propagation-viz {
+    width: 100%;
+    aspect-ratio: 1;
+    max-width: 550px;
+  }
+
+  .demo-panel {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
+  .demo-terminal {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+
+  .demo-terminal :global(.cmd) { color: var(--signal-pulse); }
+  .demo-terminal :global(.out) { color: var(--text-muted); }
+  .demo-terminal :global(.s-proven) { color: var(--proven); }
+  .demo-terminal :global(.s-suspect) { color: var(--suspect); }
+  .demo-terminal :global(.s-broke) { color: var(--broke); }
+  .demo-terminal :global(.prompt) { color: var(--text-muted); }
+
+  .demo-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--trace-line);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .demo-btn:hover {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  @media (max-width: 768px) {
+    .network-demo { grid-template-columns: 1fr; }
+    #propagation-viz { max-width: 100%; }
+  }
+</style>

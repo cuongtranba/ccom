@@ -1,0 +1,156 @@
+---
+import Base from '../layouts/Base.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+import StateMachine from '../components/StateMachine.astro';
+import PropagationDemo from '../components/PropagationDemo.astro';
+import VotingCard from '../components/VotingCard.astro';
+import ArchGrid from '../components/ArchGrid.astro';
+---
+
+<Base title="Inventory Network — A Living Protocol">
+
+  <!-- HERO -->
+  <section class="hero">
+    <p class="hero-eyebrow">Inventory Network Protocol v1.0</p>
+    <h1 class="hero-title">
+      Each team owns its <span class="highlight">source of truth.</span>
+      The network keeps them <span class="highlight">alive.</span>
+    </h1>
+    <p class="hero-sub">
+      A distributed protocol where inventories are nodes, traces are synapses,
+      and signals propagate change across teams — automatically.
+      Human and AI agents participate as equals.
+    </p>
+  </section>
+
+  <!-- STATE MACHINE -->
+  <section class="section">
+    <SectionHeader
+      label="01 — The Lifecycle"
+      title="Every item has a pulse"
+      description="Items enter as unverified. Evidence makes them proven. When upstream changes, they become suspect — automatically. Click a state to see the transitions fire."
+    />
+    <StateMachine />
+  </section>
+
+  <!-- NEURAL PROPAGATION -->
+  <section class="section">
+    <SectionHeader
+      label="02 — Neural Propagation"
+      title="Change one node. Watch the network respond."
+      description="When PM updates a user story, signals travel through traces and automatically mark affected items in Design and Dev as suspect. Like neurons firing across synapses."
+    />
+    <PropagationDemo />
+  </section>
+
+  <!-- VOTING -->
+  <section class="section">
+    <SectionHeader
+      label="03 — Consensus"
+      title="Nodes vote. AI participates as an equal."
+      description="When a change crosses inventory boundaries, affected nodes vote. AI agents vote alongside humans — with reasons, not just rubber stamps."
+    />
+    <VotingCard />
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="section">
+    <SectionHeader
+      label="04 — Architecture"
+      title="Three layers. One protocol."
+    />
+    <ArchGrid />
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <SectionHeader
+      label="05 — Start"
+      title="Own your inventory."
+      description="Each team decides its own structure, its own workflow. The protocol handles the connections."
+    />
+    <div class="cta-install" id="cta-install">
+      <span class="dollar">$</span> go install github.com/cuongtran/my-inventory@latest
+    </div>
+  </section>
+
+</Base>
+
+<script>
+  document.getElementById('cta-install')?.addEventListener('click', () => {
+    navigator.clipboard.writeText('go install github.com/cuongtran/my-inventory@latest');
+  });
+</script>
+
+<style>
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 clamp(2rem, 8vw, 10rem);
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: clamp(0.7rem, 1vw, 0.85rem);
+    font-weight: 300;
+    color: var(--signal-pulse);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.3s forwards;
+  }
+
+  .hero-title {
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    max-width: 14ch;
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.5s forwards;
+  }
+
+  .hero-title .highlight { color: var(--proven); }
+
+  .hero-sub {
+    font-size: clamp(1rem, 1.8vw, 1.35rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 50ch;
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.7s forwards;
+  }
+
+  .section {
+    padding: clamp(4rem, 10vh, 8rem) clamp(2rem, 8vw, 10rem);
+  }
+
+  .cta-section {
+    padding: clamp(6rem, 15vh, 12rem) clamp(2rem, 8vw, 10rem);
+  }
+
+  .cta-install {
+    font-family: var(--font-mono);
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    padding: 1rem 2rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--trace-line);
+    border-radius: 6px;
+    color: var(--signal-pulse);
+    display: inline-block;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .cta-install:hover {
+    border-color: var(--signal-pulse);
+    box-shadow: 0 0 20px color-mix(in oklch, var(--signal-pulse) 10%, transparent);
+  }
+
+  .cta-install .dollar { color: var(--text-muted); }
+</style>

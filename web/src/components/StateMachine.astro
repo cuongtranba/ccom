@@ -1,0 +1,153 @@
+---
+---
+
+<div class="state-machine" id="state-machine-viz">
+  <svg id="state-arrows" viewBox="0 0 900 400" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="var(--trace-line)" />
+      </marker>
+      <marker id="arrowhead-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="var(--signal-pulse)" />
+      </marker>
+    </defs>
+    <path id="arrow-verify" class="transition-arrow" d="M 165 185 C 200 80, 330 40, 395 65" />
+    <text class="transition-label" x="240" y="95">verify</text>
+    <path id="arrow-suspect" class="transition-arrow" d="M 520 75 C 600 80, 680 140, 700 185" />
+    <text class="transition-label" x="620" y="110">signal</text>
+    <path id="arrow-reverify" class="transition-arrow" d="M 680 220 C 650 160, 560 100, 500 80" />
+    <text class="transition-label" x="610" y="155">re-verify</text>
+    <path id="arrow-break" class="transition-arrow" d="M 715 220 C 720 280, 600 340, 520 345" />
+    <text class="transition-label" x="650" y="300">break</text>
+    <path id="arrow-fix" class="transition-arrow" d="M 395 340 C 300 320, 330 200, 390 80" />
+    <text class="transition-label" x="310" y="230">fix</text>
+  </svg>
+
+  <div class="state-node" data-state="unverified">unverified</div>
+  <div class="state-node" data-state="proven">proven</div>
+  <div class="state-node" data-state="suspect">suspect</div>
+  <div class="state-node" data-state="broke">broke</div>
+</div>
+
+<script>
+  const transitions: Record<string, [string, string]> = {
+    unverified: ['arrow-verify', 'proven'],
+    proven: ['arrow-suspect', 'suspect'],
+    suspect: ['arrow-break', 'broke'],
+    broke: ['arrow-fix', 'proven'],
+  };
+
+  document.querySelectorAll<HTMLElement>('.state-node').forEach(node => {
+    node.addEventListener('click', () => {
+      const state = node.dataset.state!;
+      const allNodes = document.querySelectorAll<HTMLElement>('.state-node');
+      const allArrows = document.querySelectorAll<SVGPathElement>('.transition-arrow');
+
+      allNodes.forEach(n => n.classList.remove('active'));
+      allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
+
+      node.classList.add('active');
+
+      const [arrowId, targetState] = transitions[state];
+      const arrow = document.getElementById(arrowId) as SVGPathElement | null;
+
+      setTimeout(() => {
+        if (arrow) {
+          arrow.classList.add('active');
+          arrow.style.markerEnd = 'url(#arrowhead-active)';
+        }
+      }, 200);
+
+      setTimeout(() => {
+        document.querySelector<HTMLElement>(`[data-state="${targetState}"]`)?.classList.add('active');
+      }, 600);
+
+      setTimeout(() => {
+        allNodes.forEach(n => n.classList.remove('active'));
+        allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
+      }, 2000);
+    });
+  });
+</script>
+
+<style>
+  .state-machine {
+    width: 100%;
+    max-width: 900px;
+    height: 400px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  #state-arrows {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .transition-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    fill: var(--text-muted);
+  }
+
+  .transition-arrow {
+    stroke: var(--trace-line);
+    stroke-width: 1.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+
+  .transition-arrow.active {
+    stroke: var(--signal-pulse);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 6px var(--signal-pulse));
+  }
+
+  .state-node {
+    position: absolute;
+    padding: 1rem 1.8rem;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+    user-select: none;
+  }
+
+  .state-node:hover { transform: scale(1.08); }
+  .state-node.active {
+    transform: scale(1.15);
+    box-shadow: 0 0 40px color-mix(in oklch, currentColor 30%, transparent);
+  }
+
+  [data-state="unverified"] {
+    background: color-mix(in oklch, var(--unverified) 15%, var(--bg-surface));
+    border: 1.5px solid var(--unverified);
+    color: var(--unverified);
+    left: 5%; top: 45%;
+  }
+
+  [data-state="proven"] {
+    background: color-mix(in oklch, var(--proven) 15%, var(--bg-surface));
+    border: 1.5px solid var(--proven);
+    color: var(--proven);
+    left: 42%; top: 10%;
+    box-shadow: 0 0 30px color-mix(in oklch, var(--proven-glow) 20%, transparent);
+  }
+
+  [data-state="suspect"] {
+    background: color-mix(in oklch, var(--suspect) 15%, var(--bg-surface));
+    border: 1.5px solid var(--suspect);
+    color: var(--suspect);
+    left: 75%; top: 45%;
+  }
+
+  [data-state="broke"] {
+    background: color-mix(in oklch, var(--broke) 15%, var(--bg-surface));
+    border: 1.5px solid var(--broke);
+    color: var(--broke);
+    left: 42%; top: 80%;
+  }
+</style>

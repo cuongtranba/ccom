@@ -1,0 +1,115 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	pumped "github.com/pumped-fn/pumped-go"
+	"github.com/rs/zerolog"
+)
+
+type AppConfig struct {
+	DBPath      string
+	Project     string
+	SystemLevel zerolog.Level
+	AgentLevel  zerolog.Level
+}
+
+var Config = pumped.Provide(func(ctx *pumped.ResolveCtx) (*AppConfig, error) {
+	return &AppConfig{
+		DBPath:      "inventory.db",
+		Project:     "clinic-checkin",
+		SystemLevel: zerolog.InfoLevel,
+		AgentLevel:  zerolog.InfoLevel,
+	}, nil
+})
+
+var SystemLog = pumped.Derive1(
+	Config,
+	func(ctx *pumped.ResolveCtx, cfgCtrl *pumped.Controller[*AppConfig]) (*zerolog.Logger, error) {
+		cfg, err := cfgCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config: %w", err)
+		}
+		logger := zerolog.New(os.Stderr).With().Timestamp().Str("source", "system").Logger().Level(cfg.SystemLevel)
+		return &logger, nil
+	},
+)
+
+var AgentLog = pumped.Derive1(
+	Config,
+	func(ctx *pumped.ResolveCtx, cfgCtrl *pumped.Controller[*AppConfig]) (*zerolog.Logger, error) {
+		cfg, err := cfgCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config: %w", err)
+		}
+		logger := zerolog.New(os.Stdout).With().Str("source", "agent").Logger().Level(cfg.AgentLevel)
+		return &logger, nil
+	},
+)
+
+var DBStore = pumped.Derive1(
+	Config,
+	func(ctx *pumped.ResolveCtx, cfgCtrl *pumped.Controller[*AppConfig]) (*Store, error) {
+		cfg, err := cfgCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config: %w", err)
+		}
+
+		store, err := NewStore(cfg.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open store: %w", err)
+		}
+
+		ctx.OnCleanup(func() error {
+			return store.Close()
+		})
+
+		return store, nil
+	},
+)
+
+var ItemStateMachine = pumped.Provide(func(ctx *pumped.ResolveCtx) (*StateMachine, error) {
+	return NewStateMachine(), nil
+})
+
+var CRStateMachineExec = pumped.Provide(func(ctx *pumped.ResolveCtx) (*CRStateMachine, error) {
+	return NewCRStateMachine(), nil
+})
+
+var Propagator = pumped.Derive2(
+	DBStore,
+	ItemStateMachine,
+	func(ctx *pumped.ResolveCtx, storeCtrl *pumped.Controller[*Store], smCtrl *pumped.Controller[*StateMachine]) (*SignalPropagator, error) {
+		store, err := storeCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get store: %w", err)
+		}
+		sm, err := smCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get state machine: %w", err)
+		}
+		return NewSignalPropagator(store, sm), nil
+	},
+)
+
+var NetworkEngine = pumped.Derive3(
+	DBStore,
+	Propagator,
+	CRStateMachineExec,
+	func(ctx *pumped.ResolveCtx, storeCtrl *pumped.Controller[*Store], propCtrl *pumped.Controller[*SignalPropagator], crsmCtrl *pumped.Controller[*CRStateMachine]) (*Engine, error) {
+		store, err := storeCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get store: %w", err)
+		}
+		prop, err := propCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get propagator: %w", err)
+		}
+		crsm, err := crsmCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get CR state machine: %w", err)
+		}
+		return NewEngine(store, prop, crsm), nil
+	},
+)

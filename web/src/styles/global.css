@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: oklch(0.12 0.01 260);
+  --bg-surface: oklch(0.16 0.01 260);
+  --bg-elevated: oklch(0.20 0.015 260);
+  --border-subtle: oklch(0.25 0.01 260);
+  --border-hover: oklch(0.35 0.02 260);
+
+  --text-primary: oklch(0.92 0.01 80);
+  --text-secondary: oklch(0.65 0.01 260);
+  --text-muted: oklch(0.45 0.01 260);
+
+  --proven: oklch(0.75 0.15 85);
+  --proven-glow: oklch(0.65 0.18 85);
+  --suspect: oklch(0.70 0.18 25);
+  --suspect-glow: oklch(0.60 0.22 25);
+  --broke: oklch(0.65 0.20 15);
+  --unverified: oklch(0.65 0.08 250);
+  --unverified-glow: oklch(0.55 0.10 250);
+
+  --signal-pulse: oklch(0.80 0.14 145);
+  --trace-line: oklch(0.30 0.02 260);
+  --trace-active: oklch(0.50 0.08 145);
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-display);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

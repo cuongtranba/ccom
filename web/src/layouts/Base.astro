@@ -1,0 +1,40 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Inventory Network — A distributed protocol where inventories are nodes, traces are synapses, and signals propagate change across teams." />
+    <title>{title}</title>
+  </head>
+  <body>
+    <canvas id="network-canvas"></canvas>
+    <div class="content-layer">
+      <slot />
+    </div>
+    <script>
+      import '../scripts/background-network.ts';
+    </script>
+  </body>
+</html>
+
+<style>
+  #network-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  .content-layer {
+    position: relative;
+    z-index: 1;
+  }
+</style>

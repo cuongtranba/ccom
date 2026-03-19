@@ -1,0 +1,97 @@
+---
+interface Vote {
+  node: string;
+  icon: string;
+  iconColor?: string;
+  reason: string;
+  isAI?: boolean;
+}
+
+const votes: Vote[] = [
+  { node: 'Dev Node', icon: '✎', reason: 'proposed' },
+  { node: 'PM Node', icon: '✓', iconColor: 'var(--proven)', reason: 'Aligns with mobile check-in epic' },
+  { node: 'Design Node', icon: '↻', iconColor: 'var(--suspect)', reason: 'Need loading state for async — creating screen spec', isAI: true },
+  { node: 'QA Node', icon: '✓', iconColor: 'var(--proven)', reason: 'Can update test suites, no breaking changes', isAI: true },
+  { node: 'DevOps Node', icon: '✓', iconColor: 'var(--proven)', reason: 'Monitoring covers async patterns' },
+];
+---
+
+<div class="cr-card">
+  <div class="cr-header">
+    <span class="cr-badge">VOTING</span>
+    <span class="cr-title-text">CR-042: Change check-in API from sync to async</span>
+  </div>
+  {votes.map(v => (
+    <div class="vote-row">
+      <span class="vote-node">{v.node}</span>
+      <span class="vote-icon" style={v.iconColor ? `color: ${v.iconColor}` : ''}>{v.icon}</span>
+      <span class="vote-reason">{v.reason}</span>
+      {v.isAI && <span class="vote-ai-tag">AI</span>}
+    </div>
+  ))}
+</div>
+
+<style>
+  .cr-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: clamp(2rem, 3vw, 3rem);
+    max-width: 700px;
+    margin: 3rem 0;
+  }
+
+  .cr-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .cr-badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    font-weight: 500;
+    background: color-mix(in oklch, var(--proven) 15%, transparent);
+    color: var(--proven);
+    border: 1px solid color-mix(in oklch, var(--proven) 30%, transparent);
+  }
+
+  .cr-title-text { font-size: 1.1rem; font-weight: 500; }
+
+  .vote-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid oklch(0.22 0.01 260);
+    font-size: 0.9rem;
+  }
+
+  .vote-node {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 120px;
+  }
+
+  .vote-icon { font-size: 1rem; }
+
+  .vote-reason {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .vote-ai-tag {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    padding: 0.15rem 0.4rem;
+    background: color-mix(in oklch, var(--signal-pulse) 10%, transparent);
+    color: var(--signal-pulse);
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+  }
+</style>

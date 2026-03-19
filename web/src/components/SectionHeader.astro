@@ -1,0 +1,41 @@
+---
+interface Props {
+  label: string;
+  title: string;
+  description?: string;
+}
+
+const { label, title, description } = Astro.props;
+---
+
+<div class="section-header">
+  <p class="section-label">{label}</p>
+  <h2 class="section-title">{title}</h2>
+  {description && <p class="section-desc">{description}</p>}
+</div>
+
+<style>
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+
+  .section-desc {
+    font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+    color: var(--text-secondary);
+    max-width: 55ch;
+    margin-bottom: clamp(3rem, 5vh, 5rem);
+    font-weight: 300;
+  }
+</style>
