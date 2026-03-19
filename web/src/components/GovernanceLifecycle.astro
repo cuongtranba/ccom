@@ -235,65 +235,6 @@ Status: </span><span class="s-muted">DRAFT</span>
     color: var(--text-muted);
   }
 
-  /* ---- Terminal panel ---- */
-  .demo-panel {
-    padding: clamp(1.5rem, 3vw, 2.5rem);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-  }
-
-  .demo-terminal {
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    line-height: 1.8;
-    color: var(--text-secondary);
-    white-space: pre-wrap;
-    margin: 0;
-    background: none;
-    border: none;
-  }
-
-  .demo-terminal :global(.cmd) { color: var(--signal-pulse); }
-  .demo-terminal :global(.out) { color: var(--text-muted); }
-  .demo-terminal :global(.s-proven) { color: var(--proven); }
-  .demo-terminal :global(.s-suspect) { color: var(--suspect); }
-  .demo-terminal :global(.s-muted) { color: var(--text-muted); }
-  .demo-terminal :global(.prompt) { color: var(--text-muted); }
-
-  .demo-buttons {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-  }
-
-  .demo-btn {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--trace-line);
-    border-radius: 4px;
-    background: var(--bg-deep);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    letter-spacing: 0.02em;
-  }
-
-  .demo-btn:hover {
-    border-color: var(--signal-pulse);
-    color: var(--signal-pulse);
-    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
-  }
-
-  .demo-btn.active {
-    border-color: var(--signal-pulse);
-    color: var(--signal-pulse);
-    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
-    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
-  }
-
   @media (max-width: 768px) {
     .governance-demo { grid-template-columns: 1fr; }
   }

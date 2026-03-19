@@ -1,3 +1,14 @@
+import {
+  type ActiveSignal,
+  createCssVarReader,
+  createSandSignal,
+  renderSignals,
+  resolveStatusColor,
+  setupCanvasHover,
+  calcSmoothScale,
+  setupDemoButtons,
+} from './demo-utils';
+
 interface DemoNode {
   id: string;
   label: string;
@@ -5,6 +16,8 @@ interface DemoNode {
   x: number;
   y: number;
   status: string;
+  prevStatus: string;
+  pulse: number;
 }
 
 interface DemoTrace {
@@ -12,40 +25,18 @@ interface DemoTrace {
   to: string;
 }
 
-interface SandParticle {
-  progress: number;
-  speed: number;
-  offsetX: number;
-  offsetY: number;
-  size: number;
-  opacity: number;
-}
-
-interface ActiveSignal {
-  from: string;
-  to: string;
-  particles: SandParticle[];
-  done: boolean;
-  onArrive: (() => void) | null;
-  arrived: boolean;
-}
-
 const propCanvas = document.getElementById('propagation-viz') as HTMLCanvasElement | null;
 if (propCanvas) {
   const pCtx = propCanvas.getContext('2d')!;
-
-  const rootStyles = getComputedStyle(document.documentElement);
-  function cssVar(name: string): string {
-    return rootStyles.getPropertyValue(name).trim();
-  }
+  const cssVar = createCssVarReader();
 
   const demoNodes: DemoNode[] = [
-    { id: 'pm-us001', label: 'US-001', vertical: 'PM', x: 275, y: 60, status: 'unverified' },
-    { id: 'des-s001', label: 'S-001', vertical: 'Design', x: 120, y: 220, status: 'unverified' },
-    { id: 'des-s002', label: 'S-002', vertical: 'Design', x: 430, y: 220, status: 'unverified' },
-    { id: 'dev-api', label: 'API-001', vertical: 'Dev', x: 160, y: 400, status: 'unverified' },
-    { id: 'dev-adr', label: 'ADR-001', vertical: 'Dev', x: 390, y: 400, status: 'unverified' },
-    { id: 'qa-tc', label: 'TC-101', vertical: 'QA', x: 275, y: 510, status: 'unverified' },
+    { id: 'pm-us001', label: 'US-001', vertical: 'PM', x: 275, y: 60, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'des-s001', label: 'S-001', vertical: 'Design', x: 120, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'des-s002', label: 'S-002', vertical: 'Design', x: 430, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'dev-api', label: 'API-001', vertical: 'Dev', x: 160, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'dev-adr', label: 'ADR-001', vertical: 'Dev', x: 390, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'qa-tc', label: 'TC-101', vertical: 'QA', x: 275, y: 510, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
   ];
 
   const demoTraces: DemoTrace[] = [
@@ -61,39 +52,17 @@ if (propCanvas) {
 
   function getNode(id: string) { return demoNodes.find(n => n.id === id)!; }
 
-  function createSandSignal(from: string, to: string, onArrive: (() => void) | null): ActiveSignal {
-    const particles: SandParticle[] = Array.from({ length: 10 }, () => ({
-      progress: -(Math.random() * 0.15),
-      speed: 0.012 + (Math.random() - 0.5) * 0.004,
-      offsetX: (Math.random() - 0.5) * 6,
-      offsetY: (Math.random() - 0.5) * 6,
-      size: 1.5 + Math.random() * 1.5,
-      opacity: 0.6 + Math.random() * 0.4,
-    }));
-    return { from, to, particles, done: false, onArrive, arrived: false };
-  }
+  // Node dimensions matching StateMachine's rounded-rectangle style
+  const NODE_W = 88;
+  const NODE_H = 40;
+  const NODE_R = 6;
 
-  function statusColor(status: string): string {
-    switch (status) {
-      case 'proven': return cssVar('--proven');
-      case 'suspect': return cssVar('--suspect');
-      case 'broke': return cssVar('--broke');
-      default: return cssVar('--unverified');
-    }
-  }
-
-  function drawOrganicCircle(cx: number, cy: number, radius: number, segments: number = 24) {
+  function drawNodeRect(cx: number, cy: number): void {
     pCtx.beginPath();
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const wobble = radius + (Math.sin(angle * 5 + cx) * 1.2);
-      const px = cx + Math.cos(angle) * wobble;
-      const py = cy + Math.sin(angle) * wobble;
-      if (i === 0) pCtx.moveTo(px, py);
-      else pCtx.lineTo(px, py);
-    }
-    pCtx.closePath();
+    pCtx.roundRect(cx - NODE_W / 2, cy - NODE_H / 2, NODE_W, NODE_H, NODE_R);
   }
+
+  const { getHoveredId, hoverScales } = setupCanvasHover(propCanvas, demoNodes, NODE_W, NODE_H);
 
   function drawLoop() {
     const w = propCanvas!.width;
@@ -113,89 +82,74 @@ if (propCanvas) {
     }
     pCtx.globalAlpha = 1.0;
 
-    activeSignals = activeSignals.filter(s => !s.done);
-    const signalColor = cssVar('--signal-pulse');
-
-    for (const s of activeSignals) {
-      const fromNode = getNode(s.from);
-      const toNode = getNode(s.to);
-      let allDone = true;
-
-      for (const p of s.particles) {
-        p.progress += p.speed;
-        if (p.progress < 0 || p.progress > 1) {
-          if (p.progress < 1) allDone = false;
-          continue;
-        }
-        allDone = false;
-
-        const x = fromNode.x + (toNode.x - fromNode.x) * p.progress + p.offsetX;
-        const y = fromNode.y + (toNode.y - fromNode.y) * p.progress + p.offsetY;
-
-        const fadeOut = p.progress > 0.8 ? (1.0 - p.progress) / 0.2 : 1.0;
-        const alpha = p.opacity * fadeOut;
-
-        pCtx.globalAlpha = alpha;
-        pCtx.fillStyle = signalColor;
-        pCtx.shadowBlur = 8;
-        pCtx.shadowColor = signalColor;
-        pCtx.beginPath();
-        pCtx.arc(x, y, p.size, 0, Math.PI * 2);
-        pCtx.fill();
-      }
-
-      pCtx.shadowBlur = 0;
-      pCtx.globalAlpha = 1.0;
-
-      if (!s.arrived && s.particles.some(p => p.progress >= 0.85)) {
-        s.arrived = true;
-        if (s.onArrive) {
-          s.onArrive();
-          s.onArrive = null;
-        }
-      }
-
-      if (allDone) s.done = true;
-    }
+    activeSignals = renderSignals(pCtx, activeSignals, id => getNode(id), cssVar('--signal-pulse'));
 
     for (const n of demoNodes) {
-      const color = statusColor(n.status);
+      // State change pulse
+      if (n.status !== n.prevStatus) {
+        n.pulse = 1.0;
+        n.prevStatus = n.status;
+      }
+      if (n.pulse > 0) n.pulse = Math.max(0, n.pulse - 0.03);
 
-      // Fill & stroke
-      pCtx.globalAlpha = 0.1;
+      const scale = calcSmoothScale(n.id, n.id === getHoveredId(), n.pulse, hoverScales);
+
+      if (Math.abs(scale - 1.0) > 0.001) {
+        pCtx.save();
+        pCtx.translate(n.x, n.y);
+        pCtx.scale(scale, scale);
+        pCtx.translate(-n.x, -n.y);
+      }
+
+      const color = resolveStatusColor(cssVar, n.status);
+
+      // Background: bg-surface base + status color overlay (replicates color-mix)
+      pCtx.fillStyle = cssVar('--bg-surface');
+      drawNodeRect(n.x, n.y);
+      pCtx.fill();
+
+      pCtx.globalAlpha = 0.15;
       pCtx.fillStyle = color;
-      drawOrganicCircle(n.x, n.y, 34);
+      drawNodeRect(n.x, n.y);
       pCtx.fill();
       pCtx.globalAlpha = 1.0;
+
+      // Border — 1.5px matching StateMachine
       pCtx.strokeStyle = color;
-      pCtx.lineWidth = 2;
-      drawOrganicCircle(n.x, n.y, 34);
+      pCtx.lineWidth = 1.5;
+      drawNodeRect(n.x, n.y);
       pCtx.stroke();
 
-      // Glow for proven
+      // Proven glow using --proven-glow token
       if (n.status === 'proven') {
-        pCtx.shadowBlur = 18;
-        pCtx.shadowColor = color;
-        drawOrganicCircle(n.x, n.y, 34);
+        pCtx.shadowBlur = 25;
+        pCtx.shadowColor = cssVar('--proven-glow');
+        drawNodeRect(n.x, n.y);
         pCtx.stroke();
         pCtx.shadowBlur = 0;
       }
 
-      // Node label (e.g. US-001)
-      pCtx.fillStyle = cssVar('--text-primary');
-      pCtx.font = '500 13px "JetBrains Mono", monospace';
+      // Label — status color to match StateMachine
+      pCtx.fillStyle = color;
+      pCtx.font = '500 14px "JetBrains Mono", monospace';
       pCtx.textAlign = 'center';
-      pCtx.fillText(n.label, n.x, n.y - 6);
+      pCtx.textBaseline = 'middle';
+      pCtx.fillText(n.label, n.x, n.y);
 
-      // Vertical label (e.g. PM, Design)
-      pCtx.fillStyle = cssVar('--text-secondary');
-      pCtx.font = '400 10px "Space Grotesk", sans-serif';
-      pCtx.fillText(n.vertical, n.x, n.y + 10);
+      // Vertical label above node
+      pCtx.textBaseline = 'alphabetic';
+      pCtx.fillStyle = cssVar('--text-muted');
+      pCtx.font = '500 11px "JetBrains Mono", monospace';
+      pCtx.fillText(n.vertical, n.x, n.y - NODE_H / 2 - 8);
 
       // Status label below node
-      pCtx.fillStyle = cssVar('--text-secondary');
+      pCtx.fillStyle = color;
       pCtx.font = '500 11px "JetBrains Mono", monospace';
-      pCtx.fillText(n.status, n.x, n.y + 54);
+      pCtx.fillText(n.status, n.x, n.y + NODE_H / 2 + 16);
+
+      if (Math.abs(scale - 1.0) > 0.001) {
+        pCtx.restore();
+      }
     }
 
     requestAnimationFrame(drawLoop);
@@ -207,7 +161,7 @@ if (propCanvas) {
 
   function runDemo(action: string) {
     if (action === 'reset') {
-      demoNodes.forEach(n => n.status = 'unverified');
+      demoNodes.forEach(n => { n.status = 'unverified'; n.prevStatus = 'unverified'; n.pulse = 0; });
       activeSignals = [];
       output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>\n<span class="out">ID        NAME              VERTICAL  OWNER\n0fb8353f  Dev Inventory     dev       cuong\nde061a81  PM Inventory      pm        duke\n5447c4b6  Design Inventory  design    may</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
       return;
@@ -261,13 +215,6 @@ if (propCanvas) {
 
   const demoContainer = propCanvas.closest('.network-demo');
   if (demoContainer) {
-    const allBtns = demoContainer.querySelectorAll<HTMLButtonElement>('.demo-btn[data-action]');
-    allBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        allBtns.forEach(b => b.classList.remove('active'));
-        if (btn.dataset.action !== 'reset') btn.classList.add('active');
-        runDemo(btn.dataset.action!);
-      });
-    });
+    setupDemoButtons(demoContainer, '.demo-btn[data-action]', 'action', runDemo);
   }
 }

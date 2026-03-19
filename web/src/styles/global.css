@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import './demo-shared.css';
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -33,7 +34,10 @@ html { scroll-behavior: smooth; }
 
 body {
   font-family: var(--font-display);
-  background: var(--bg-deep);
+  background:
+    radial-gradient(ellipse 140% 50% at 50% 105%, oklch(0.20 0.07 55 / 0.7) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 85% 15%, oklch(0.16 0.05 50 / 0.3) 0%, transparent 100%),
+    linear-gradient(175deg, oklch(0.10 0.025 55) 0%, oklch(0.15 0.045 58) 100%);
   color: var(--text-primary);
   overflow-x: hidden;
   line-height: 1.6;

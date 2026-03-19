@@ -1,3 +1,5 @@
+import { setupDemoButtons } from './demo-utils';
+
 const humanTerminal = document.getElementById('human-terminal') as HTMLPreElement | null;
 const aiTerminal = document.getElementById('ai-terminal') as HTMLPreElement | null;
 
@@ -94,12 +96,5 @@ if (humanTerminal && aiTerminal) {
     }
   }
 
-  const claudeBtns = document.querySelectorAll<HTMLButtonElement>('[data-claude]');
-  claudeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      claudeBtns.forEach(b => b.classList.remove('active'));
-      if (btn.dataset.claude !== 'reset') btn.classList.add('active');
-      runClaudeDemo(btn.dataset.claude!);
-    });
-  });
+  setupDemoButtons(document, '[data-claude]', 'claude', runClaudeDemo);
 }

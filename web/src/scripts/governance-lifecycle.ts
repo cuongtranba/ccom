@@ -1,3 +1,5 @@
+import { setupDemoButtons } from './demo-utils';
+
 // ---------------------------------------------------------------------------
 // Governance Lifecycle — CR card lifecycle demo
 // Animates a Change Request through 5 stages:
@@ -61,6 +63,7 @@ Status: </span><span class="s-muted">DRAFT</span>
     // Quorum
     quorumEl.classList.remove('visible');
     quorumFill.style.width = '0%';
+    quorumFill.setAttribute('aria-valuenow', '0');
     quorumText.textContent = '0/3 human votes (need >50%)';
 
     // Terminal
@@ -87,6 +90,7 @@ Status: </span><span class="s-muted">DRAFT</span>
     // Show quorum
     quorumEl.classList.add('visible');
     quorumFill.style.width = '0%';
+    quorumFill.setAttribute('aria-valuenow', '0');
     quorumText.textContent = '0/3 human votes (need >50%)';
 
     // Terminal
@@ -108,6 +112,7 @@ Status: </span><span class="s-muted">DRAFT</span>
     lifecycle.classList.remove('approved', 'archived');
     quorumEl.classList.add('visible');
     quorumFill.style.width = '0%';
+    quorumFill.setAttribute('aria-valuenow', '0');
 
     output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv cr vote CR-042 --all</span>
 <span class="out">Broadcasting vote request to all nodes...</span>`;
@@ -155,6 +160,7 @@ Status: </span><span class="s-muted">DRAFT</span>
           humanVotes++;
           const pct = Math.round((humanVotes / totalHuman) * 100);
           quorumFill.style.width = `${pct}%`;
+          quorumFill.setAttribute('aria-valuenow', String(humanVotes));
           quorumText.textContent = `${humanVotes}/${totalHuman} human votes (need >50%)`;
         }
 
@@ -192,6 +198,7 @@ Status: </span><span class="s-muted">DRAFT</span>
     // Quorum — full
     quorumEl.classList.add('visible');
     quorumFill.style.width = '100%';
+    quorumFill.setAttribute('aria-valuenow', '3');
     quorumText.textContent = '3/3 human votes — approved';
 
     // Terminal
@@ -233,13 +240,5 @@ Status: </span><span class="s-muted">DRAFT</span>
     }
   }
 
-  // ---- Button listeners ----
-  const govBtns = document.querySelectorAll<HTMLButtonElement>('[data-gov]');
-  govBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      govBtns.forEach(b => b.classList.remove('active'));
-      if (btn.dataset.gov !== 'reset') btn.classList.add('active');
-      runAction(btn.dataset.gov!);
-    });
-  });
+  setupDemoButtons(document, '[data-gov]', 'gov', runAction);
 }

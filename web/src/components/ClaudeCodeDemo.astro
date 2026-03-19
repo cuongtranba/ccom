@@ -49,7 +49,7 @@
     gap: 0.5rem;
     padding: 0.6rem 1.2rem;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--text-muted);
@@ -58,7 +58,7 @@
   }
 
   .terminal-label-ai {
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     padding: 0.1rem 0.35rem;
     background: color-mix(in oklch, var(--signal-pulse) 15%, transparent);
     color: var(--signal-pulse);
@@ -78,49 +78,12 @@
     color: var(--text-secondary);
   }
 
-  .split-terminal :global(.cmd) { color: var(--signal-pulse); }
-  .split-terminal :global(.out) { color: var(--text-muted); }
-  .split-terminal :global(.s-proven) { color: var(--proven); }
-  .split-terminal :global(.s-suspect) { color: var(--suspect); }
   .split-terminal :global(.event) { color: var(--suspect); }
   .split-terminal :global(.warn) { color: var(--suspect); font-weight: bold; }
-  .split-terminal :global(.prompt) { color: var(--text-muted); }
   .split-terminal :global(.ai-mode) { color: var(--signal-pulse); }
 
   .claude-buttons {
     margin-top: 1.5rem;
-  }
-
-  .demo-buttons {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .demo-btn {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--trace-line);
-    border-radius: 4px;
-    background: var(--bg-deep);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    letter-spacing: 0.02em;
-  }
-
-  .demo-btn:hover {
-    border-color: var(--signal-pulse);
-    color: var(--signal-pulse);
-    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
-  }
-
-  .demo-btn.active {
-    border-color: var(--signal-pulse);
-    color: var(--signal-pulse);
-    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
-    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
   }
 
   @media (max-width: 768px) {

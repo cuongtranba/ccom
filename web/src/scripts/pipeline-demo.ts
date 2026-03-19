@@ -1,3 +1,5 @@
+import { setupDemoButtons } from './demo-utils';
+
 interface CheckItem {
   label: string;
   checked: boolean;
@@ -202,12 +204,5 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
     }
   }
 
-  const pipelineBtns = document.querySelectorAll<HTMLButtonElement>('[data-pipeline]');
-  pipelineBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      pipelineBtns.forEach(b => b.classList.remove('active'));
-      if (btn.dataset.pipeline !== 'reset') btn.classList.add('active');
-      runPipeline(btn.dataset.pipeline!);
-    });
-  });
+  setupDemoButtons(document, '[data-pipeline]', 'pipeline', runPipeline);
 }
