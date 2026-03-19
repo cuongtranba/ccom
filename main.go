@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"strings"
+	"syscall"
+	"text/tabwriter"
+	"time"
 
 	pumped "github.com/pumped-fn/pumped-go"
 	"github.com/rs/zerolog"
@@ -34,6 +39,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	store, err := pumped.Resolve(scope, DBStore)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve store: %v\n", err)
+		os.Exit(1)
+	}
+
+	proposalEng, err := pumped.Resolve(scope, ProposalEngineProvider)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve proposal engine: %v\n", err)
+		os.Exit(1)
+	}
+
+	challengeEng, err := pumped.Resolve(scope, ChallengeEngineProvider)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve challenge engine: %v\n", err)
+		os.Exit(1)
+	}
+
 	root := &cobra.Command{
 		Use:   "inv",
 		Short: "Inventory Network — a distributed inventory protocol for teams and AI agents",
@@ -54,6 +77,12 @@ func main() {
 		sweepCmd(engine, agentLog, sysLog),
 		reconcileCmd(engine, agentLog, sysLog),
 		mcpCmd(scope),
+		initCmd(),
+		serveCmd(scope),
+		networkCmd(engine, store),
+		proposalCmd(store, proposalEng),
+		challengeCmd(store, challengeEng),
+		pairCmd(engine, store, agentLog, sysLog),
 	)
 
 	if err := root.Execute(); err != nil {
@@ -198,17 +227,35 @@ func traceCmd(e *Engine, agentLog, sysLog *zerolog.Logger) *cobra.Command {
 
 	addCmd := &cobra.Command{
 		Use:   "add",
-		Short: "Create a trace between two items",
+		Short: "Create a trace between two items (supports cross-node: peer_id:item_id)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			from, _ := cmd.Flags().GetString("from")
 			to, _ := cmd.Flags().GetString("to")
 			relation, _ := cmd.Flags().GetString("relation")
 			actor, _ := cmd.Flags().GetString("actor")
 
+			// Check for cross-node trace (peer_id:item_id format)
+			var toPeerID string
+			if strings.Contains(to, ":") {
+				parts := strings.SplitN(to, ":", 2)
+				toPeerID = parts[0]
+				to = parts[1]
+			}
+
 			trace, err := e.AddTrace(context.Background(), from, to, TraceRelation(relation), actor)
+			if err != nil && toPeerID != "" {
+				// For cross-node traces, the to_item_id might not exist locally
+				sysLog.Warn().Str("from", from).Str("to_peer", toPeerID).Str("to_item", to).Msg("cross-node trace target not local")
+				fmt.Fprintf(os.Stderr, "Cross-node trace: %s -> %s:%s\n", from[:8], toPeerID[:12]+"...", to[:8])
+				return nil
+			}
 			if err != nil {
 				sysLog.Error().Err(err).Str("from", from).Str("to", to).Msg("failed to add trace")
 				return err
+			}
+
+			if toPeerID != "" {
+				trace.ToPeerID = toPeerID
 			}
 			data, _ := json.Marshal(trace)
 			agentLog.Info().RawJSON("data", data).Str("command", "trace.add").Msg("trace created")
@@ -750,7 +797,848 @@ func mcpCmd(scope *pumped.Scope) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("resolve engine: %w", err)
 			}
-			return serveMCP(engine)
+			store, err := pumped.Resolve(scope, DBStore)
+			if err != nil {
+				return fmt.Errorf("resolve store: %w", err)
+			}
+			challengeEng, err := pumped.Resolve(scope, ChallengeEngineProvider)
+			if err != nil {
+				return fmt.Errorf("resolve challenge engine: %w", err)
+			}
+			return serveMCP(engine, store, challengeEng)
 		},
 	}
+}
+
+func initCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialize a new inv node (generate identity, write config, create database)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name, _ := cmd.Flags().GetString("name")
+			vertical, _ := cmd.Flags().GetString("vertical")
+			project, _ := cmd.Flags().GetString("project")
+			owner, _ := cmd.Flags().GetString("owner")
+			isAI, _ := cmd.Flags().GetBool("ai")
+			mode, _ := cmd.Flags().GetString("mode")
+			fromPeer, _ := cmd.Flags().GetString("from-peer")
+
+			invDir, err := EnsureInvDir()
+			if err != nil {
+				return err
+			}
+
+			keyPath := filepath.Join(invDir, "identity.key")
+			peerIDPath := filepath.Join(invDir, "peer_id")
+			cfgPath := filepath.Join(invDir, "config.yaml")
+
+			fmt.Fprintln(os.Stderr, "\ninv — Inventory Network")
+			fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════")
+
+			fmt.Fprintln(os.Stderr, "\nGenerating Ed25519 keypair...")
+			ident, err := LoadOrCreateIdentity(keyPath, peerIDPath)
+			if err != nil {
+				return fmt.Errorf("identity: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "  Peer ID: %s\n", ident.PeerID)
+			fmt.Fprintf(os.Stderr, "  Key saved: %s (chmod 600)\n", keyPath)
+
+			cfg := DefaultNodeConfig()
+			cfg.Node.Name = name
+			cfg.Node.Vertical = Vertical(vertical)
+			cfg.Node.Project = project
+			cfg.Node.Owner = owner
+			cfg.Node.IsAI = isAI
+			cfg.Node.PermissionMode = PermissionMode(mode)
+
+			// AI nodes default to autonomous mode
+			if isAI && mode == string(PermissionNormal) {
+				cfg.Node.PermissionMode = PermissionAutonomous
+				cfg.Challenges.AutoChallenge = true
+				cfg.Challenges.StaleThreshold = 24 * time.Hour
+			}
+
+			if fromPeer != "" {
+				cfg.Network.BootstrapPeers = []string{fromPeer}
+				fmt.Fprintf(os.Stderr, "\nJoining network via: %s\n", fromPeer)
+				fmt.Fprintln(os.Stderr, "  Status: pending (awaiting approval from existing peers)")
+			}
+
+			if err := WriteNodeConfig(cfgPath, cfg); err != nil {
+				return fmt.Errorf("write config: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "\nConfig written: %s\n", cfgPath)
+
+			// Ensure database exists
+			dbPath := cfg.Database.Path
+			s, err := NewStore(dbPath)
+			if err != nil {
+				return fmt.Errorf("create database: %w", err)
+			}
+			s.Close()
+			fmt.Fprintf(os.Stderr, "Database created: %s\n", dbPath)
+
+			fmt.Fprintln(os.Stderr, "\n═══════════════════════════════════════════════════")
+			fmt.Fprintf(os.Stderr, "  Node:      %s\n", name)
+			fmt.Fprintf(os.Stderr, "  Vertical:  %s\n", vertical)
+			fmt.Fprintf(os.Stderr, "  Project:   %s\n", project)
+			fmt.Fprintf(os.Stderr, "  Owner:     %s\n", owner)
+			if isAI {
+				fmt.Fprintln(os.Stderr, "  AI:        yes (votes are advisory-only)")
+			} else {
+				fmt.Fprintln(os.Stderr, "  AI:        no")
+			}
+			fmt.Fprintf(os.Stderr, "  Mode:      %s\n", cfg.Node.PermissionMode)
+			fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════")
+
+			fmt.Fprintln(os.Stderr, "\nDone! Your node is ready.")
+			fmt.Fprintln(os.Stderr, "\nNext steps:")
+			fmt.Fprintln(os.Stderr, "  inv serve                          # Start P2P node")
+			fmt.Fprintln(os.Stderr, "  inv network peers                  # See who's online")
+
+			return nil
+		},
+	}
+	cmd.Flags().String("name", "", "Node name (e.g., dev-inventory)")
+	cmd.Flags().String("vertical", "dev", "Team role: pm, design, dev, qa, devops")
+	cmd.Flags().String("project", "", "Project name — nodes with same project form a network")
+	cmd.Flags().String("owner", "", "Person or AI agent name responsible for this node")
+	cmd.Flags().Bool("ai", false, "AI agent node (votes advisory-only, doesn't count toward quorum)")
+	cmd.Flags().String("mode", "normal", "Permission mode: normal (AI suggests, human confirms) or autonomous (AI acts freely)")
+	cmd.Flags().String("from-peer", "", "Multiaddr of existing peer to join network")
+	cmd.MarkFlagRequired("name")
+	cmd.MarkFlagRequired("project")
+	cmd.MarkFlagRequired("owner")
+	return cmd
+}
+
+func serveCmd(scope *pumped.Scope) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start P2P node (long-running daemon with P2P host + MCP server)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			port, _ := cmd.Flags().GetInt("port")
+			project, _ := cmd.Flags().GetString("project")
+			mode, _ := cmd.Flags().GetString("mode")
+			autoChallenge, _ := cmd.Flags().GetBool("auto-challenge")
+
+			invDir := InvDirPath()
+			cfgPath := filepath.Join(invDir, "config.yaml")
+			keyPath := filepath.Join(invDir, "identity.key")
+			peerIDPath := filepath.Join(invDir, "peer_id")
+
+			// Load config
+			cfg, err := LoadNodeConfig(cfgPath)
+			if err != nil {
+				cfg = DefaultNodeConfig()
+			}
+			// Apply CLI overrides
+			if port != 0 {
+				cfg.Network.ListenPort = port
+			}
+			if project != "" {
+				cfg.Node.Project = project
+			}
+			if mode != "" {
+				cfg.Node.PermissionMode = PermissionMode(mode)
+			}
+			if autoChallenge {
+				cfg.Challenges.AutoChallenge = true
+			}
+
+			// Load identity
+			ident, err := LoadOrCreateIdentity(keyPath, peerIDPath)
+			if err != nil {
+				return fmt.Errorf("identity: %w", err)
+			}
+
+			// Resolve store from DI
+			store, err := pumped.Resolve(scope, DBStore)
+			if err != nil {
+				return fmt.Errorf("resolve store: %w", err)
+			}
+
+			// Prune old events on startup
+			pruned, pruneErr := store.PruneOldEvents(context.Background(), 7)
+			if pruneErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to prune old events: %v\n", pruneErr)
+			} else if pruned > 0 {
+				fmt.Fprintf(os.Stderr, "pruned %d events older than 7 days\n", pruned)
+			}
+
+			// Start P2P host
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			host, err := NewP2PHost(ctx, ident, cfg, store)
+			if err != nil {
+				return fmt.Errorf("start P2P host: %w", err)
+			}
+			defer host.Close()
+
+			// Set up sender + drain outbox
+			sender := NewP2PSender(host, store)
+			sent, _ := sender.DrainAllOutbox(ctx)
+
+			// Print startup banner
+			printStartupBanner(cfg, ident, host, sent)
+
+			// Block until signal
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+			<-sigCh
+
+			fmt.Fprintf(os.Stderr, "\nShutting down...\n")
+			return nil
+		},
+	}
+	cmd.Flags().Int("port", 0, "Listen port (overrides config)")
+	cmd.Flags().String("project", "", "Project name (overrides config)")
+	cmd.Flags().String("mode", "", "Permission mode: normal or autonomous (overrides config)")
+	cmd.Flags().Bool("auto-challenge", false, "Enable automatic challenges (overrides config)")
+	return cmd
+}
+
+func printStartupBanner(cfg *NodeConfig, ident *NodeIdentity, host *P2PHost, outboxDrained int) {
+	fmt.Fprintf(os.Stderr, "\ninv — Inventory Network\n")
+	fmt.Fprintf(os.Stderr, "═══════════════════════════════════════════════════\n\n")
+
+	fmt.Fprintf(os.Stderr, "  Node:      %s\n", cfg.Node.Name)
+	fmt.Fprintf(os.Stderr, "  Vertical:  %s\n", cfg.Node.Vertical)
+	fmt.Fprintf(os.Stderr, "  Project:   %s\n", cfg.Node.Project)
+	fmt.Fprintf(os.Stderr, "  Owner:     %s\n", cfg.Node.Owner)
+	if cfg.Node.IsAI {
+		fmt.Fprintf(os.Stderr, "  AI:        yes (votes are advisory-only)\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "  AI:        no\n")
+	}
+	fmt.Fprintf(os.Stderr, "  Mode:      %s\n", cfg.Node.PermissionMode)
+
+	fmt.Fprintf(os.Stderr, "\n  Peer ID:   %s\n", ident.PeerID)
+	fmt.Fprintf(os.Stderr, "  Listening: /ip4/0.0.0.0/tcp/%d\n", cfg.Network.ListenPort)
+
+	addrs := host.ShareableAddrs()
+	if len(addrs) > 0 {
+		fmt.Fprintf(os.Stderr, "\n  Share this address with your team:\n")
+		for _, addr := range addrs {
+			fmt.Fprintf(os.Stderr, "    %s\n", addr)
+		}
+		fmt.Fprintf(os.Stderr, "\n  Join command:\n")
+		fmt.Fprintf(os.Stderr, "    inv init --from-peer %s\n", addrs[0])
+	}
+
+	fmt.Fprintf(os.Stderr, "\n═══════════════════════════════════════════════════\n")
+
+	mdnsStatus := "disabled"
+	if cfg.Network.EnableMDNS {
+		mdnsStatus = "enabled"
+	}
+	dhtStatus := "disabled"
+	if cfg.Network.EnableDHT {
+		dhtStatus = "enabled"
+	}
+	fmt.Fprintf(os.Stderr, "  MCP server: stdio (ready for Claude Code)\n")
+	fmt.Fprintf(os.Stderr, "  mDNS:       %s (LAN auto-discovery)\n", mdnsStatus)
+	fmt.Fprintf(os.Stderr, "  DHT:        %s (internet-wide discovery)\n", dhtStatus)
+
+	peerCount := host.ConnectedPeerCount()
+	fmt.Fprintf(os.Stderr, "\n  Peers:      %d connected\n", peerCount)
+	if outboxDrained > 0 {
+		fmt.Fprintf(os.Stderr, "  Outbox:     %d messages delivered on startup\n", outboxDrained)
+	} else {
+		fmt.Fprintf(os.Stderr, "  Outbox:     0 messages queued\n")
+	}
+
+	if cfg.Challenges.AutoChallenge {
+		fmt.Fprintf(os.Stderr, "  Auto-challenge: enabled (stale threshold: %s)\n", cfg.Challenges.StaleThreshold)
+	}
+
+	fmt.Fprintf(os.Stderr, "\nWaiting for connections...\n")
+}
+
+func networkCmd(e *Engine, store *Store) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "network",
+		Short: "Network status, peers, health, and reputation",
+	}
+
+	statusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show node status, connected peers, outbox, governance, reputation",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			project, _ := cmd.Flags().GetString("project")
+
+			peers, err := store.ListPeers(ctx, project)
+			if err != nil {
+				return err
+			}
+
+			outboxDepth, err := store.OutboxDepth(ctx)
+			if err != nil {
+				return err
+			}
+
+			activeProposals, _ := store.ListAllActiveProposals(ctx)
+			activeChallenges, _ := store.ListChallenges(ctx, ChallengeOpen)
+
+			fmt.Fprintf(os.Stderr, "Project:     %s\n", project)
+			fmt.Fprintf(os.Stderr, "Peers:       %d\n", len(peers))
+			for _, p := range peers {
+				status := string(p.Status)
+				rep, _ := store.GetPeerReputation(ctx, p.PeerID)
+				peerIDShort := p.PeerID
+				if len(peerIDShort) > 12 {
+					peerIDShort = peerIDShort[:12] + "..."
+				}
+				fmt.Fprintf(os.Stderr, "  %s (%s) %s rep:%+d\n", p.Name, peerIDShort, status, rep)
+			}
+			fmt.Fprintf(os.Stderr, "Outbox:      %d messages queued\n", outboxDepth)
+			fmt.Fprintf(os.Stderr, "Proposals:   %d active\n", len(activeProposals))
+			fmt.Fprintf(os.Stderr, "Challenges:  %d open\n", len(activeChallenges))
+
+			return nil
+		},
+	}
+	statusCmd.Flags().String("project", "", "Project name")
+	statusCmd.MarkFlagRequired("project")
+
+	peersCmd := &cobra.Command{
+		Use:   "peers",
+		Short: "List discovered peers with reputation scores",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			project, _ := cmd.Flags().GetString("project")
+
+			peers, err := store.ListPeers(ctx, project)
+			if err != nil {
+				return err
+			}
+
+			if len(peers) == 0 {
+				fmt.Fprintln(os.Stderr, "No peers discovered.")
+				return nil
+			}
+
+			w := tabwriter.NewWriter(os.Stderr, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "PEER ID\tNAME\tVERTICAL\tSTATUS\tREPUTATION\tOWNER")
+			for _, p := range peers {
+				rep, _ := store.GetPeerReputation(ctx, p.PeerID)
+				peerIDShort := p.PeerID
+				if len(peerIDShort) > 16 {
+					peerIDShort = peerIDShort[:16] + "..."
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%+d\t%s\n", peerIDShort, p.Name, p.Vertical, p.Status, rep, p.Owner)
+			}
+			w.Flush()
+			return nil
+		},
+	}
+	peersCmd.Flags().String("project", "", "Project name")
+	peersCmd.MarkFlagRequired("project")
+
+	connectCmd := &cobra.Command{
+		Use:   "connect [multiaddr]",
+		Short: "Manually connect to a peer",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintf(os.Stderr, "Connection to %s must be done while `inv serve` is running.\n", args[0])
+			fmt.Fprintln(os.Stderr, "Add the address to bootstrap_peers in config.yaml or use inv init --from-peer.")
+			return nil
+		},
+	}
+
+	healthCmd := &cobra.Command{
+		Use:   "health",
+		Short: "Machine-readable health status (JSON)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			project, _ := cmd.Flags().GetString("project")
+
+			peers, _ := store.ListPeers(ctx, project)
+			outboxDepth, _ := store.OutboxDepth(ctx)
+			activeProposals, _ := store.ListAllActiveProposals(ctx)
+			activeChallenges, _ := store.ListChallenges(ctx, ChallengeOpen)
+
+			approvedCount := 0
+			pendingCount := 0
+			for _, p := range peers {
+				if p.Status == PeerStatusApproved {
+					approvedCount++
+				} else if p.Status == PeerStatusPending {
+					pendingCount++
+				}
+			}
+
+			type HealthStatus struct {
+				ConnectedPeers   int `json:"connected_peers"`
+				PendingPeers     int `json:"pending_peers"`
+				OutboxDepth      int `json:"outbox_depth"`
+				ActiveProposals  int `json:"active_proposals"`
+				ActiveChallenges int `json:"active_challenges"`
+			}
+			health := HealthStatus{
+				ConnectedPeers:   approvedCount,
+				PendingPeers:     pendingCount,
+				OutboxDepth:      outboxDepth,
+				ActiveProposals:  len(activeProposals),
+				ActiveChallenges: len(activeChallenges),
+			}
+			data, _ := json.Marshal(health)
+			fmt.Println(string(data))
+			return nil
+		},
+	}
+	healthCmd.Flags().String("project", "", "Project name")
+	healthCmd.MarkFlagRequired("project")
+
+	reputationCmd := &cobra.Command{
+		Use:   "reputation",
+		Short: "Show peer reputation scores",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			peerID, _ := cmd.Flags().GetString("peer")
+
+			if peerID != "" {
+				score, err := store.GetPeerReputation(ctx, peerID)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Peer %s: reputation %+d\n", peerID, score)
+				return nil
+			}
+
+			project, _ := cmd.Flags().GetString("project")
+			peers, err := store.ListPeers(ctx, project)
+			if err != nil {
+				return err
+			}
+
+			for _, p := range peers {
+				score, _ := store.GetPeerReputation(ctx, p.PeerID)
+				peerIDShort := p.PeerID
+				if len(peerIDShort) > 12 {
+					peerIDShort = peerIDShort[:12] + "..."
+				}
+				fmt.Fprintf(os.Stderr, "  %s (%s): %+d\n", p.Name, peerIDShort, score)
+			}
+			return nil
+		},
+	}
+	reputationCmd.Flags().String("peer", "", "Specific peer ID")
+	reputationCmd.Flags().String("project", "", "Project name")
+
+	cmd.AddCommand(statusCmd, peersCmd, connectCmd, healthCmd, reputationCmd)
+	return cmd
+}
+
+func proposalCmd(store *Store, proposalEngine *ProposalEngine) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "proposal",
+		Short: "Manage governance proposals (create, vote, status)",
+	}
+
+	createCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a new proposal for cross-node governance",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			kind, _ := cmd.Flags().GetString("kind")
+			title, _ := cmd.Flags().GetString("title")
+			desc, _ := cmd.Flags().GetString("description")
+			proposer, _ := cmd.Flags().GetString("proposer")
+			owner, _ := cmd.Flags().GetString("owner")
+			affected, _ := cmd.Flags().GetString("affected")
+			hours, _ := cmd.Flags().GetInt("deadline-hours")
+
+			var items []string
+			if affected != "" {
+				items = strings.Split(affected, ",")
+			}
+
+			prop := &Proposal{
+				Kind:          ProposalKind(kind),
+				Title:         title,
+				Description:   desc,
+				ProposerPeer:  proposer,
+				ProposerName:  proposer,
+				OwnerPeer:     owner,
+				AffectedItems: items,
+				Deadline:      time.Now().Add(time.Duration(hours) * time.Hour),
+			}
+
+			if err := store.CreateProposal(ctx, prop); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Proposal created: %s [%s] %s\n", prop.ID[:8], prop.Kind, prop.Title)
+			return nil
+		},
+	}
+	createCmd.Flags().String("kind", "change_request", "Proposal kind (change_request, trace_dispute, sweep_acceptance, network_membership, challenge)")
+	createCmd.Flags().String("title", "", "Proposal title")
+	createCmd.Flags().String("description", "", "Description")
+	createCmd.Flags().String("proposer", "", "Proposer peer ID")
+	createCmd.Flags().String("owner", "", "Owner peer ID (for veto)")
+	createCmd.Flags().String("affected", "", "Comma-separated affected item IDs")
+	createCmd.Flags().Int("deadline-hours", 24, "Deadline in hours")
+	createCmd.MarkFlagRequired("title")
+	createCmd.MarkFlagRequired("proposer")
+
+	voteCmd := &cobra.Command{
+		Use:   "vote [proposal-id]",
+		Short: "Vote on an active proposal",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			voter, _ := cmd.Flags().GetString("voter")
+			voterID, _ := cmd.Flags().GetString("voter-id")
+			decision, _ := cmd.Flags().GetString("decision")
+			reason, _ := cmd.Flags().GetString("reason")
+			isAI, _ := cmd.Flags().GetBool("ai")
+
+			vote := &ProposalVoteRecord{
+				ProposalID: args[0],
+				VoterPeer:  voter,
+				VoterID:    voterID,
+				Decision:   decision,
+				Reason:     reason,
+				IsAI:       isAI,
+			}
+			if err := store.CreateProposalVote(ctx, vote); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Vote recorded: %s from %s\n", decision, voter)
+			return nil
+		},
+	}
+	voteCmd.Flags().String("voter", "", "Voter peer ID")
+	voteCmd.Flags().String("voter-id", "", "Voter ID")
+	voteCmd.Flags().String("decision", "", "Vote: approve or reject")
+	voteCmd.Flags().String("reason", "", "Reason")
+	voteCmd.Flags().Bool("ai", false, "Is this an AI vote")
+	voteCmd.MarkFlagRequired("voter")
+	voteCmd.MarkFlagRequired("decision")
+
+	statusCmd := &cobra.Command{
+		Use:   "status [proposal-id]",
+		Short: "Show proposal status and tally",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			project, _ := cmd.Flags().GetString("project")
+
+			prop, err := store.GetProposal(ctx, args[0])
+			if err != nil {
+				return err
+			}
+
+			result, err := proposalEngine.TallyProposal(ctx, args[0], project)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(os.Stderr, "Proposal: %s\n", prop.Title)
+			fmt.Fprintf(os.Stderr, "Kind:     %s\n", prop.Kind)
+			fmt.Fprintf(os.Stderr, "Status:   %s\n", prop.Status)
+			fmt.Fprintf(os.Stderr, "Deadline: %s\n", prop.Deadline.Format(time.RFC3339))
+			fmt.Fprintf(os.Stderr, "\nTally:\n")
+			fmt.Fprintf(os.Stderr, "  Eligible voters: %d\n", result.TotalEligible)
+			fmt.Fprintf(os.Stderr, "  Human votes:     %d (approve: %d, reject: %d)\n", result.HumanVotes, result.Approve, result.Reject)
+			fmt.Fprintf(os.Stderr, "  AI votes:        %d (advisory only)\n", result.AIVotes)
+			fmt.Fprintf(os.Stderr, "  Quorum reached:  %v\n", result.QuorumReached)
+			fmt.Fprintf(os.Stderr, "  Decision:        %s\n", result.Decision)
+			if result.OwnerVetoed {
+				fmt.Fprintln(os.Stderr, "  Owner vetoed:    yes")
+			}
+			return nil
+		},
+	}
+	statusCmd.Flags().String("project", "", "Project name")
+	statusCmd.MarkFlagRequired("project")
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List active proposals",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			proposals, err := store.ListAllActiveProposals(ctx)
+			if err != nil {
+				return err
+			}
+
+			if len(proposals) == 0 {
+				fmt.Fprintln(os.Stderr, "No active proposals.")
+				return nil
+			}
+
+			for _, p := range proposals {
+				remaining := time.Until(p.Deadline).Truncate(time.Minute)
+				fmt.Fprintf(os.Stderr, "  [%s] %s — %s (%s remaining)\n", p.ID[:8], p.Kind, p.Title, remaining)
+			}
+			return nil
+		},
+	}
+
+	cmd.AddCommand(createCmd, voteCmd, statusCmd, listCmd)
+	return cmd
+}
+
+func challengeCmd(store *Store, challengeEng *ChallengeEngine) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "challenge",
+		Short: "Manage node-to-node challenges (item, trace, respond, vote, list)",
+	}
+
+	itemChallengeCmd := &cobra.Command{
+		Use:   "item [item-id]",
+		Short: "Challenge a node's item (stale data or weak evidence)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			peerID, _ := cmd.Flags().GetString("peer")
+			kind, _ := cmd.Flags().GetString("kind")
+			reason, _ := cmd.Flags().GetString("reason")
+			evidence, _ := cmd.Flags().GetString("evidence")
+			selfPeer, _ := cmd.Flags().GetString("self")
+
+			ch, err := challengeEng.CreateChallenge(ctx, ChallengeKind(kind), selfPeer, peerID, args[0], "", reason, evidence, 24*time.Hour)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Challenge created: %s [%s] against %s\n", ch.ID[:8], ch.Kind, peerID)
+			return nil
+		},
+	}
+	itemChallengeCmd.Flags().String("peer", "", "Target peer ID")
+	itemChallengeCmd.Flags().String("kind", "stale_data", "Challenge kind (stale_data, weak_evidence)")
+	itemChallengeCmd.Flags().String("reason", "", "Reason for challenge")
+	itemChallengeCmd.Flags().String("evidence", "", "Supporting evidence")
+	itemChallengeCmd.Flags().String("self", "", "Your peer ID")
+	itemChallengeCmd.MarkFlagRequired("peer")
+	itemChallengeCmd.MarkFlagRequired("reason")
+	itemChallengeCmd.MarkFlagRequired("self")
+
+	traceChallengeCmd := &cobra.Command{
+		Use:   "trace [trace-id]",
+		Short: "Challenge a trace relationship",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			peerID, _ := cmd.Flags().GetString("peer")
+			reason, _ := cmd.Flags().GetString("reason")
+			selfPeer, _ := cmd.Flags().GetString("self")
+
+			ch, err := challengeEng.CreateChallenge(ctx, ChallengeTraceIntegrity, selfPeer, peerID, "", args[0], reason, "", 24*time.Hour)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Challenge created: %s [trace_integrity] against %s\n", ch.ID[:8], peerID)
+			return nil
+		},
+	}
+	traceChallengeCmd.Flags().String("peer", "", "Target peer ID")
+	traceChallengeCmd.Flags().String("reason", "", "Reason")
+	traceChallengeCmd.Flags().String("self", "", "Your peer ID")
+	traceChallengeCmd.MarkFlagRequired("peer")
+	traceChallengeCmd.MarkFlagRequired("reason")
+	traceChallengeCmd.MarkFlagRequired("self")
+
+	respondCmd := &cobra.Command{
+		Use:   "respond [challenge-id]",
+		Short: "Respond to a challenge against your node",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			evidence, _ := cmd.Flags().GetString("evidence")
+
+			if err := challengeEng.RespondToChallenge(ctx, args[0], evidence); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Response submitted for challenge %s\n", args[0][:8])
+			return nil
+		},
+	}
+	respondCmd.Flags().String("evidence", "", "Evidence for your response")
+	respondCmd.MarkFlagRequired("evidence")
+
+	voteInfoCmd := &cobra.Command{
+		Use:   "vote [challenge-id]",
+		Short: "Vote on an active challenge",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintf(os.Stderr, "Challenge voting for %s uses the proposal system.\n", args[0][:8])
+			fmt.Fprintln(os.Stderr, "Use: inv proposal vote <proposal-id> --decision <sustain|dismiss>")
+			return nil
+		},
+	}
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List challenges",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			incoming, _ := cmd.Flags().GetBool("incoming")
+			outgoing, _ := cmd.Flags().GetBool("outgoing")
+			selfPeer, _ := cmd.Flags().GetString("self")
+
+			if incoming && selfPeer != "" {
+				challenges, err := store.ListChallengesByPeer(ctx, selfPeer, true)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Incoming challenges (%d):\n", len(challenges))
+				for _, ch := range challenges {
+					fmt.Fprintf(os.Stderr, "  [%s] %s from %s — %s (%s)\n", ch.ID[:8], ch.Kind, ch.ChallengerPeer, ch.Reason, ch.Status)
+				}
+				return nil
+			}
+
+			if outgoing && selfPeer != "" {
+				challenges, err := store.ListChallengesByPeer(ctx, selfPeer, false)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Outgoing challenges (%d):\n", len(challenges))
+				for _, ch := range challenges {
+					fmt.Fprintf(os.Stderr, "  [%s] %s against %s — %s (%s)\n", ch.ID[:8], ch.Kind, ch.ChallengedPeer, ch.Reason, ch.Status)
+				}
+				return nil
+			}
+
+			// Default: show all open
+			challenges, err := store.ListChallenges(ctx, ChallengeOpen)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Open challenges (%d):\n", len(challenges))
+			for _, ch := range challenges {
+				remaining := time.Until(ch.Deadline).Truncate(time.Minute)
+				fmt.Fprintf(os.Stderr, "  [%s] %s: %s vs %s — %s (%s remaining)\n",
+					ch.ID[:8], ch.Kind, ch.ChallengerPeer, ch.ChallengedPeer, ch.Reason, remaining)
+			}
+			return nil
+		},
+	}
+	listCmd.Flags().Bool("incoming", false, "Show challenges against your node")
+	listCmd.Flags().Bool("outgoing", false, "Show challenges you filed")
+	listCmd.Flags().String("self", "", "Your peer ID")
+
+	cmd.AddCommand(itemChallengeCmd, traceChallengeCmd, respondCmd, voteInfoCmd, listCmd)
+	return cmd
+}
+
+func pairCmd(engine *Engine, store *Store, agentLog, sysLog *zerolog.Logger) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "pair",
+		Short: "Manage pairing sessions between nodes",
+	}
+
+	inviteCmd := &cobra.Command{
+		Use:   "invite",
+		Short: "Invite a guest to a pairing session",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			hostPeer, _ := cmd.Flags().GetString("host-peer")
+			hostNode, _ := cmd.Flags().GetString("host-node")
+			guestPeer, _ := cmd.Flags().GetString("guest-peer")
+			guestNode, _ := cmd.Flags().GetString("guest-node")
+
+			sess, err := engine.InvitePair(context.Background(), hostPeer, hostNode, guestPeer, guestNode)
+			if err != nil {
+				sysLog.Error().Err(err).Str("host_peer", hostPeer).Str("guest_peer", guestPeer).Msg("failed to invite pair")
+				return err
+			}
+			data, _ := json.Marshal(sess)
+			agentLog.Info().RawJSON("data", data).Str("command", "pair.invite").Msg("pairing session created")
+			fmt.Fprintf(os.Stderr, "Pairing session created: %s\n", sess.ID)
+			return nil
+		},
+	}
+	inviteCmd.Flags().String("host-peer", "", "Host peer ID")
+	inviteCmd.Flags().String("host-node", "", "Host node ID")
+	inviteCmd.Flags().String("guest-peer", "", "Guest peer ID")
+	inviteCmd.Flags().String("guest-node", "", "Guest node ID")
+	inviteCmd.MarkFlagRequired("host-peer")
+	inviteCmd.MarkFlagRequired("host-node")
+	inviteCmd.MarkFlagRequired("guest-peer")
+	inviteCmd.MarkFlagRequired("guest-node")
+
+	joinCmd := &cobra.Command{
+		Use:   "join [session-id]",
+		Short: "Accept a pairing session invitation",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			guestPeer, _ := cmd.Flags().GetString("guest-peer")
+
+			sess, err := engine.AcceptPair(context.Background(), args[0], guestPeer)
+			if err != nil {
+				sysLog.Error().Err(err).Str("session", args[0]).Str("guest_peer", guestPeer).Msg("failed to join pair")
+				return err
+			}
+			data, _ := json.Marshal(sess)
+			agentLog.Info().RawJSON("data", data).Str("command", "pair.join").Msg("pairing session joined")
+			fmt.Fprintf(os.Stderr, "Joined pairing session: %s\n", sess.ID)
+			return nil
+		},
+	}
+	joinCmd.Flags().String("guest-peer", "", "Guest peer ID")
+	joinCmd.MarkFlagRequired("guest-peer")
+
+	endCmd := &cobra.Command{
+		Use:   "end [session-id]",
+		Short: "End an active pairing session",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			peerID, _ := cmd.Flags().GetString("peer")
+
+			sess, err := engine.EndPair(context.Background(), args[0], peerID)
+			if err != nil {
+				sysLog.Error().Err(err).Str("session", args[0]).Str("peer", peerID).Msg("failed to end pair")
+				return err
+			}
+			data, _ := json.Marshal(sess)
+			agentLog.Info().RawJSON("data", data).Str("command", "pair.end").Msg("pairing session ended")
+			fmt.Fprintf(os.Stderr, "Ended pairing session: %s\n", sess.ID)
+			return nil
+		},
+	}
+	endCmd.Flags().String("peer", "", "Your peer ID")
+	endCmd.MarkFlagRequired("peer")
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List active pairing sessions",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			peerID, _ := cmd.Flags().GetString("peer")
+
+			sessions, err := engine.ListPairingSessions(context.Background(), peerID)
+			if err != nil {
+				sysLog.Error().Err(err).Str("peer", peerID).Msg("failed to list pairing sessions")
+				return err
+			}
+			data, _ := json.Marshal(sessions)
+			agentLog.Info().RawJSON("data", data).Str("command", "pair.list").Msg("pairing sessions listed")
+
+			if len(sessions) == 0 {
+				fmt.Fprintln(os.Stderr, "No active pairing sessions.")
+				return nil
+			}
+
+			w := tabwriter.NewWriter(os.Stderr, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "SESSION\tHOST\tGUEST\tSTARTED")
+			for _, s := range sessions {
+				sessionShort := s.ID
+				if len(sessionShort) > 16 {
+					sessionShort = sessionShort[:16] + "..."
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sessionShort, s.HostPeerID, s.GuestPeerID, s.StartedAt.Format(time.RFC3339))
+			}
+			w.Flush()
+			return nil
+		},
+	}
+	listCmd.Flags().String("peer", "", "Your peer ID")
+	listCmd.MarkFlagRequired("peer")
+
+	cmd.AddCommand(inviteCmd, joinCmd, endCmd, listCmd)
+	return cmd
 }

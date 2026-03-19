@@ -2,7 +2,8 @@
 ---
 
 <div class="state-machine" id="state-machine-viz">
-  <svg id="state-arrows" viewBox="0 0 900 400" preserveAspectRatio="xMidYMid meet">
+  <svg id="state-arrows" viewBox="0 0 900 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <title>State transition arrows connecting unverified, proven, suspect, and broke states</title>
     <defs>
       <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="var(--trace-line)" />
@@ -12,61 +13,70 @@
       </marker>
     </defs>
     <path id="arrow-verify" class="transition-arrow" d="M 165 185 C 200 80, 330 40, 395 65" />
-    <text class="transition-label" x="240" y="95">verify</text>
+    <text id="label-verify" class="transition-label" x="240" y="95">verify</text>
     <path id="arrow-suspect" class="transition-arrow" d="M 520 75 C 600 80, 680 140, 700 185" />
-    <text class="transition-label" x="620" y="110">signal</text>
+    <text id="label-signal" class="transition-label" x="620" y="110">signal</text>
     <path id="arrow-reverify" class="transition-arrow" d="M 680 220 C 650 160, 560 100, 500 80" />
-    <text class="transition-label" x="610" y="155">re-verify</text>
+    <text id="label-reverify" class="transition-label" x="610" y="155">re-verify</text>
     <path id="arrow-break" class="transition-arrow" d="M 715 220 C 720 280, 600 340, 520 345" />
-    <text class="transition-label" x="650" y="300">break</text>
+    <text id="label-break" class="transition-label" x="650" y="300">break</text>
     <path id="arrow-fix" class="transition-arrow" d="M 395 340 C 300 320, 330 200, 390 80" />
-    <text class="transition-label" x="310" y="230">fix</text>
+    <text id="label-fix" class="transition-label" x="310" y="230">fix</text>
   </svg>
 
-  <div class="state-node" data-state="unverified">unverified</div>
-  <div class="state-node" data-state="proven">proven</div>
-  <div class="state-node" data-state="suspect">suspect</div>
-  <div class="state-node" data-state="broke">broke</div>
+  <button class="state-node" data-state="unverified" type="button" aria-label="Unverified state — click to trigger verify transition">unverified</button>
+  <button class="state-node" data-state="proven" type="button" aria-label="Proven state — click to trigger signal transition">proven</button>
+  <button class="state-node" data-state="suspect" type="button" aria-label="Suspect state — click to trigger break transition">suspect</button>
+  <button class="state-node" data-state="broke" type="button" aria-label="Broke state — click to trigger fix transition">broke</button>
 </div>
 
 <script>
-  const transitions: Record<string, [string, string]> = {
-    unverified: ['arrow-verify', 'proven'],
-    proven: ['arrow-suspect', 'suspect'],
-    suspect: ['arrow-break', 'broke'],
-    broke: ['arrow-fix', 'proven'],
+  const transitions: Record<string, [string, string, string]> = {
+    unverified: ['arrow-verify', 'proven', 'label-verify'],
+    proven: ['arrow-suspect', 'suspect', 'label-signal'],
+    suspect: ['arrow-break', 'broke', 'label-break'],
+    broke: ['arrow-fix', 'proven', 'label-fix'],
   };
 
-  document.querySelectorAll<HTMLElement>('.state-node').forEach(node => {
-    node.addEventListener('click', () => {
-      const state = node.dataset.state!;
-      const allNodes = document.querySelectorAll<HTMLElement>('.state-node');
-      const allArrows = document.querySelectorAll<SVGPathElement>('.transition-arrow');
+  function fireTransition(node: HTMLElement): void {
+    const state = node.dataset.state!;
+    const allNodes = document.querySelectorAll<HTMLElement>('.state-node');
+    const allArrows = document.querySelectorAll<SVGPathElement>('.transition-arrow');
+    const allLabels = document.querySelectorAll<SVGTextElement>('.transition-label');
 
+    allNodes.forEach(n => n.classList.remove('active'));
+    allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
+    allLabels.forEach(l => l.classList.remove('active'));
+
+    node.classList.add('active');
+
+    const [arrowId, targetState, labelId] = transitions[state];
+    const arrow = document.getElementById(arrowId) as SVGPathElement | null;
+    const label = document.getElementById(labelId) as SVGTextElement | null;
+
+    setTimeout(() => {
+      if (arrow) {
+        arrow.classList.add('active');
+        arrow.style.markerEnd = 'url(#arrowhead-active)';
+      }
+      if (label) {
+        label.classList.add('active');
+      }
+    }, 200);
+
+    setTimeout(() => {
+      document.querySelector<HTMLElement>(`[data-state="${targetState}"]`)?.classList.add('active');
+    }, 600);
+
+    setTimeout(() => {
       allNodes.forEach(n => n.classList.remove('active'));
       allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
+      allLabels.forEach(l => l.classList.remove('active'));
+    }, 2000);
+  }
 
-      node.classList.add('active');
-
-      const [arrowId, targetState] = transitions[state];
-      const arrow = document.getElementById(arrowId) as SVGPathElement | null;
-
-      setTimeout(() => {
-        if (arrow) {
-          arrow.classList.add('active');
-          arrow.style.markerEnd = 'url(#arrowhead-active)';
-        }
-      }, 200);
-
-      setTimeout(() => {
-        document.querySelector<HTMLElement>(`[data-state="${targetState}"]`)?.classList.add('active');
-      }, 600);
-
-      setTimeout(() => {
-        allNodes.forEach(n => n.classList.remove('active'));
-        allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
-      }, 2000);
-    });
+  document.querySelectorAll<HTMLElement>('.state-node').forEach(node => {
+    node.addEventListener('click', () => fireTransition(node));
   });
 </script>
 
@@ -74,7 +84,8 @@
   .state-machine {
     width: 100%;
     max-width: 900px;
-    height: 400px;
+    min-height: 300px;
+    aspect-ratio: 9 / 4;
     margin: 0 auto;
     position: relative;
   }
@@ -87,8 +98,15 @@
 
   .transition-label {
     font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-size: 14px;
+    font-weight: 500;
     fill: var(--text-muted);
+    transition: fill 0.2s ease;
+  }
+
+  .transition-label.active {
+    fill: var(--signal-pulse);
+    filter: drop-shadow(0 0 4px var(--signal-pulse));
   }
 
   .transition-arrow {
@@ -106,10 +124,10 @@
 
   .state-node {
     position: absolute;
-    padding: 1rem 1.8rem;
+    padding: 1.1rem 2rem;
     border-radius: 6px;
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
@@ -117,6 +135,12 @@
   }
 
   .state-node:hover { transform: scale(1.08); }
+
+  .state-node:focus-visible {
+    outline: 2px solid var(--signal-pulse);
+    outline-offset: 3px;
+  }
+
   .state-node.active {
     transform: scale(1.15);
     box-shadow: 0 0 40px color-mix(in oklch, currentColor 30%, transparent);

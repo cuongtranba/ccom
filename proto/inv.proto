@@ -1,0 +1,188 @@
+syntax = "proto3";
+package inv;
+option go_package = "github.com/cuongtran/my-inventory/proto";
+
+import "google/protobuf/timestamp.proto";
+
+message Envelope {
+  string message_id = 1;
+  string from_peer = 2;
+  string to_peer = 3;
+  google.protobuf.Timestamp timestamp = 4;
+
+  oneof payload {
+    SignalChange signal_change = 10;
+    SignalSweep signal_sweep = 11;
+    QueryAsk query_ask = 14;
+    QueryRespond query_respond = 15;
+    TraceResolveRequest trace_resolve_req = 16;
+    TraceResolveResponse trace_resolve_resp = 17;
+    Ack ack = 20;
+    Error error = 21;
+    ProposalCreate proposal_create = 22;
+    ProposalVote proposal_vote = 23;
+    ProposalResult proposal_result = 24;
+    TallyRequest tally_request = 25;
+    PeerHandshake peer_handshake = 26;
+    ChallengeCreate challenge_create = 30;
+    ChallengeResponse challenge_response = 31;
+    ChallengeVote challenge_vote = 32;
+    ChallengeResult challenge_result = 33;
+    PairInvite pair_invite = 40;
+    PairAccept pair_accept = 41;
+    PairEnd pair_end = 42;
+    PairEvent pair_event = 43;
+  }
+}
+
+message SignalChange {
+  string source_item_id = 1;
+  string source_node_id = 2;
+  string target_item_id = 3;
+  string reason = 4;
+}
+
+message SignalSweep {
+  string external_ref = 1;
+  string source_node_id = 2;
+  repeated string matched_item_ids = 3;
+}
+
+message QueryAsk {
+  string query_id = 1;
+  string asker_id = 2;
+  string question = 3;
+  string context = 4;
+}
+
+message QueryRespond {
+  string query_id = 1;
+  string responder_id = 2;
+  string answer = 3;
+  bool is_ai = 4;
+}
+
+message TraceResolveRequest {
+  string item_id = 1;
+}
+
+message TraceResolveResponse {
+  string item_id = 1;
+  string kind = 2;
+  string title = 3;
+  string status = 4;
+  string node_id = 5;
+  string vertical = 6;
+  bool found = 7;
+}
+
+message Ack {
+  string ref_message_id = 1;
+}
+
+message Error {
+  string ref_message_id = 1;
+  string code = 2;
+  string message = 3;
+}
+
+message PeerHandshake {
+  string peer_id = 1;
+  string node_id = 2;
+  string name = 3;
+  string vertical = 4;
+  string project = 5;
+  string owner = 6;
+  bool is_ai = 7;
+}
+
+message ProposalCreate {
+  string proposal_id = 1;
+  string kind = 2;
+  string title = 3;
+  string description = 4;
+  string proposer_peer = 5;
+  string owner_peer = 6;
+  repeated string affected_item_ids = 7;
+  google.protobuf.Timestamp deadline = 8;
+}
+
+message ProposalVote {
+  string proposal_id = 1;
+  string voter_peer = 2;
+  string voter_id = 3;
+  string decision = 4;
+  string reason = 5;
+  bool is_ai = 6;
+}
+
+message ProposalResult {
+  string proposal_id = 1;
+  string decision = 2;
+  int32 votes_for = 3;
+  int32 votes_against = 4;
+  int32 total_eligible = 5;
+  bool owner_vetoed = 6;
+}
+
+message TallyRequest {
+  string proposal_id = 1;
+}
+
+message ChallengeCreate {
+  string challenge_id = 1;
+  string kind = 2;
+  string challenger_peer = 3;
+  string challenged_peer = 4;
+  string target_item_id = 5;
+  string target_trace_id = 6;
+  string reason = 7;
+  string evidence = 8;
+  int64 deadline_seconds = 9;
+}
+
+message ChallengeResponse {
+  string challenge_id = 1;
+  string evidence = 2;
+  string justification = 3;
+}
+
+message ChallengeVote {
+  string challenge_id = 1;
+  string voter_peer = 2;
+  string decision = 3;
+  string reason = 4;
+  bool is_ai = 5;
+}
+
+message ChallengeResult {
+  string challenge_id = 1;
+  string outcome = 2;
+  int32 votes_sustain = 3;
+  int32 votes_dismiss = 4;
+  string penalty_applied = 5;
+}
+
+message PairInvite {
+  string session_id = 1;
+  string host_peer_id = 2;
+  string host_node_id = 3;
+  string guest_peer_id = 4;
+  string guest_node_id = 5;
+}
+
+message PairAccept {
+  string session_id = 1;
+  string guest_peer_id = 2;
+}
+
+message PairEnd {
+  string session_id = 1;
+  string ended_by = 2;
+}
+
+message PairEvent {
+  string session_id = 1;
+  string event_kind = 2;
+  string payload_json = 3;
+}

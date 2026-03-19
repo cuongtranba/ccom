@@ -94,7 +94,12 @@ if (humanTerminal && aiTerminal) {
     }
   }
 
-  document.querySelectorAll<HTMLButtonElement>('[data-claude]').forEach(btn => {
-    btn.addEventListener('click', () => runClaudeDemo(btn.dataset.claude!));
+  const claudeBtns = document.querySelectorAll<HTMLButtonElement>('[data-claude]');
+  claudeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      claudeBtns.forEach(b => b.classList.remove('active'));
+      if (btn.dataset.claude !== 'reset') btn.classList.add('active');
+      runClaudeDemo(btn.dataset.claude!);
+    });
   });
 }

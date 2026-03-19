@@ -103,9 +103,9 @@ if (propCanvas) {
     for (const t of demoTraces) {
       const from = getNode(t.from);
       const to = getNode(t.to);
-      pCtx.strokeStyle = cssVar('--trace-line');
-      pCtx.globalAlpha = 0.5;
-      pCtx.lineWidth = 1;
+      pCtx.strokeStyle = cssVar('--trace-active');
+      pCtx.globalAlpha = 0.8;
+      pCtx.lineWidth = 1.5;
       pCtx.beginPath();
       pCtx.moveTo(from.x, from.y);
       pCtx.lineTo(to.x, to.y);
@@ -162,36 +162,40 @@ if (propCanvas) {
       const color = statusColor(n.status);
 
       // Fill & stroke
-      pCtx.fillStyle = color + '20';
-      pCtx.strokeStyle = color;
-      pCtx.lineWidth = 1.5;
-      drawOrganicCircle(n.x, n.y, 28);
+      pCtx.globalAlpha = 0.1;
+      pCtx.fillStyle = color;
+      drawOrganicCircle(n.x, n.y, 34);
       pCtx.fill();
+      pCtx.globalAlpha = 1.0;
+      pCtx.strokeStyle = color;
+      pCtx.lineWidth = 2;
+      drawOrganicCircle(n.x, n.y, 34);
       pCtx.stroke();
 
       // Glow for proven
       if (n.status === 'proven') {
-        pCtx.shadowBlur = 15;
+        pCtx.shadowBlur = 18;
         pCtx.shadowColor = color;
-        drawOrganicCircle(n.x, n.y, 28);
+        drawOrganicCircle(n.x, n.y, 34);
         pCtx.stroke();
         pCtx.shadowBlur = 0;
       }
 
-      pCtx.fillStyle = color;
-      pCtx.font = '500 11px "JetBrains Mono", monospace';
+      // Node label (e.g. US-001)
+      pCtx.fillStyle = cssVar('--text-primary');
+      pCtx.font = '500 13px "JetBrains Mono", monospace';
       pCtx.textAlign = 'center';
-      pCtx.fillText(n.label, n.x, n.y - 4);
+      pCtx.fillText(n.label, n.x, n.y - 6);
 
-      pCtx.fillStyle = cssVar('--text-muted');
-      pCtx.globalAlpha = 0.7;
-      pCtx.font = '300 9px "Space Grotesk", sans-serif';
+      // Vertical label (e.g. PM, Design)
+      pCtx.fillStyle = cssVar('--text-secondary');
+      pCtx.font = '400 10px "Space Grotesk", sans-serif';
       pCtx.fillText(n.vertical, n.x, n.y + 10);
-      pCtx.globalAlpha = 1.0;
 
-      pCtx.fillStyle = color;
-      pCtx.font = '300 8px "JetBrains Mono", monospace';
-      pCtx.fillText(n.status, n.x, n.y + 42);
+      // Status label below node
+      pCtx.fillStyle = cssVar('--text-secondary');
+      pCtx.font = '500 11px "JetBrains Mono", monospace';
+      pCtx.fillText(n.status, n.x, n.y + 54);
     }
 
     requestAnimationFrame(drawLoop);
@@ -255,7 +259,15 @@ if (propCanvas) {
     }
   }
 
-  document.querySelectorAll<HTMLButtonElement>('.demo-btn').forEach(btn => {
-    btn.addEventListener('click', () => runDemo(btn.dataset.action!));
-  });
+  const demoContainer = propCanvas.closest('.network-demo');
+  if (demoContainer) {
+    const allBtns = demoContainer.querySelectorAll<HTMLButtonElement>('.demo-btn[data-action]');
+    allBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        allBtns.forEach(b => b.classList.remove('active'));
+        if (btn.dataset.action !== 'reset') btn.classList.add('active');
+        runDemo(btn.dataset.action!);
+      });
+    });
+  }
 }

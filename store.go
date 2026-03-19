@@ -65,6 +65,7 @@ func (s *Store) migrate() error {
 		from_node_id TEXT NOT NULL REFERENCES nodes(id),
 		to_item_id   TEXT NOT NULL REFERENCES items(id),
 		to_node_id   TEXT NOT NULL REFERENCES nodes(id),
+		to_peer_id   TEXT DEFAULT '',
 		relation     TEXT NOT NULL,
 		confirmed_by TEXT DEFAULT '',
 		confirmed_at DATETIME,
@@ -190,6 +191,123 @@ func (s *Store) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_votes_cr ON votes(cr_id);
 	CREATE INDEX IF NOT EXISTS idx_transitions_item ON transitions(item_id);
 	CREATE INDEX IF NOT EXISTS idx_checklist_item ON checklist_entries(item_id);
+
+	CREATE TABLE IF NOT EXISTS peers (
+		peer_id     TEXT PRIMARY KEY,
+		node_id     TEXT NOT NULL,
+		name        TEXT NOT NULL,
+		vertical    TEXT NOT NULL,
+		project     TEXT NOT NULL,
+		owner       TEXT NOT NULL,
+		is_ai       INTEGER DEFAULT 0,
+		status      TEXT DEFAULT 'pending',
+		last_seen   DATETIME,
+		addrs       TEXT DEFAULT '[]'
+	);
+
+	CREATE TABLE IF NOT EXISTS outbox (
+		id          TEXT PRIMARY KEY,
+		to_peer     TEXT NOT NULL,
+		envelope    BLOB NOT NULL,
+		attempts    INTEGER DEFAULT 0,
+		created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+		next_retry  DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS peer_blocklist (
+		peer_id     TEXT PRIMARY KEY,
+		reason      TEXT NOT NULL,
+		blocked_by  TEXT NOT NULL,
+		blocked_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_outbox_peer ON outbox(to_peer, next_retry);
+	CREATE INDEX IF NOT EXISTS idx_peers_project ON peers(project);
+
+	CREATE TABLE IF NOT EXISTS proposals (
+		id             TEXT PRIMARY KEY,
+		kind           TEXT NOT NULL,
+		title          TEXT NOT NULL,
+		description    TEXT DEFAULT '',
+		proposer_peer  TEXT NOT NULL,
+		proposer_name  TEXT NOT NULL,
+		owner_peer     TEXT DEFAULT '',
+		status         TEXT NOT NULL DEFAULT 'voting',
+		affected_items TEXT DEFAULT '[]',
+		deadline       DATETIME NOT NULL,
+		created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+		resolved_at    DATETIME
+	);
+
+	CREATE TABLE IF NOT EXISTS proposal_votes (
+		id           TEXT PRIMARY KEY,
+		proposal_id  TEXT NOT NULL REFERENCES proposals(id),
+		voter_peer   TEXT NOT NULL,
+		voter_id     TEXT NOT NULL,
+		decision     TEXT NOT NULL,
+		reason       TEXT DEFAULT '',
+		is_ai        INTEGER DEFAULT 0,
+		created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(proposal_id, voter_peer)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_proposal_votes_proposal ON proposal_votes(proposal_id);
+
+	CREATE TABLE IF NOT EXISTS challenges (
+		id                TEXT PRIMARY KEY,
+		kind              TEXT NOT NULL,
+		challenger_peer   TEXT NOT NULL,
+		challenged_peer   TEXT NOT NULL,
+		target_item_id    TEXT,
+		target_trace_id   TEXT,
+		reason            TEXT NOT NULL,
+		evidence          TEXT DEFAULT '',
+		response_evidence TEXT DEFAULT '',
+		status            TEXT NOT NULL DEFAULT 'open',
+		deadline          DATETIME NOT NULL,
+		created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+		resolved_at       DATETIME
+	);
+
+	CREATE TABLE IF NOT EXISTS peer_reputation (
+		peer_id    TEXT PRIMARY KEY,
+		score      INTEGER DEFAULT 0,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS challenge_cooldowns (
+		challenger_peer TEXT NOT NULL,
+		challenged_peer TEXT NOT NULL,
+		last_challenge  DATETIME NOT NULL,
+		PRIMARY KEY (challenger_peer, challenged_peer)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_challenges_status ON challenges(status);
+	CREATE INDEX IF NOT EXISTS idx_challenges_challenged ON challenges(challenged_peer);
+
+	CREATE TABLE IF NOT EXISTS events (
+		id         TEXT PRIMARY KEY,
+		kind       TEXT NOT NULL,
+		payload    TEXT NOT NULL,
+		urgent     INTEGER DEFAULT 0,
+		read       INTEGER DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_events_read ON events(read);
+	CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
+	CREATE TABLE IF NOT EXISTS pairing_sessions (
+		id            TEXT PRIMARY KEY,
+		host_peer_id  TEXT NOT NULL,
+		host_node_id  TEXT NOT NULL,
+		guest_peer_id TEXT NOT NULL,
+		guest_node_id TEXT NOT NULL,
+		status        TEXT DEFAULT 'pending',
+		started_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+		ended_at      DATETIME
+	);
+	CREATE INDEX IF NOT EXISTS idx_pairing_host ON pairing_sessions(host_peer_id, status);
+	CREATE INDEX IF NOT EXISTS idx_pairing_guest ON pairing_sessions(guest_peer_id, status);
 	`
 	_, err := s.db.Exec(schema)
 	return err
@@ -340,15 +458,15 @@ func (s *Store) CreateTrace(ctx context.Context, t *Trace) error {
 	}
 	t.CreatedAt = time.Now()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO traces (id, from_item_id, from_node_id, to_item_id, to_node_id, relation, confirmed_by, confirmed_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.FromItemID, t.FromNodeID, t.ToItemID, t.ToNodeID, t.Relation, t.ConfirmedBy, t.ConfirmedAt, t.CreatedAt)
+		`INSERT INTO traces (id, from_item_id, from_node_id, to_item_id, to_node_id, to_peer_id, relation, confirmed_by, confirmed_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.FromItemID, t.FromNodeID, t.ToItemID, t.ToNodeID, t.ToPeerID, t.Relation, t.ConfirmedBy, t.ConfirmedAt, t.CreatedAt)
 	return err
 }
 
 func (s *Store) GetDependentTraces(ctx context.Context, itemID string) ([]Trace, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, from_item_id, from_node_id, to_item_id, to_node_id, relation, confirmed_by, confirmed_at, created_at
+		`SELECT id, from_item_id, from_node_id, to_item_id, to_node_id, to_peer_id, relation, confirmed_by, confirmed_at, created_at
 		 FROM traces WHERE to_item_id = ?`, itemID)
 	if err != nil {
 		return nil, err
@@ -359,7 +477,7 @@ func (s *Store) GetDependentTraces(ctx context.Context, itemID string) ([]Trace,
 	for rows.Next() {
 		var t Trace
 		var confirmedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.FromItemID, &t.FromNodeID, &t.ToItemID, &t.ToNodeID, &t.Relation,
+		if err := rows.Scan(&t.ID, &t.FromItemID, &t.FromNodeID, &t.ToItemID, &t.ToNodeID, &t.ToPeerID, &t.Relation,
 			&t.ConfirmedBy, &confirmedAt, &t.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -373,7 +491,7 @@ func (s *Store) GetDependentTraces(ctx context.Context, itemID string) ([]Trace,
 
 func (s *Store) GetItemTraces(ctx context.Context, itemID string) ([]Trace, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, from_item_id, from_node_id, to_item_id, to_node_id, relation, confirmed_by, confirmed_at, created_at
+		`SELECT id, from_item_id, from_node_id, to_item_id, to_node_id, to_peer_id, relation, confirmed_by, confirmed_at, created_at
 		 FROM traces WHERE from_item_id = ? OR to_item_id = ?`, itemID, itemID)
 	if err != nil {
 		return nil, err
@@ -384,7 +502,7 @@ func (s *Store) GetItemTraces(ctx context.Context, itemID string) ([]Trace, erro
 	for rows.Next() {
 		var t Trace
 		var confirmedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.FromItemID, &t.FromNodeID, &t.ToItemID, &t.ToNodeID, &t.Relation,
+		if err := rows.Scan(&t.ID, &t.FromItemID, &t.FromNodeID, &t.ToItemID, &t.ToNodeID, &t.ToPeerID, &t.Relation,
 			&t.ConfirmedBy, &confirmedAt, &t.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -896,4 +1014,661 @@ func (s *Store) GetUpstreamTraces(ctx context.Context, itemID string) ([]Trace, 
 		traces = append(traces, t)
 	}
 	return traces, rows.Err()
+}
+
+// --- Peer CRUD ---
+
+func (s *Store) CreatePeer(ctx context.Context, p *Peer) error {
+	addrs, _ := json.Marshal(p.Addrs)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO peers (peer_id, node_id, name, vertical, project, owner, is_ai, status, addrs)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(peer_id) DO UPDATE SET
+		   node_id = excluded.node_id, name = excluded.name, vertical = excluded.vertical,
+		   project = excluded.project, owner = excluded.owner, is_ai = excluded.is_ai,
+		   addrs = excluded.addrs`,
+		p.PeerID, p.NodeID, p.Name, p.Vertical, p.Project, p.Owner, p.IsAI, p.Status, string(addrs))
+	return err
+}
+
+func (s *Store) GetPeer(ctx context.Context, peerID string) (*Peer, error) {
+	p := &Peer{}
+	var lastSeen sql.NullTime
+	var addrs string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT peer_id, node_id, name, vertical, project, owner, is_ai, status, last_seen, addrs
+		 FROM peers WHERE peer_id = ?`, peerID).
+		Scan(&p.PeerID, &p.NodeID, &p.Name, &p.Vertical, &p.Project, &p.Owner, &p.IsAI, &p.Status, &lastSeen, &addrs)
+	if err != nil {
+		return nil, err
+	}
+	if lastSeen.Valid {
+		p.LastSeen = &lastSeen.Time
+	}
+	_ = json.Unmarshal([]byte(addrs), &p.Addrs)
+	return p, nil
+}
+
+func (s *Store) ListPeers(ctx context.Context, project string) ([]Peer, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT peer_id, node_id, name, vertical, project, owner, is_ai, status, last_seen, addrs
+		 FROM peers WHERE project = ? ORDER BY name`, project)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var peers []Peer
+	for rows.Next() {
+		var p Peer
+		var lastSeen sql.NullTime
+		var addrs string
+		if err := rows.Scan(&p.PeerID, &p.NodeID, &p.Name, &p.Vertical, &p.Project, &p.Owner, &p.IsAI, &p.Status, &lastSeen, &addrs); err != nil {
+			return nil, err
+		}
+		if lastSeen.Valid {
+			p.LastSeen = &lastSeen.Time
+		}
+		_ = json.Unmarshal([]byte(addrs), &p.Addrs)
+		peers = append(peers, p)
+	}
+	return peers, rows.Err()
+}
+
+func (s *Store) UpdatePeerStatus(ctx context.Context, peerID string, status PeerStatus) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE peers SET status = ? WHERE peer_id = ?`, status, peerID)
+	return err
+}
+
+func (s *Store) UpdatePeerLastSeen(ctx context.Context, peerID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE peers SET last_seen = ? WHERE peer_id = ?`, time.Now(), peerID)
+	return err
+}
+
+func (s *Store) DeletePeer(ctx context.Context, peerID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM peers WHERE peer_id = ?`, peerID)
+	return err
+}
+
+// --- Outbox CRUD ---
+
+func (s *Store) EnqueueOutbox(ctx context.Context, msg *OutboxMessage) error {
+	if msg.ID == "" {
+		msg.ID = uuid.New().String()
+	}
+	msg.CreatedAt = time.Now()
+	msg.NextRetry = time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO outbox (id, to_peer, envelope, attempts, created_at, next_retry)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		msg.ID, msg.ToPeer, msg.Envelope, msg.Attempts, msg.CreatedAt, msg.NextRetry)
+	return err
+}
+
+func (s *Store) GetPendingOutbox(ctx context.Context, peerID string, limit int) ([]OutboxMessage, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, to_peer, envelope, attempts, created_at, next_retry
+		 FROM outbox WHERE to_peer = ? AND next_retry <= ? ORDER BY created_at LIMIT ?`,
+		peerID, time.Now(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []OutboxMessage
+	for rows.Next() {
+		var m OutboxMessage
+		if err := rows.Scan(&m.ID, &m.ToPeer, &m.Envelope, &m.Attempts, &m.CreatedAt, &m.NextRetry); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
+}
+
+func (s *Store) GetAllPendingOutbox(ctx context.Context, limit int) ([]OutboxMessage, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, to_peer, envelope, attempts, created_at, next_retry
+		 FROM outbox WHERE next_retry <= ? ORDER BY created_at LIMIT ?`,
+		time.Now(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []OutboxMessage
+	for rows.Next() {
+		var m OutboxMessage
+		if err := rows.Scan(&m.ID, &m.ToPeer, &m.Envelope, &m.Attempts, &m.CreatedAt, &m.NextRetry); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
+}
+
+func (s *Store) IncrementOutboxAttempts(ctx context.Context, msgID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE outbox SET attempts = attempts + 1,
+		 next_retry = datetime('now', '+' || CAST((1 << attempts) * 30 AS TEXT) || ' seconds')
+		 WHERE id = ?`, msgID)
+	return err
+}
+
+func (s *Store) DeleteOutboxMessage(ctx context.Context, msgID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM outbox WHERE id = ?`, msgID)
+	return err
+}
+
+func (s *Store) OutboxDepth(ctx context.Context) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM outbox`).Scan(&count)
+	return count, err
+}
+
+// --- Blocklist CRUD ---
+
+func (s *Store) BlockPeer(ctx context.Context, peerID, reason, blockedBy string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO peer_blocklist (peer_id, reason, blocked_by) VALUES (?, ?, ?)
+		 ON CONFLICT(peer_id) DO UPDATE SET reason = excluded.reason, blocked_by = excluded.blocked_by`,
+		peerID, reason, blockedBy)
+	return err
+}
+
+func (s *Store) UnblockPeer(ctx context.Context, peerID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM peer_blocklist WHERE peer_id = ?`, peerID)
+	return err
+}
+
+func (s *Store) IsBlocked(ctx context.Context, peerID string) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM peer_blocklist WHERE peer_id = ?`, peerID).Scan(&count)
+	return count > 0, err
+}
+
+// --- Proposal CRUD ---
+
+func (s *Store) CreateProposal(ctx context.Context, p *Proposal) error {
+	if p.ID == "" {
+		p.ID = uuid.New().String()
+	}
+	p.CreatedAt = time.Now()
+	p.Status = ProposalVoting
+	affected, _ := json.Marshal(p.AffectedItems)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO proposals (id, kind, title, description, proposer_peer, proposer_name, owner_peer, status, affected_items, deadline, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Kind, p.Title, p.Description, p.ProposerPeer, p.ProposerName, p.OwnerPeer, p.Status, string(affected), p.Deadline, p.CreatedAt)
+	return err
+}
+
+func (s *Store) GetProposal(ctx context.Context, id string) (*Proposal, error) {
+	p := &Proposal{}
+	var affected string
+	var resolvedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, kind, title, description, proposer_peer, proposer_name, owner_peer, status, affected_items, deadline, created_at, resolved_at
+		 FROM proposals WHERE id = ?`, id).
+		Scan(&p.ID, &p.Kind, &p.Title, &p.Description, &p.ProposerPeer, &p.ProposerName, &p.OwnerPeer, &p.Status, &affected, &p.Deadline, &p.CreatedAt, &resolvedAt)
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(affected), &p.AffectedItems)
+	if resolvedAt.Valid {
+		p.ResolvedAt = &resolvedAt.Time
+	}
+	return p, nil
+}
+
+func (s *Store) UpdateProposalStatus(ctx context.Context, id string, status ProposalStatus) error {
+	now := time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE proposals SET status = ?, resolved_at = ? WHERE id = ?`, status, now, id)
+	return err
+}
+
+func (s *Store) ListProposals(ctx context.Context, status ProposalStatus) ([]Proposal, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, kind, title, description, proposer_peer, proposer_name, owner_peer, status, affected_items, deadline, created_at, resolved_at
+		 FROM proposals WHERE status = ? ORDER BY created_at DESC`, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var proposals []Proposal
+	for rows.Next() {
+		var p Proposal
+		var affected string
+		var resolvedAt sql.NullTime
+		if err := rows.Scan(&p.ID, &p.Kind, &p.Title, &p.Description, &p.ProposerPeer, &p.ProposerName, &p.OwnerPeer, &p.Status, &affected, &p.Deadline, &p.CreatedAt, &resolvedAt); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(affected), &p.AffectedItems)
+		if resolvedAt.Valid {
+			p.ResolvedAt = &resolvedAt.Time
+		}
+		proposals = append(proposals, p)
+	}
+	return proposals, rows.Err()
+}
+
+func (s *Store) ListAllActiveProposals(ctx context.Context) ([]Proposal, error) {
+	return s.ListProposals(ctx, ProposalVoting)
+}
+
+func (s *Store) CreateProposalVote(ctx context.Context, v *ProposalVoteRecord) error {
+	if v.ID == "" {
+		v.ID = uuid.New().String()
+	}
+	v.CreatedAt = time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO proposal_votes (id, proposal_id, voter_peer, voter_id, decision, reason, is_ai, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		v.ID, v.ProposalID, v.VoterPeer, v.VoterID, v.Decision, v.Reason, v.IsAI, v.CreatedAt)
+	return err
+}
+
+func (s *Store) GetProposalVotes(ctx context.Context, proposalID string) ([]ProposalVoteRecord, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, proposal_id, voter_peer, voter_id, decision, reason, is_ai, created_at
+		 FROM proposal_votes WHERE proposal_id = ? ORDER BY created_at`, proposalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var votes []ProposalVoteRecord
+	for rows.Next() {
+		var v ProposalVoteRecord
+		if err := rows.Scan(&v.ID, &v.ProposalID, &v.VoterPeer, &v.VoterID, &v.Decision, &v.Reason, &v.IsAI, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		votes = append(votes, v)
+	}
+	return votes, rows.Err()
+}
+
+// --- Challenge CRUD ---
+
+func (s *Store) CreateChallenge(ctx context.Context, ch *Challenge) error {
+	if ch.ID == "" {
+		ch.ID = uuid.New().String()
+	}
+	ch.CreatedAt = time.Now()
+	ch.Status = ChallengeOpen
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO challenges (id, kind, challenger_peer, challenged_peer, target_item_id, target_trace_id, reason, evidence, status, deadline, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		ch.ID, ch.Kind, ch.ChallengerPeer, ch.ChallengedPeer, ch.TargetItemID, ch.TargetTraceID, ch.Reason, ch.Evidence, ch.Status, ch.Deadline, ch.CreatedAt)
+	return err
+}
+
+func (s *Store) GetChallenge(ctx context.Context, id string) (*Challenge, error) {
+	ch := &Challenge{}
+	var resolvedAt sql.NullTime
+	var targetItemID, targetTraceID sql.NullString
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, kind, challenger_peer, challenged_peer, target_item_id, target_trace_id, reason, evidence, response_evidence, status, deadline, created_at, resolved_at
+		 FROM challenges WHERE id = ?`, id).
+		Scan(&ch.ID, &ch.Kind, &ch.ChallengerPeer, &ch.ChallengedPeer, &targetItemID, &targetTraceID, &ch.Reason, &ch.Evidence, &ch.ResponseEvidence, &ch.Status, &ch.Deadline, &ch.CreatedAt, &resolvedAt)
+	if err != nil {
+		return nil, err
+	}
+	if targetItemID.Valid {
+		ch.TargetItemID = targetItemID.String
+	}
+	if targetTraceID.Valid {
+		ch.TargetTraceID = targetTraceID.String
+	}
+	if resolvedAt.Valid {
+		ch.ResolvedAt = &resolvedAt.Time
+	}
+	return ch, nil
+}
+
+func (s *Store) UpdateChallengeStatus(ctx context.Context, id string, status ChallengeStatus) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE challenges SET status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (s *Store) UpdateChallengeResponse(ctx context.Context, id string, responseEvidence string, status ChallengeStatus) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE challenges SET response_evidence = ?, status = ? WHERE id = ?`, responseEvidence, status, id)
+	return err
+}
+
+func (s *Store) ResolveChallengeStatus(ctx context.Context, id string, status ChallengeStatus) error {
+	now := time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE challenges SET status = ?, resolved_at = ? WHERE id = ?`, status, now, id)
+	return err
+}
+
+func (s *Store) ListChallenges(ctx context.Context, status ChallengeStatus) ([]Challenge, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, kind, challenger_peer, challenged_peer, target_item_id, target_trace_id, reason, evidence, response_evidence, status, deadline, created_at, resolved_at
+		 FROM challenges WHERE status = ? ORDER BY created_at DESC`, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var challenges []Challenge
+	for rows.Next() {
+		var ch Challenge
+		var resolvedAt sql.NullTime
+		var targetItemID, targetTraceID sql.NullString
+		if err := rows.Scan(&ch.ID, &ch.Kind, &ch.ChallengerPeer, &ch.ChallengedPeer, &targetItemID, &targetTraceID, &ch.Reason, &ch.Evidence, &ch.ResponseEvidence, &ch.Status, &ch.Deadline, &ch.CreatedAt, &resolvedAt); err != nil {
+			return nil, err
+		}
+		if targetItemID.Valid {
+			ch.TargetItemID = targetItemID.String
+		}
+		if targetTraceID.Valid {
+			ch.TargetTraceID = targetTraceID.String
+		}
+		if resolvedAt.Valid {
+			ch.ResolvedAt = &resolvedAt.Time
+		}
+		challenges = append(challenges, ch)
+	}
+	return challenges, rows.Err()
+}
+
+func (s *Store) ListChallengesByPeer(ctx context.Context, peerID string, incoming bool) ([]Challenge, error) {
+	column := "challenger_peer"
+	if incoming {
+		column = "challenged_peer"
+	}
+	query := fmt.Sprintf(
+		`SELECT id, kind, challenger_peer, challenged_peer, target_item_id, target_trace_id, reason, evidence, response_evidence, status, deadline, created_at, resolved_at
+		 FROM challenges WHERE %s = ? ORDER BY created_at DESC`, column)
+
+	rows, err := s.db.QueryContext(ctx, query, peerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var challenges []Challenge
+	for rows.Next() {
+		var ch Challenge
+		var resolvedAt sql.NullTime
+		var targetItemID, targetTraceID sql.NullString
+		if err := rows.Scan(&ch.ID, &ch.Kind, &ch.ChallengerPeer, &ch.ChallengedPeer, &targetItemID, &targetTraceID, &ch.Reason, &ch.Evidence, &ch.ResponseEvidence, &ch.Status, &ch.Deadline, &ch.CreatedAt, &resolvedAt); err != nil {
+			return nil, err
+		}
+		if targetItemID.Valid {
+			ch.TargetItemID = targetItemID.String
+		}
+		if targetTraceID.Valid {
+			ch.TargetTraceID = targetTraceID.String
+		}
+		if resolvedAt.Valid {
+			ch.ResolvedAt = &resolvedAt.Time
+		}
+		challenges = append(challenges, ch)
+	}
+	return challenges, rows.Err()
+}
+
+func (s *Store) GetPeerReputation(ctx context.Context, peerID string) (int, error) {
+	var score int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE((SELECT score FROM peer_reputation WHERE peer_id = ?), 0)`, peerID).Scan(&score)
+	return score, err
+}
+
+func (s *Store) AdjustPeerReputation(ctx context.Context, peerID string, delta int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO peer_reputation (peer_id, score, updated_at) VALUES (?, MAX(?, -10), CURRENT_TIMESTAMP)
+		 ON CONFLICT(peer_id) DO UPDATE SET
+		   score = MAX(peer_reputation.score + ?, -10),
+		   updated_at = CURRENT_TIMESTAMP`,
+		peerID, delta, delta)
+	return err
+}
+
+func (s *Store) SetChallengeCooldown(ctx context.Context, challengerPeer, challengedPeer string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO challenge_cooldowns (challenger_peer, challenged_peer, last_challenge)
+		 VALUES (?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(challenger_peer, challenged_peer) DO UPDATE SET last_challenge = CURRENT_TIMESTAMP`,
+		challengerPeer, challengedPeer)
+	return err
+}
+
+func (s *Store) IsOnChallengeCooldown(ctx context.Context, challengerPeer, challengedPeer string, cooldownDuration time.Duration) (bool, error) {
+	var count int
+	cutoff := time.Now().Add(-cooldownDuration)
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM challenge_cooldowns
+		 WHERE challenger_peer = ? AND challenged_peer = ? AND last_challenge > ?`,
+		challengerPeer, challengedPeer, cutoff).Scan(&count)
+	return count > 0, err
+}
+
+// --- Event CRUD ---
+
+func (s *Store) SaveEvent(ctx context.Context, event *StoredEvent) error {
+	if event.ID == "" {
+		event.ID = uuid.New().String()
+	}
+	event.CreatedAt = time.Now()
+	urgent := 0
+	if event.Urgent {
+		urgent = 1
+	}
+	read := 0
+	if event.Read {
+		read = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO events (id, kind, payload, urgent, read, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		event.ID, event.Kind, event.Payload, urgent, read, event.CreatedAt)
+	return err
+}
+
+func (s *Store) GetPendingEvents(ctx context.Context) ([]StoredEvent, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, kind, payload, urgent, read, created_at FROM events WHERE read = 0 ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []StoredEvent
+	for rows.Next() {
+		var e StoredEvent
+		var urgent, read int
+		if err := rows.Scan(&e.ID, &e.Kind, &e.Payload, &urgent, &read, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		e.Urgent = urgent == 1
+		e.Read = read == 1
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
+func (s *Store) GetPendingEventsCount(ctx context.Context) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE read = 0`).Scan(&count)
+	return count, err
+}
+
+func (s *Store) MarkEventRead(ctx context.Context, eventID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE events SET read = 1 WHERE id = ?`, eventID)
+	return err
+}
+
+func (s *Store) MarkEventsRead(ctx context.Context, eventIDs []string) error {
+	if len(eventIDs) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.PrepareContext(ctx, `UPDATE events SET read = 1 WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, id := range eventIDs {
+		if _, err := stmt.ExecContext(ctx, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) PruneOldEvents(ctx context.Context, olderThanDays int) (int, error) {
+	result, err := s.db.ExecContext(ctx,
+		`DELETE FROM events WHERE created_at < datetime('now', '-' || ? || ' days')`, olderThanDays)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	return int(affected), err
+}
+
+// --- Session Status Helpers ---
+
+func (s *Store) GetPendingCRs(ctx context.Context, nodeID string) ([]ChangeRequest, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, title, description, proposer_id, node_id, status, affected_items, created_at, updated_at
+		 FROM change_requests WHERE status IN ('proposed', 'voting') ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var crs []ChangeRequest
+	for rows.Next() {
+		var cr ChangeRequest
+		var affected string
+		if err := rows.Scan(&cr.ID, &cr.Title, &cr.Description, &cr.ProposerID, &cr.NodeID, &cr.Status, &affected, &cr.CreatedAt, &cr.UpdatedAt); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(affected), &cr.AffectedItems)
+		crs = append(crs, cr)
+	}
+	return crs, rows.Err()
+}
+
+func (s *Store) GetUnansweredQueries(ctx context.Context, nodeID string) ([]Query, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, asker_id, asker_node, question, context, target_node, resolved, created_at
+		 FROM queries WHERE resolved = 0 AND (target_node = ? OR target_node = '') ORDER BY created_at`,
+		nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var queries []Query
+	for rows.Next() {
+		var q Query
+		if err := rows.Scan(&q.ID, &q.AskerID, &q.AskerNode, &q.Question, &q.Context, &q.TargetNode, &q.Resolved, &q.CreatedAt); err != nil {
+			return nil, err
+		}
+		queries = append(queries, q)
+	}
+	return queries, rows.Err()
+}
+
+// --- Pairing Session CRUD ---
+
+func (s *Store) CreatePairingSession(ctx context.Context, ps *PairingSession) error {
+	if ps.ID == "" {
+		ps.ID = uuid.New().String()
+	}
+	ps.Status = PairingPending
+	ps.StartedAt = time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO pairing_sessions (id, host_peer_id, host_node_id, guest_peer_id, guest_node_id, status, started_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		ps.ID, ps.HostPeerID, ps.HostNodeID, ps.GuestPeerID, ps.GuestNodeID, ps.Status, ps.StartedAt)
+	return err
+}
+
+func (s *Store) GetPairingSession(ctx context.Context, id string) (*PairingSession, error) {
+	ps := &PairingSession{}
+	var endedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, host_peer_id, host_node_id, guest_peer_id, guest_node_id, status, started_at, ended_at
+		 FROM pairing_sessions WHERE id = ?`, id).
+		Scan(&ps.ID, &ps.HostPeerID, &ps.HostNodeID, &ps.GuestPeerID, &ps.GuestNodeID, &ps.Status, &ps.StartedAt, &endedAt)
+	if err != nil {
+		return nil, err
+	}
+	if endedAt.Valid {
+		ps.EndedAt = &endedAt.Time
+	}
+	return ps, nil
+}
+
+func (s *Store) UpdatePairingSessionStatus(ctx context.Context, id string, status PairingStatus) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE pairing_sessions SET status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (s *Store) EndPairingSession(ctx context.Context, id string) error {
+	now := time.Now()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE pairing_sessions SET status = ?, ended_at = ? WHERE id = ?`,
+		PairingEnded, now, id)
+	return err
+}
+
+func (s *Store) ListActivePairingSessions(ctx context.Context, peerID string) ([]PairingSession, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, host_peer_id, host_node_id, guest_peer_id, guest_node_id, status, started_at, ended_at
+		 FROM pairing_sessions
+		 WHERE (host_peer_id = ? OR guest_peer_id = ?) AND status = ?
+		 ORDER BY started_at DESC`, peerID, peerID, PairingActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []PairingSession
+	for rows.Next() {
+		var ps PairingSession
+		var endedAt sql.NullTime
+		if err := rows.Scan(&ps.ID, &ps.HostPeerID, &ps.HostNodeID, &ps.GuestPeerID, &ps.GuestNodeID, &ps.Status, &ps.StartedAt, &endedAt); err != nil {
+			return nil, err
+		}
+		if endedAt.Valid {
+			ps.EndedAt = &endedAt.Time
+		}
+		sessions = append(sessions, ps)
+	}
+	return sessions, rows.Err()
+}
+
+func (s *Store) GetActivePairingBetween(ctx context.Context, hostPeerID, guestPeerID string) (*PairingSession, error) {
+	ps := &PairingSession{}
+	var endedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, host_peer_id, host_node_id, guest_peer_id, guest_node_id, status, started_at, ended_at
+		 FROM pairing_sessions
+		 WHERE host_peer_id = ? AND guest_peer_id = ? AND status = ?`,
+		hostPeerID, guestPeerID, PairingActive).
+		Scan(&ps.ID, &ps.HostPeerID, &ps.HostNodeID, &ps.GuestPeerID, &ps.GuestNodeID, &ps.Status, &ps.StartedAt, &endedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if endedAt.Valid {
+		ps.EndedAt = &endedAt.Time
+	}
+	return ps, nil
 }

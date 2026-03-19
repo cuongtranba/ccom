@@ -202,7 +202,12 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
     }
   }
 
-  document.querySelectorAll<HTMLButtonElement>('[data-pipeline]').forEach(btn => {
-    btn.addEventListener('click', () => runPipeline(btn.dataset.pipeline!));
+  const pipelineBtns = document.querySelectorAll<HTMLButtonElement>('[data-pipeline]');
+  pipelineBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pipelineBtns.forEach(b => b.classList.remove('active'));
+      if (btn.dataset.pipeline !== 'reset') btn.classList.add('active');
+      runPipeline(btn.dataset.pipeline!);
+    });
   });
 }

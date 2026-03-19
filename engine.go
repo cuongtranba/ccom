@@ -635,3 +635,165 @@ func (e *Engine) collectTraceDown(ctx context.Context, itemID string, visited ma
 	}
 	return chain, nil
 }
+
+// --- Events ---
+
+// GetPendingEvents returns all unread events.
+func (e *Engine) GetPendingEvents(ctx context.Context) ([]StoredEvent, error) {
+	return e.store.GetPendingEvents(ctx)
+}
+
+// AcknowledgeEvents marks the given events as read.
+func (e *Engine) AcknowledgeEvents(ctx context.Context, eventIDs []string) error {
+	return e.store.MarkEventsRead(ctx, eventIDs)
+}
+
+// --- Session Status ---
+
+// SessionStatus provides a comprehensive snapshot of the current node's state.
+type SessionStatus struct {
+	Nodes             []Node          `json:"nodes"`
+	MyNode            Node            `json:"my_node"`
+	SuspectItems      []Item          `json:"suspect_items"`
+	BrokenItems       []Item          `json:"broken_items"`
+	PendingCRs        []ChangeRequest `json:"pending_crs"`
+	ActiveChallenges  []Challenge     `json:"active_challenges"`
+	UnansweredQueries []Query         `json:"unanswered_queries"`
+	AuditReport       *AuditReport    `json:"audit_report"`
+	PendingEvents     int             `json:"pending_events"`
+}
+
+// GetSessionStatus gathers a full status snapshot for the given node.
+func (e *Engine) GetSessionStatus(ctx context.Context, project string, myNodeID string) (*SessionStatus, error) {
+	myNode, err := e.store.GetNode(ctx, myNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get my node: %w", err)
+	}
+	nodes, err := e.store.ListNodes(ctx, project)
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	suspectItems, err := e.store.GetItemsByNodeAndStatus(ctx, myNodeID, StatusSuspect)
+	if err != nil {
+		return nil, fmt.Errorf("get suspect items: %w", err)
+	}
+	brokenItems, err := e.store.GetItemsByNodeAndStatus(ctx, myNodeID, StatusBroke)
+	if err != nil {
+		return nil, fmt.Errorf("get broken items: %w", err)
+	}
+	pendingCRs, err := e.store.GetPendingCRs(ctx, myNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get pending CRs: %w", err)
+	}
+	unansweredQueries, err := e.store.GetUnansweredQueries(ctx, myNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get unanswered queries: %w", err)
+	}
+	activeChallenges, err := e.store.ListChallengesByPeer(ctx, myNodeID, true)
+	if err != nil {
+		return nil, fmt.Errorf("get active challenges: %w", err)
+	}
+	var activeOnly []Challenge
+	for _, ch := range activeChallenges {
+		if ch.Status == ChallengeOpen || ch.Status == ChallengeResponded {
+			activeOnly = append(activeOnly, ch)
+		}
+	}
+	auditReport, err := e.store.AuditNode(ctx, myNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("audit node: %w", err)
+	}
+	pendingEventsCount, err := e.store.GetPendingEventsCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get pending events count: %w", err)
+	}
+	return &SessionStatus{
+		Nodes:             nodes,
+		MyNode:            *myNode,
+		SuspectItems:      suspectItems,
+		BrokenItems:       brokenItems,
+		PendingCRs:        pendingCRs,
+		ActiveChallenges:  activeOnly,
+		UnansweredQueries: unansweredQueries,
+		AuditReport:       auditReport,
+		PendingEvents:     pendingEventsCount,
+	}, nil
+}
+
+// AuditAllNodes runs an audit on every node in the given project.
+func (e *Engine) AuditAllNodes(ctx context.Context, project string) ([]AuditReport, error) {
+	nodes, err := e.store.ListNodes(ctx, project)
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	reports := make([]AuditReport, 0, len(nodes))
+	for _, node := range nodes {
+		report, err := e.store.AuditNode(ctx, node.ID)
+		if err != nil {
+			return nil, fmt.Errorf("audit node %s: %w", node.ID, err)
+		}
+		reports = append(reports, *report)
+	}
+	return reports, nil
+}
+
+// --- Pairing Sessions ---
+
+// InvitePair creates a new pending pairing session between host and guest.
+func (e *Engine) InvitePair(ctx context.Context, hostPeerID, hostNodeID, guestPeerID, guestNodeID string) (*PairingSession, error) {
+	ps := &PairingSession{
+		HostPeerID:  hostPeerID,
+		HostNodeID:  hostNodeID,
+		GuestPeerID: guestPeerID,
+		GuestNodeID: guestNodeID,
+	}
+	if err := e.store.CreatePairingSession(ctx, ps); err != nil {
+		return nil, fmt.Errorf("create pairing session: %w", err)
+	}
+	return ps, nil
+}
+
+// AcceptPair transitions a pending pairing session to active.
+// Only the invited guest may accept.
+func (e *Engine) AcceptPair(ctx context.Context, sessionID, guestPeerID string) (*PairingSession, error) {
+	ps, err := e.store.GetPairingSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get pairing session: %w", err)
+	}
+	if ps.GuestPeerID != guestPeerID {
+		return nil, fmt.Errorf("not the invited guest")
+	}
+	if ps.Status != PairingPending {
+		return nil, fmt.Errorf("session is not pending (status: %s)", ps.Status)
+	}
+	if err := e.store.UpdatePairingSessionStatus(ctx, sessionID, PairingActive); err != nil {
+		return nil, fmt.Errorf("activate pairing session: %w", err)
+	}
+	ps.Status = PairingActive
+	return ps, nil
+}
+
+// EndPair ends a pairing session. Only host or guest may end it.
+func (e *Engine) EndPair(ctx context.Context, sessionID, peerID string) (*PairingSession, error) {
+	ps, err := e.store.GetPairingSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get pairing session: %w", err)
+	}
+	if ps.HostPeerID != peerID && ps.GuestPeerID != peerID {
+		return nil, fmt.Errorf("not a participant in this pairing session")
+	}
+	if err := e.store.EndPairingSession(ctx, sessionID); err != nil {
+		return nil, fmt.Errorf("end pairing session: %w", err)
+	}
+	// Re-fetch to get the ended_at timestamp
+	return e.store.GetPairingSession(ctx, sessionID)
+}
+
+// ListPairingSessions returns active pairing sessions for a peer.
+func (e *Engine) ListPairingSessions(ctx context.Context, peerID string) ([]PairingSession, error) {
+	sessions, err := e.store.ListActivePairingSessions(ctx, peerID)
+	if err != nil {
+		return nil, fmt.Errorf("list active pairing sessions: %w", err)
+	}
+	return sessions, nil
+}

@@ -48,5 +48,10 @@ body {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+    animation-fill-mode: forwards !important;
+  }
+
+  .hero-eyebrow, .hero-title, .hero-sub {
+    opacity: 1 !important;
   }
 }

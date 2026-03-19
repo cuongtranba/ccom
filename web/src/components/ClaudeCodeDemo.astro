@@ -5,11 +5,11 @@
   <div class="terminal-split">
     <div class="terminal-column">
       <div class="terminal-label">⌘ HUMAN — CLI</div>
-      <pre class="demo-terminal split-terminal" id="human-terminal"><span class="prompt">$</span> <span class="cmd">_</span></pre>
+      <pre class="demo-terminal split-terminal" id="human-terminal" aria-live="polite"><span class="prompt">$</span> <span class="cmd">_</span></pre>
     </div>
     <div class="terminal-column">
       <div class="terminal-label"><span class="terminal-label-ai">AI</span> AGENT — MCP</div>
-      <pre class="demo-terminal split-terminal" id="ai-terminal"><span class="prompt">⟩</span> <span class="cmd">_</span></pre>
+      <pre class="demo-terminal split-terminal" id="ai-terminal" aria-live="polite"><span class="prompt">⟩</span> <span class="cmd">_</span></pre>
     </div>
   </div>
   <div class="demo-buttons claude-buttons">
@@ -114,6 +114,13 @@
     border-color: var(--signal-pulse);
     color: var(--signal-pulse);
     background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  .demo-btn.active {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
+    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
   }
 
   @media (max-width: 768px) {

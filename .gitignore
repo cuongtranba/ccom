@@ -1,0 +1,21 @@
+# Binary
+my-inventory
+
+# Screenshots / images (not source)
+*.png
+
+# Node modules & build artifacts
+web/node_modules/
+web/dist/
+web/.astro/
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

@@ -92,18 +92,13 @@ import PipelineDemo from '../components/PipelineDemo.astro';
       title="Own your inventory."
       description="Each team decides its own structure, its own workflow. The protocol handles the connections."
     />
-    <div class="cta-install" id="cta-install">
-      <span class="dollar">$</span> go install github.com/cuongtran/my-inventory@latest
+    <div class="cta-badge">
+      coming soon
     </div>
   </section>
 
 </Base>
 
-<script>
-  document.getElementById('cta-install')?.addEventListener('click', () => {
-    navigator.clipboard.writeText('go install github.com/cuongtran/my-inventory@latest');
-  });
-</script>
 
 <style>
   .hero {
@@ -157,23 +152,16 @@ import PipelineDemo from '../components/PipelineDemo.astro';
     padding: clamp(6rem, 15vh, 12rem) clamp(2rem, 8vw, 10rem);
   }
 
-  .cta-install {
+  .cta-badge {
     font-family: var(--font-mono);
     font-size: clamp(0.85rem, 1.2vw, 1rem);
-    padding: 1rem 2rem;
+    padding: 0.75rem 2rem;
     background: var(--bg-surface);
     border: 1px solid var(--trace-line);
     border-radius: 6px;
-    color: var(--signal-pulse);
+    color: var(--text-secondary);
     display: inline-block;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
   }
-
-  .cta-install:hover {
-    border-color: var(--signal-pulse);
-    box-shadow: 0 0 20px color-mix(in oklch, var(--signal-pulse) 10%, transparent);
-  }
-
-  .cta-install .dollar { color: var(--text-muted); }
 </style>

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "command": "echo 'INV_HINT: File changed, check if inventory item needs update'"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "echo 'INV_HINT: Session ending. Run inv_audit before closing.'"
+      }
+    ]
+  }
+}

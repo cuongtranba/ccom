@@ -12,7 +12,7 @@
     <div class="cr-votes" id="cr-votes"></div>
     <div class="cr-quorum" id="cr-quorum">
       <div class="quorum-bar">
-        <div class="quorum-fill" id="quorum-fill"></div>
+        <div class="quorum-fill" id="quorum-fill" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="3" aria-label="Human vote quorum progress"></div>
       </div>
       <span class="quorum-text" id="quorum-text">0/3 human votes (need &gt;50%)</span>
     </div>
@@ -27,7 +27,7 @@
       <button class="demo-btn" data-gov="archive">archive</button>
       <button class="demo-btn" data-gov="reset">reset</button>
     </div>
-    <pre class="demo-terminal" id="gov-output"><span class="prompt">$</span> <span class="cmd">inv cr show CR-042</span>
+    <pre class="demo-terminal" id="gov-output" aria-live="polite"><span class="prompt">$</span> <span class="cmd">inv cr show CR-042</span>
 <span class="out">CR-042  Change check-in API from sync to async
 Status: </span><span class="s-muted">DRAFT</span>
 <span class="out">Votes:  none</span>
@@ -77,7 +77,7 @@ Status: </span><span class="s-muted">DRAFT</span>
 
   .cr-badge {
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     padding: 0.25rem 0.6rem;
     border-radius: 3px;
     font-weight: 500;
@@ -186,7 +186,7 @@ Status: </span><span class="s-muted">DRAFT</span>
 
   .cr-votes :global(.vote-ai-tag) {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: 0.75rem;
     padding: 0.15rem 0.4rem;
     background: color-mix(in oklch, var(--signal-pulse) 10%, transparent);
     color: var(--signal-pulse);
@@ -196,7 +196,7 @@ Status: </span><span class="s-muted">DRAFT</span>
   }
 
   .cr-votes :global(.vote-advisory) {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     flex-shrink: 0;
   }
@@ -285,6 +285,13 @@ Status: </span><span class="s-muted">DRAFT</span>
     border-color: var(--signal-pulse);
     color: var(--signal-pulse);
     background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  .demo-btn.active {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
+    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
   }
 
   @media (max-width: 768px) {

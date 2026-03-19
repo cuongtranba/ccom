@@ -234,7 +234,12 @@ Status: </span><span class="s-muted">DRAFT</span>
   }
 
   // ---- Button listeners ----
-  document.querySelectorAll<HTMLButtonElement>('[data-gov]').forEach(btn => {
-    btn.addEventListener('click', () => runAction(btn.dataset.gov!));
+  const govBtns = document.querySelectorAll<HTMLButtonElement>('[data-gov]');
+  govBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      govBtns.forEach(b => b.classList.remove('active'));
+      if (btn.dataset.gov !== 'reset') btn.classList.add('active');
+      runAction(btn.dataset.gov!);
+    });
   });
 }

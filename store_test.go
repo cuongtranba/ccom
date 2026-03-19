@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -346,6 +347,239 @@ func (s *StoreSuite) TestAuditNode() {
 	s.Len(report.Unverified, 1)
 	s.Len(report.Orphans, 1) // item3 has no traces
 	s.Equal(item3.ID, report.Orphans[0])
+}
+
+func (s *StoreSuite) TestPeerCRUD() {
+	p := &Peer{
+		PeerID:   "12D3KooWABC",
+		NodeID:   "node-1",
+		Name:     "dev-node",
+		Vertical: VerticalDev,
+		Project:  "clinic-checkin",
+		Owner:    "cuong",
+		IsAI:     false,
+		Status:   PeerStatusPending,
+		Addrs:    []string{"/ip4/127.0.0.1/tcp/9090"},
+	}
+	err := s.store.CreatePeer(s.ctx, p)
+	s.Require().NoError(err)
+
+	got, err := s.store.GetPeer(s.ctx, "12D3KooWABC")
+	s.Require().NoError(err)
+	s.Equal("dev-node", got.Name)
+	s.Equal(PeerStatusPending, got.Status)
+
+	err = s.store.UpdatePeerStatus(s.ctx, "12D3KooWABC", PeerStatusApproved)
+	s.Require().NoError(err)
+	got, _ = s.store.GetPeer(s.ctx, "12D3KooWABC")
+	s.Equal(PeerStatusApproved, got.Status)
+
+	peers, err := s.store.ListPeers(s.ctx, "clinic-checkin")
+	s.Require().NoError(err)
+	s.Len(peers, 1)
+
+	err = s.store.UpdatePeerLastSeen(s.ctx, "12D3KooWABC")
+	s.Require().NoError(err)
+}
+
+func (s *StoreSuite) TestOutboxCRUD() {
+	msg := &OutboxMessage{
+		ToPeer:   "12D3KooWABC",
+		Envelope: []byte("test envelope data"),
+	}
+	err := s.store.EnqueueOutbox(s.ctx, msg)
+	s.Require().NoError(err)
+
+	msgs, err := s.store.GetPendingOutbox(s.ctx, "12D3KooWABC", 10)
+	s.Require().NoError(err)
+	s.Len(msgs, 1)
+	s.Equal("test envelope data", string(msgs[0].Envelope))
+
+	err = s.store.DeleteOutboxMessage(s.ctx, msgs[0].ID)
+	s.Require().NoError(err)
+
+	msgs, _ = s.store.GetPendingOutbox(s.ctx, "12D3KooWABC", 10)
+	s.Len(msgs, 0)
+}
+
+func (s *StoreSuite) TestOutboxRetryIncrement() {
+	msg := &OutboxMessage{
+		ToPeer:   "12D3KooWABC",
+		Envelope: []byte("retry test"),
+	}
+	err := s.store.EnqueueOutbox(s.ctx, msg)
+	s.Require().NoError(err)
+
+	msgs, _ := s.store.GetPendingOutbox(s.ctx, "12D3KooWABC", 10)
+	err = s.store.IncrementOutboxAttempts(s.ctx, msgs[0].ID)
+	s.Require().NoError(err)
+
+	// After increment, next_retry is in the future so it won't appear in pending
+	depth, err := s.store.OutboxDepth(s.ctx)
+	s.Require().NoError(err)
+	s.Equal(1, depth)
+}
+
+func (s *StoreSuite) TestBlocklistCRUD() {
+	err := s.store.BlockPeer(s.ctx, "12D3KooWBAD", "spam", "admin")
+	s.Require().NoError(err)
+
+	blocked, err := s.store.IsBlocked(s.ctx, "12D3KooWBAD")
+	s.Require().NoError(err)
+	s.True(blocked)
+
+	blocked, _ = s.store.IsBlocked(s.ctx, "12D3KooWGOOD")
+	s.False(blocked)
+
+	err = s.store.UnblockPeer(s.ctx, "12D3KooWBAD")
+	s.Require().NoError(err)
+
+	blocked, _ = s.store.IsBlocked(s.ctx, "12D3KooWBAD")
+	s.False(blocked)
+}
+
+func (s *StoreSuite) TestProposalCRUD() {
+	deadline := time.Now().Add(24 * time.Hour)
+	prop := &Proposal{
+		Kind:          ProposalCR,
+		Title:         "Switch to WebSocket",
+		Description:   "Replace REST with WebSocket for real-time updates",
+		ProposerPeer:  "12D3KooWABC",
+		ProposerName:  "cuong",
+		OwnerPeer:     "",
+		AffectedItems: []string{"item-1", "item-2"},
+		Deadline:      deadline,
+	}
+	err := s.store.CreateProposal(s.ctx, prop)
+	s.Require().NoError(err)
+	s.NotEmpty(prop.ID)
+
+	got, err := s.store.GetProposal(s.ctx, prop.ID)
+	s.Require().NoError(err)
+	s.Equal("Switch to WebSocket", got.Title)
+	s.Equal(ProposalVoting, got.Status)
+	s.Len(got.AffectedItems, 2)
+
+	// Cast a vote
+	vote := &ProposalVoteRecord{
+		ProposalID: prop.ID,
+		VoterPeer:  "12D3KooWDEF",
+		VoterID:    "voter-1",
+		Decision:   "approve",
+		Reason:     "looks good",
+		IsAI:       false,
+	}
+	err = s.store.CreateProposalVote(s.ctx, vote)
+	s.Require().NoError(err)
+
+	votes, err := s.store.GetProposalVotes(s.ctx, prop.ID)
+	s.Require().NoError(err)
+	s.Len(votes, 1)
+	s.Equal("approve", votes[0].Decision)
+
+	// Update proposal status
+	err = s.store.UpdateProposalStatus(s.ctx, prop.ID, ProposalApproved)
+	s.Require().NoError(err)
+	got, _ = s.store.GetProposal(s.ctx, prop.ID)
+	s.Equal(ProposalApproved, got.Status)
+
+	// List proposals - none voting now
+	props, err := s.store.ListProposals(s.ctx, ProposalVoting)
+	s.Require().NoError(err)
+	s.Len(props, 0)
+}
+
+func (s *StoreSuite) TestProposalVoteUniqueness() {
+	prop := &Proposal{
+		Kind:         ProposalCR,
+		Title:        "Test Uniqueness",
+		ProposerPeer: "12D3KooWABC",
+		ProposerName: "cuong",
+		Deadline:     time.Now().Add(24 * time.Hour),
+	}
+	err := s.store.CreateProposal(s.ctx, prop)
+	s.Require().NoError(err)
+
+	vote := &ProposalVoteRecord{
+		ProposalID: prop.ID,
+		VoterPeer:  "12D3KooWDEF",
+		VoterID:    "voter-1",
+		Decision:   "approve",
+	}
+	err = s.store.CreateProposalVote(s.ctx, vote)
+	s.Require().NoError(err)
+
+	// Same voter_peer should fail
+	vote2 := &ProposalVoteRecord{
+		ProposalID: prop.ID,
+		VoterPeer:  "12D3KooWDEF",
+		VoterID:    "voter-1",
+		Decision:   "reject",
+	}
+	err = s.store.CreateProposalVote(s.ctx, vote2)
+	s.Error(err)
+}
+
+func (s *StoreSuite) TestChallengeCRUD() {
+	deadline := time.Now().Add(24 * time.Hour)
+	ch := &Challenge{
+		Kind:           ChallengeStaleData,
+		ChallengerPeer: "12D3KooWABC",
+		ChallengedPeer: "12D3KooWDEF",
+		TargetItemID:   "item-1",
+		Reason:         "Upstream changed, no re-verification",
+		Deadline:       deadline,
+	}
+	err := s.store.CreateChallenge(s.ctx, ch)
+	s.Require().NoError(err)
+
+	got, err := s.store.GetChallenge(s.ctx, ch.ID)
+	s.Require().NoError(err)
+	s.Equal(ChallengeStaleData, got.Kind)
+	s.Equal(ChallengeOpen, got.Status)
+
+	err = s.store.UpdateChallengeStatus(s.ctx, ch.ID, ChallengeResponded)
+	s.Require().NoError(err)
+	got, _ = s.store.GetChallenge(s.ctx, ch.ID)
+	s.Equal(ChallengeResponded, got.Status)
+
+	err = s.store.UpdateChallengeResponse(s.ctx, ch.ID, "Re-verified against spec", ChallengeResponded)
+	s.Require().NoError(err)
+
+	challenges, err := s.store.ListChallenges(s.ctx, ChallengeResponded)
+	s.Require().NoError(err)
+	s.Len(challenges, 1)
+}
+
+func (s *StoreSuite) TestPeerReputation() {
+	score, err := s.store.GetPeerReputation(s.ctx, "12D3KooWABC")
+	s.Require().NoError(err)
+	s.Equal(0, score)
+
+	err = s.store.AdjustPeerReputation(s.ctx, "12D3KooWABC", 1)
+	s.Require().NoError(err)
+	score, _ = s.store.GetPeerReputation(s.ctx, "12D3KooWABC")
+	s.Equal(1, score)
+
+	// Adjust down below floor
+	for i := 0; i < 15; i++ {
+		s.store.AdjustPeerReputation(s.ctx, "12D3KooWABC", -1)
+	}
+	score, _ = s.store.GetPeerReputation(s.ctx, "12D3KooWABC")
+	s.Equal(-10, score)
+}
+
+func (s *StoreSuite) TestChallengeCooldown() {
+	err := s.store.SetChallengeCooldown(s.ctx, "12D3KooWABC", "12D3KooWDEF")
+	s.Require().NoError(err)
+
+	onCooldown, err := s.store.IsOnChallengeCooldown(s.ctx, "12D3KooWABC", "12D3KooWDEF", 24*time.Hour)
+	s.Require().NoError(err)
+	s.True(onCooldown)
+
+	notCooldown, err := s.store.IsOnChallengeCooldown(s.ctx, "12D3KooWDEF", "12D3KooWABC", 24*time.Hour)
+	s.Require().NoError(err)
+	s.False(notCooldown)
 }
 
 func TestStoreSuite(t *testing.T) {

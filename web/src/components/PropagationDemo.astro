@@ -2,7 +2,7 @@
 ---
 
 <div class="network-demo">
-  <canvas id="propagation-viz" width="550" height="550"></canvas>
+  <canvas id="propagation-viz" width="550" height="550" aria-label="Neural propagation network — interactive demo showing how changes cascade through connected inventory items"></canvas>
 
   <div class="demo-panel">
     <div class="demo-buttons">
@@ -11,7 +11,7 @@
       <button class="demo-btn" data-action="reverify">re-verify chain</button>
       <button class="demo-btn" data-action="reset">reset</button>
     </div>
-    <pre class="demo-terminal" id="demo-output"><span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>
+    <pre class="demo-terminal" id="demo-output" aria-live="polite"><span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>
 <span class="out">ID        NAME              VERTICAL  OWNER
 0fb8353f  Dev Inventory     dev       cuong
 de061a81  PM Inventory      pm        duke
@@ -94,6 +94,18 @@ de061a81  PM Inventory      pm        duke
     border-color: var(--signal-pulse);
     color: var(--signal-pulse);
     background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  .demo-btn:focus-visible {
+    outline: 2px solid var(--signal-pulse);
+    outline-offset: 2px;
+  }
+
+  .demo-btn.active {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
+    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
   }
 
   @media (max-width: 768px) {

@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func serveMCP(engine *Engine) error {
+func serveMCP(engine *Engine, store *Store, challengeEngine *ChallengeEngine) error {
 	s := server.NewMCPServer(
 		"Inventory Network",
 		"1.0.0",
@@ -629,8 +630,440 @@ func serveMCP(engine *Engine) error {
 		return resultJSON(chain)
 	})
 
+	// --- P2P Network MCP Tools ---
+
+	s.AddTool(mcp.NewTool("inv_network_status",
+		mcp.WithDescription("Show P2P network status: peers, outbox, governance, reputation"),
+		mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing project: %v", err)), nil
+		}
+		peers, err := store.ListPeers(ctx, project)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		outboxDepth, _ := store.OutboxDepth(ctx)
+		activeProposals, _ := store.ListAllActiveProposals(ctx)
+		activeChallenges, _ := store.ListChallenges(ctx, ChallengeOpen)
+
+		type NetworkStatus struct {
+			Peers            int `json:"peers"`
+			OutboxDepth      int `json:"outbox_depth"`
+			ActiveProposals  int `json:"active_proposals"`
+			ActiveChallenges int `json:"active_challenges"`
+		}
+		return resultJSON(NetworkStatus{
+			Peers:            len(peers),
+			OutboxDepth:      outboxDepth,
+			ActiveProposals:  len(activeProposals),
+			ActiveChallenges: len(activeChallenges),
+		})
+	})
+
+	s.AddTool(mcp.NewTool("inv_network_peers",
+		mcp.WithDescription("List discovered peers with reputation scores"),
+		mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing project: %v", err)), nil
+		}
+		peers, err := store.ListPeers(ctx, project)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		type PeerWithRep struct {
+			Peer
+			Reputation int `json:"reputation"`
+		}
+		var result []PeerWithRep
+		for _, p := range peers {
+			rep, _ := store.GetPeerReputation(ctx, p.PeerID)
+			result = append(result, PeerWithRep{Peer: p, Reputation: rep})
+		}
+		return resultJSON(result)
+	})
+
+	s.AddTool(mcp.NewTool("inv_network_health",
+		mcp.WithDescription("Machine-readable health status (JSON)"),
+		mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+		mcp.WithString("peer_id", mcp.Required(), mcp.Description("Local peer ID")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing project: %v", err)), nil
+		}
+		peerID, err := req.RequireString("peer_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing peer_id: %v", err)), nil
+		}
+		health, err := BuildHealthStatus(ctx, store, peerID, project, time.Now())
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(health)
+	})
+
+	s.AddTool(mcp.NewTool("inv_proposal_create",
+		mcp.WithDescription("Create a governance proposal (change request, trace dispute, membership, challenge)"),
+		mcp.WithString("kind", mcp.Required(), mcp.Description("Proposal kind: change_request, trace_dispute, sweep_acceptance, network_membership, challenge")),
+		mcp.WithString("title", mcp.Required(), mcp.Description("Proposal title")),
+		mcp.WithString("description", mcp.Description("Description")),
+		mcp.WithString("proposer_peer", mcp.Required(), mcp.Description("Proposer peer ID")),
+		mcp.WithString("owner_peer", mcp.Description("Owner peer ID (for veto)")),
+		mcp.WithString("affected_items", mcp.Description("Comma-separated affected item IDs")),
+		mcp.WithNumber("deadline_hours", mcp.Description("Deadline in hours (default 24)")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		kind, err := req.RequireString("kind")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing kind: %v", err)), nil
+		}
+		title, err := req.RequireString("title")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing title: %v", err)), nil
+		}
+		proposer, err := req.RequireString("proposer_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing proposer_peer: %v", err)), nil
+		}
+
+		args := req.GetArguments()
+		desc, _ := args["description"].(string)
+		owner, _ := args["owner_peer"].(string)
+		affectedStr, _ := args["affected_items"].(string)
+		hours, _ := args["deadline_hours"].(float64)
+		if hours == 0 {
+			hours = 24
+		}
+
+		var items []string
+		if affectedStr != "" {
+			items = strings.Split(affectedStr, ",")
+		}
+
+		prop := &Proposal{
+			Kind: ProposalKind(kind), Title: title, Description: desc,
+			ProposerPeer: proposer, ProposerName: proposer, OwnerPeer: owner,
+			AffectedItems: items, Deadline: time.Now().Add(time.Duration(hours) * time.Hour),
+		}
+		if err := store.CreateProposal(ctx, prop); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(prop)
+	})
+
+	s.AddTool(mcp.NewTool("inv_proposal_vote",
+		mcp.WithDescription("Vote on an active proposal"),
+		mcp.WithString("proposal_id", mcp.Required(), mcp.Description("Proposal ID")),
+		mcp.WithString("voter_peer", mcp.Required(), mcp.Description("Voter peer ID")),
+		mcp.WithString("voter_id", mcp.Required(), mcp.Description("Voter ID")),
+		mcp.WithString("decision", mcp.Required(), mcp.Description("Vote: approve or reject")),
+		mcp.WithString("reason", mcp.Description("Reason")),
+		mcp.WithBoolean("is_ai", mcp.Description("Is this an AI vote")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		proposalID, err := req.RequireString("proposal_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing proposal_id: %v", err)), nil
+		}
+		voterPeer, err := req.RequireString("voter_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing voter_peer: %v", err)), nil
+		}
+		voterID, err := req.RequireString("voter_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing voter_id: %v", err)), nil
+		}
+		decision, err := req.RequireString("decision")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing decision: %v", err)), nil
+		}
+
+		args := req.GetArguments()
+		reason, _ := args["reason"].(string)
+		isAI, _ := args["is_ai"].(bool)
+
+		vote := &ProposalVoteRecord{
+			ProposalID: proposalID, VoterPeer: voterPeer, VoterID: voterID,
+			Decision: decision, Reason: reason, IsAI: isAI,
+		}
+		if err := store.CreateProposalVote(ctx, vote); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(fmt.Sprintf("Vote recorded: %s from %s", decision, voterPeer)), nil
+	})
+
+	s.AddTool(mcp.NewTool("inv_challenge_create",
+		mcp.WithDescription("File a challenge against a peer's item or trace"),
+		mcp.WithString("kind", mcp.Required(), mcp.Description("Challenge kind: stale_data, weak_evidence, trace_integrity")),
+		mcp.WithString("challenger_peer", mcp.Required(), mcp.Description("Your peer ID")),
+		mcp.WithString("challenged_peer", mcp.Required(), mcp.Description("Target peer ID")),
+		mcp.WithString("target_item_id", mcp.Description("Target item ID (for stale_data/weak_evidence)")),
+		mcp.WithString("target_trace_id", mcp.Description("Target trace ID (for trace_integrity)")),
+		mcp.WithString("reason", mcp.Required(), mcp.Description("Reason for challenge")),
+		mcp.WithString("evidence", mcp.Description("Supporting evidence")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		kind, err := req.RequireString("kind")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing kind: %v", err)), nil
+		}
+		challenger, err := req.RequireString("challenger_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing challenger_peer: %v", err)), nil
+		}
+		challenged, err := req.RequireString("challenged_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing challenged_peer: %v", err)), nil
+		}
+		reason, err := req.RequireString("reason")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing reason: %v", err)), nil
+		}
+
+		args := req.GetArguments()
+		targetItem, _ := args["target_item_id"].(string)
+		targetTrace, _ := args["target_trace_id"].(string)
+		evidence, _ := args["evidence"].(string)
+
+		ch, err := challengeEngine.CreateChallenge(ctx, ChallengeKind(kind), challenger, challenged, targetItem, targetTrace, reason, evidence, 24*time.Hour)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(ch)
+	})
+
+	s.AddTool(mcp.NewTool("inv_challenge_respond",
+		mcp.WithDescription("Respond to a challenge against your node"),
+		mcp.WithString("challenge_id", mcp.Required(), mcp.Description("Challenge ID")),
+		mcp.WithString("evidence", mcp.Required(), mcp.Description("Evidence for your response")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		challengeID, err := req.RequireString("challenge_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing challenge_id: %v", err)), nil
+		}
+		evidence, err := req.RequireString("evidence")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing evidence: %v", err)), nil
+		}
+
+		if err := challengeEngine.RespondToChallenge(ctx, challengeID, evidence); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(fmt.Sprintf("Response submitted for challenge %s", challengeID)), nil
+	})
+
+	s.AddTool(mcp.NewTool("inv_challenge_list",
+		mcp.WithDescription("List challenges (all open, incoming, or outgoing)"),
+		mcp.WithString("peer_id", mcp.Description("Your peer ID (for incoming/outgoing filter)")),
+		mcp.WithBoolean("incoming", mcp.Description("Show challenges against your node")),
+		mcp.WithBoolean("outgoing", mcp.Description("Show challenges you filed")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := req.GetArguments()
+		peerID, _ := args["peer_id"].(string)
+		incoming, _ := args["incoming"].(bool)
+		outgoing, _ := args["outgoing"].(bool)
+
+		if peerID != "" && (incoming || outgoing) {
+			challenges, err := store.ListChallengesByPeer(ctx, peerID, incoming)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			return resultJSON(challenges)
+		}
+
+		challenges, err := store.ListChallenges(ctx, ChallengeOpen)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(challenges)
+	})
+
+	// --- Workflow MCP Tools ---
+
+	s.AddTool(mcp.NewTool("inv_pending_events",
+		mcp.WithDescription("Get pending (unread) events — challenges, proposals, peer joins, signals, queries"),
+		mcp.WithBoolean("acknowledge", mcp.Description("Mark returned events as read after fetching")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		events, err := engine.GetPendingEvents(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		ack, _ := req.GetArguments()["acknowledge"].(bool)
+		if ack && len(events) > 0 {
+			ids := make([]string, len(events))
+			for i, e := range events {
+				ids[i] = e.ID
+			}
+			if err := engine.AcknowledgeEvents(ctx, ids); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("acknowledge: %v", err)), nil
+			}
+		}
+
+		return resultJSON(events)
+	})
+
+	s.AddTool(mcp.NewTool("inv_session_status",
+		mcp.WithDescription("Get comprehensive session status: nodes, suspect/broken items, pending CRs, challenges, queries, audit, events"),
+		mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+		mcp.WithString("node_id", mcp.Required(), mcp.Description("Your node ID")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing project: %v", err)), nil
+		}
+		nodeID, err := req.RequireString("node_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing node_id: %v", err)), nil
+		}
+
+		status, err := engine.GetSessionStatus(ctx, project, nodeID)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(status)
+	})
+
+	s.AddTool(mcp.NewTool("inv_config_mode",
+		mcp.WithDescription("Get or set permission mode. Returns current mode and action-level permission matrix."),
+		mcp.WithString("new_mode", mcp.Description("Set mode: 'normal' or 'autonomous' (omit to just read current)")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		cfgPath := InvDirPath() + "/config.yaml"
+		cfg, err := LoadNodeConfig(cfgPath)
+		if err != nil {
+			cfg = DefaultNodeConfig()
+		}
+
+		if newMode, ok := req.GetArguments()["new_mode"].(string); ok && newMode != "" {
+			mode := PermissionMode(newMode)
+			if !IsValidPermissionMode(mode) {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid mode: %s (must be 'normal' or 'autonomous')", newMode)), nil
+			}
+			cfg.Node.PermissionMode = mode
+			if err := WriteNodeConfig(cfgPath, cfg); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("save config: %v", err)), nil
+			}
+		}
+
+		mode := cfg.Node.PermissionMode
+		if mode == "" {
+			mode = PermissionNormal
+		}
+		return resultJSON(BuildConfigModeResponse(mode))
+	})
+
+	s.AddTool(mcp.NewTool("inv_audit_all",
+		mcp.WithDescription("Audit all nodes in a project — cross-inventory oversight for project leads"),
+		mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing project: %v", err)), nil
+		}
+
+		reports, err := engine.AuditAllNodes(ctx, project)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(reports)
+	})
+
+	// --- Pairing Session MCP Tools ---
+
+	s.AddTool(mcp.NewTool("inv_pair_invite",
+		mcp.WithDescription("Invite a guest to a pairing session between two nodes"),
+		mcp.WithString("host_peer", mcp.Required(), mcp.Description("Host peer ID")),
+		mcp.WithString("host_node", mcp.Required(), mcp.Description("Host node ID")),
+		mcp.WithString("guest_peer", mcp.Required(), mcp.Description("Guest peer ID")),
+		mcp.WithString("guest_node", mcp.Required(), mcp.Description("Guest node ID")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		hostPeer, err := req.RequireString("host_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing host_peer: %v", err)), nil
+		}
+		hostNode, err := req.RequireString("host_node")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing host_node: %v", err)), nil
+		}
+		guestPeer, err := req.RequireString("guest_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing guest_peer: %v", err)), nil
+		}
+		guestNode, err := req.RequireString("guest_node")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing guest_node: %v", err)), nil
+		}
+
+		sess, err := engine.InvitePair(ctx, hostPeer, hostNode, guestPeer, guestNode)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(sess)
+	})
+
+	s.AddTool(mcp.NewTool("inv_pair_join",
+		mcp.WithDescription("Accept a pairing session invitation"),
+		mcp.WithString("session_id", mcp.Required(), mcp.Description("Pairing session ID")),
+		mcp.WithString("guest_peer", mcp.Required(), mcp.Description("Guest peer ID")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		sessionID, err := req.RequireString("session_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing session_id: %v", err)), nil
+		}
+		guestPeer, err := req.RequireString("guest_peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing guest_peer: %v", err)), nil
+		}
+
+		sess, err := engine.AcceptPair(ctx, sessionID, guestPeer)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(sess)
+	})
+
+	s.AddTool(mcp.NewTool("inv_pair_end",
+		mcp.WithDescription("End an active pairing session"),
+		mcp.WithString("session_id", mcp.Required(), mcp.Description("Pairing session ID")),
+		mcp.WithString("peer", mcp.Required(), mcp.Description("Your peer ID (must be host or guest)")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		sessionID, err := req.RequireString("session_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing session_id: %v", err)), nil
+		}
+		peerID, err := req.RequireString("peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing peer: %v", err)), nil
+		}
+
+		sess, err := engine.EndPair(ctx, sessionID, peerID)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(sess)
+	})
+
+	s.AddTool(mcp.NewTool("inv_pair_list",
+		mcp.WithDescription("List active pairing sessions for a peer"),
+		mcp.WithString("peer", mcp.Required(), mcp.Description("Peer ID to list sessions for")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		peerID, err := req.RequireString("peer")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("missing peer: %v", err)), nil
+		}
+
+		sessions, err := engine.ListPairingSessions(ctx, peerID)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return resultJSON(sessions)
+	})
+
 	return server.ServeStdio(s)
 }
+
 
 func resultJSON(v any) (*mcp.CallToolResult, error) {
 	data, err := json.MarshalIndent(v, "", "  ")

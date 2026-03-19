@@ -199,6 +199,13 @@ dev       pending     0/3    —</span>
     background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
   }
 
+  .demo-btn.active {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 12%, var(--bg-deep));
+    box-shadow: 0 0 8px color-mix(in oklch, var(--signal-pulse) 15%, transparent);
+  }
+
   /* Card inner content injected by JS */
   .pipeline-card :global(.trace-ref) {
     font-family: var(--font-mono);

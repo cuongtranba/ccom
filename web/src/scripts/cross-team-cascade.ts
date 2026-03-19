@@ -60,17 +60,17 @@ if (cascadeCanvas) {
   const islands: Island[] = [
     {
       id: 'pm', team: 'PM', x: 450, y: 60,
-      nodes: [{ label: 'US-001', ox: -30, oy: 0 }, { label: 'US-002', ox: 30, oy: 0 }],
+      nodes: [{ label: 'US-001', ox: -35, oy: 0 }, { label: 'US-002', ox: 35, oy: 0 }],
       status: 'disconnected', discoveryPulse: 0,
     },
     {
       id: 'design', team: 'Design', x: 150, y: 220,
-      nodes: [{ label: 'S-001', ox: -25, oy: -15 }, { label: 'S-002', ox: 25, oy: 15 }],
+      nodes: [{ label: 'S-001', ox: -30, oy: -18 }, { label: 'S-002', ox: 30, oy: 18 }],
       status: 'disconnected', discoveryPulse: 0,
     },
     {
       id: 'dev', team: 'Dev', x: 750, y: 220,
-      nodes: [{ label: 'API-001', ox: -30, oy: -10 }, { label: 'ADR-001', ox: 25, oy: 15 }],
+      nodes: [{ label: 'API-001', ox: -35, oy: -12 }, { label: 'ADR-001', ox: 30, oy: 18 }],
       status: 'disconnected', discoveryPulse: 0,
     },
     {
@@ -124,28 +124,31 @@ if (cascadeCanvas) {
 
   // ---- Drawing helpers ----
   function drawIsland(island: Island): void {
-    const radius = 45;
+    const radius = 55;
     const color = statusColor(island.status);
 
     // Disconnected islands are dim
     if (island.status === 'disconnected') {
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.35;
     }
 
     // Fill circle
     ctx.beginPath();
     ctx.arc(island.x, island.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = color + '15';
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = (island.status === 'disconnected' ? 0.35 : 1.0) * 0.1;
+    ctx.fillStyle = color;
     ctx.fill();
+    ctx.globalAlpha = prevAlpha;
 
     // Stroke circle
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     // Proven glow
     if (island.status === 'proven') {
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 18;
       ctx.shadowColor = color;
       ctx.beginPath();
       ctx.arc(island.x, island.y, radius, 0, Math.PI * 2);
@@ -157,22 +160,22 @@ if (cascadeCanvas) {
     for (const node of island.nodes) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(island.x + node.ox, island.y + node.oy, 4, 0, Math.PI * 2);
+      ctx.arc(island.x + node.ox, island.y + node.oy, 5.5, 0, Math.PI * 2);
       ctx.fill();
 
       // Node label
-      ctx.fillStyle = color;
-      ctx.font = '500 9px "JetBrains Mono", monospace';
+      ctx.fillStyle = cssVar('--text-primary');
+      ctx.font = '500 13px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(node.label, island.x + node.ox, island.y + node.oy - 8);
+      ctx.fillText(node.label, island.x + node.ox, island.y + node.oy - 10);
     }
 
     // Team label below island
-    ctx.fillStyle = cssVar('--text-muted');
-    ctx.globalAlpha = island.status === 'disconnected' ? 0.3 : 0.7;
-    ctx.font = '300 11px "Space Grotesk", sans-serif';
+    ctx.fillStyle = cssVar('--text-primary');
+    ctx.globalAlpha = island.status === 'disconnected' ? 0.35 : 1.0;
+    ctx.font = '500 14px "Space Grotesk", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(island.team, island.x, island.y + radius + 16);
+    ctx.fillText(island.team, island.x, island.y + radius + 20);
 
     ctx.globalAlpha = 1.0;
   }
@@ -180,7 +183,7 @@ if (cascadeCanvas) {
   function drawDiscoveryPulse(island: Island): void {
     if (island.discoveryPulse <= 0 || island.status === 'disconnected') return;
 
-    const maxRadius = 70;
+    const maxRadius = 85;
     const pulseRadius = (island.discoveryPulse % 1) * maxRadius;
     const pulseAlpha = 1.0 - (island.discoveryPulse % 1);
 
@@ -202,9 +205,9 @@ if (cascadeCanvas) {
     const endX = fromIsland.x + (toIsland.x - fromIsland.x) * link.drawProgress;
     const endY = fromIsland.y + (toIsland.y - fromIsland.y) * link.drawProgress;
 
-    ctx.strokeStyle = cssVar('--trace-line');
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = cssVar('--trace-active');
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(fromIsland.x, fromIsland.y);
     ctx.lineTo(endX, endY);
@@ -447,7 +450,12 @@ Discovery            </span><span class="s-proven">active</span>\n\n<span class=
   }
 
   // ---- Button listeners ----
-  document.querySelectorAll<HTMLButtonElement>('[data-cascade]').forEach(btn => {
-    btn.addEventListener('click', () => runDemo(btn.dataset.cascade!));
+  const cascadeBtns = document.querySelectorAll<HTMLButtonElement>('[data-cascade]');
+  cascadeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      cascadeBtns.forEach(b => b.classList.remove('active'));
+      if (btn.dataset.cascade !== 'reset') btn.classList.add('active');
+      runDemo(btn.dataset.cascade!);
+    });
   });
 }

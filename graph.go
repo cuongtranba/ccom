@@ -113,3 +113,47 @@ var NetworkEngine = pumped.Derive3(
 		return NewEngine(store, prop, crsm), nil
 	},
 )
+
+var ProposalEngineProvider = pumped.Derive1(
+	DBStore,
+	func(ctx *pumped.ResolveCtx, storeCtrl *pumped.Controller[*Store]) (*ProposalEngine, error) {
+		store, err := storeCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get store: %w", err)
+		}
+		return NewProposalEngine(store), nil
+	},
+)
+
+var ChallengeEngineProvider = pumped.Derive2(
+	DBStore,
+	ProposalEngineProvider,
+	func(ctx *pumped.ResolveCtx, storeCtrl *pumped.Controller[*Store], propCtrl *pumped.Controller[*ProposalEngine]) (*ChallengeEngine, error) {
+		store, err := storeCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get store: %w", err)
+		}
+		proposals, err := propCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get proposal engine: %w", err)
+		}
+		return NewChallengeEngine(store, proposals), nil
+	},
+)
+
+var P2PHandlersProvider = pumped.Derive2(
+	NetworkEngine,
+	DBStore,
+	func(ctx *pumped.ResolveCtx, engCtrl *pumped.Controller[*Engine], storeCtrl *pumped.Controller[*Store]) (*P2PHandlers, error) {
+		engine, err := engCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get engine: %w", err)
+		}
+		store, err := storeCtrl.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get store: %w", err)
+		}
+		bus := NewP2PEventBus()
+		return NewP2PHandlers(engine, store, bus), nil
+	},
+)
