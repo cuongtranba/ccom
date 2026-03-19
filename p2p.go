@@ -46,6 +46,25 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 	if cfg.Network.EnableRelay {
 		opts = append(opts,
 			libp2p.EnableRelay(),
+			libp2p.EnableRelayService(),
+			libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+				ch := make(chan peer.AddrInfo, numPeers)
+				go func() {
+					defer close(ch)
+					for _, p := range dht.DefaultBootstrapPeers {
+						pi, err := peer.AddrInfoFromP2pAddr(p)
+						if err != nil {
+							continue
+						}
+						select {
+						case ch <- *pi:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+				return ch
+			}),
 			libp2p.EnableHolePunching(),
 			libp2p.NATPortMap(),
 			libp2p.EnableAutoNATv2(),
