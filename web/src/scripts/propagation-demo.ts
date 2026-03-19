@@ -12,11 +12,22 @@ interface DemoTrace {
   to: string;
 }
 
+interface SandParticle {
+  progress: number;
+  speed: number;
+  offsetX: number;
+  offsetY: number;
+  size: number;
+  opacity: number;
+}
+
 interface ActiveSignal {
   from: string;
   to: string;
-  progress: number;
+  particles: SandParticle[];
+  done: boolean;
   onArrive: (() => void) | null;
+  arrived: boolean;
 }
 
 const propCanvas = document.getElementById('propagation-viz') as HTMLCanvasElement | null;
@@ -50,6 +61,18 @@ if (propCanvas) {
 
   function getNode(id: string) { return demoNodes.find(n => n.id === id)!; }
 
+  function createSandSignal(from: string, to: string, onArrive: (() => void) | null): ActiveSignal {
+    const particles: SandParticle[] = Array.from({ length: 10 }, () => ({
+      progress: -(Math.random() * 0.15),
+      speed: 0.012 + (Math.random() - 0.5) * 0.004,
+      offsetX: (Math.random() - 0.5) * 6,
+      offsetY: (Math.random() - 0.5) * 6,
+      size: 1.5 + Math.random() * 1.5,
+      opacity: 0.6 + Math.random() * 0.4,
+    }));
+    return { from, to, particles, done: false, onArrive, arrived: false };
+  }
+
   function statusColor(status: string): string {
     switch (status) {
       case 'proven': return cssVar('--proven');
@@ -77,26 +100,49 @@ if (propCanvas) {
     }
     pCtx.globalAlpha = 1.0;
 
-    activeSignals = activeSignals.filter(s => s.progress < 1);
+    activeSignals = activeSignals.filter(s => !s.done);
+    const signalColor = cssVar('--signal-pulse');
+
     for (const s of activeSignals) {
-      const from = getNode(s.from);
-      const to = getNode(s.to);
-      s.progress += 0.015;
-      const x = from.x + (to.x - from.x) * s.progress;
-      const y = from.y + (to.y - from.y) * s.progress;
+      const fromNode = getNode(s.from);
+      const toNode = getNode(s.to);
+      let allDone = true;
 
-      pCtx.fillStyle = cssVar('--signal-pulse');
-      pCtx.shadowBlur = 12;
-      pCtx.shadowColor = cssVar('--signal-pulse');
-      pCtx.beginPath();
-      pCtx.arc(x, y, 5, 0, Math.PI * 2);
-      pCtx.fill();
-      pCtx.shadowBlur = 0;
+      for (const p of s.particles) {
+        p.progress += p.speed;
+        if (p.progress < 0 || p.progress > 1) {
+          if (p.progress < 1) allDone = false;
+          continue;
+        }
+        allDone = false;
 
-      if (s.progress >= 1 && s.onArrive) {
-        s.onArrive();
-        s.onArrive = null;
+        const x = fromNode.x + (toNode.x - fromNode.x) * p.progress + p.offsetX;
+        const y = fromNode.y + (toNode.y - fromNode.y) * p.progress + p.offsetY;
+
+        const fadeOut = p.progress > 0.8 ? (1.0 - p.progress) / 0.2 : 1.0;
+        const alpha = p.opacity * fadeOut;
+
+        pCtx.globalAlpha = alpha;
+        pCtx.fillStyle = signalColor;
+        pCtx.shadowBlur = 8;
+        pCtx.shadowColor = signalColor;
+        pCtx.beginPath();
+        pCtx.arc(x, y, p.size, 0, Math.PI * 2);
+        pCtx.fill();
       }
+
+      pCtx.shadowBlur = 0;
+      pCtx.globalAlpha = 1.0;
+
+      if (!s.arrived && s.particles.some(p => p.progress >= 0.85)) {
+        s.arrived = true;
+        if (s.onArrive) {
+          s.onArrive();
+          s.onArrive = null;
+        }
+      }
+
+      if (allDone) s.done = true;
     }
 
     for (const n of demoNodes) {
@@ -161,19 +207,19 @@ if (propCanvas) {
       output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor duke</span>\n<span class="out">Item 38ae34fd verified -> </span><span class="s-proven">proven</span>\n<span class="out">Propagated signals through the network:</span>`;
 
       setTimeout(() => {
-        activeSignals.push({ from: 'pm-us001', to: 'des-s001', progress: 0, onArrive: () => { getNode('des-s001').status = 'suspect'; } });
-        activeSignals.push({ from: 'pm-us001', to: 'des-s002', progress: 0, onArrive: () => { getNode('des-s002').status = 'suspect'; } });
+        activeSignals.push(createSandSignal('pm-us001', 'des-s001', () => { getNode('des-s001').status = 'suspect'; }));
+        activeSignals.push(createSandSignal('pm-us001', 'des-s002', () => { getNode('des-s002').status = 'suspect'; }));
       }, 300);
 
       setTimeout(() => {
         output.innerHTML += `\n<span class="out">  -> S-001 in Design is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> S-002 in Design is now </span><span class="s-suspect">suspect</span>`;
-        activeSignals.push({ from: 'des-s001', to: 'dev-api', progress: 0, onArrive: () => { getNode('dev-api').status = 'suspect'; } });
-        activeSignals.push({ from: 'des-s002', to: 'dev-adr', progress: 0, onArrive: () => { getNode('dev-adr').status = 'suspect'; } });
+        activeSignals.push(createSandSignal('des-s001', 'dev-api', () => { getNode('dev-api').status = 'suspect'; }));
+        activeSignals.push(createSandSignal('des-s002', 'dev-adr', () => { getNode('dev-adr').status = 'suspect'; }));
       }, 1500);
 
       setTimeout(() => {
         output.innerHTML += `\n<span class="out">  -> API-001 in Dev is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> ADR-001 in Dev is now </span><span class="s-suspect">suspect</span>`;
-        activeSignals.push({ from: 'dev-api', to: 'qa-tc', progress: 0, onArrive: () => { getNode('qa-tc').status = 'suspect'; } });
+        activeSignals.push(createSandSignal('dev-api', 'qa-tc', () => { getNode('qa-tc').status = 'suspect'; }));
       }, 2800);
 
       setTimeout(() => {
