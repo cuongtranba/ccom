@@ -3,8 +3,10 @@ import Base from '../layouts/Base.astro';
 import SectionHeader from '../components/SectionHeader.astro';
 import StateMachine from '../components/StateMachine.astro';
 import PropagationDemo from '../components/PropagationDemo.astro';
-import VotingCard from '../components/VotingCard.astro';
-import ArchGrid from '../components/ArchGrid.astro';
+import CrossTeamCascade from '../components/CrossTeamCascade.astro';
+import GovernanceLifecycle from '../components/GovernanceLifecycle.astro';
+import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
+import PipelineDemo from '../components/PipelineDemo.astro';
 ---
 
 <Base title="Inventory Network — A Living Protocol">
@@ -43,29 +45,50 @@ import ArchGrid from '../components/ArchGrid.astro';
     <PropagationDemo />
   </section>
 
-  <!-- VOTING -->
+  <!-- P2P NETWORK CASCADE -->
   <section class="section">
     <SectionHeader
-      label="03 — Consensus"
-      title="Nodes vote. AI participates as an equal."
-      description="When a change crosses inventory boundaries, affected nodes vote. AI agents vote alongside humans — with reasons, not just rubber stamps."
+      label="03 — P2P Network"
+      title="One team changes. Five teams know."
+      description="Each vertical runs its own inventory node. The P2P network connects them — discovery is automatic, propagation is instant, and no central server decides what's true."
     />
-    <VotingCard />
+    <CrossTeamCascade />
   </section>
 
-  <!-- ARCHITECTURE -->
+  <!-- GOVERNANCE -->
   <section class="section">
     <SectionHeader
-      label="04 — Architecture"
-      title="Three layers. One protocol."
+      label="04 — Governance"
+      title="No change lands without consensus."
+      description="Cross-inventory changes go through a formal lifecycle. Affected nodes vote. AI participates with reasons — but only humans decide quorum."
     />
-    <ArchGrid />
+    <GovernanceLifecycle />
+  </section>
+
+  <!-- CLAUDE CODE -->
+  <section class="section">
+    <SectionHeader
+      label="05 — AI as First-Class Citizen"
+      title="Same engine. Same network. Different interface."
+      description="Claude Code connects via MCP — the same protocol, the same state. AI detects file changes, suggests verifications, and acts autonomously on its own node. Governance still requires human confirmation."
+    />
+    <ClaudeCodeDemo />
+  </section>
+
+  <!-- PIPELINE -->
+  <section class="section">
+    <SectionHeader
+      label="06 — The Pipeline"
+      title="Every vertical references upstream. Every handoff leaves a trace."
+      description="PM defines the requirements. Designer references them. Dev references both. The protocol enforces these connections — no orphan work, no lost context."
+    />
+    <PipelineDemo />
   </section>
 
   <!-- CTA -->
   <section class="cta-section">
     <SectionHeader
-      label="05 — Start"
+      label="07 — Start"
       title="Own your inventory."
       description="Each team decides its own structure, its own workflow. The protocol handles the connections."
     />
