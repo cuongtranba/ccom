@@ -1,0 +1,279 @@
+---
+---
+
+<div class="pipeline-demo">
+  <div class="pipeline-columns" id="pipeline-viz">
+    <div class="pipeline-col" data-vertical="pm">
+      <div class="pipeline-vertical-label">PM</div>
+      <div class="pipeline-card" id="pm-card"></div>
+    </div>
+    <div class="pipeline-arrow" id="arrow-pm-design">
+      <div class="arrow-line"></div>
+    </div>
+    <div class="pipeline-col" data-vertical="design">
+      <div class="pipeline-vertical-label">Designer</div>
+      <div class="pipeline-card" id="design-card"></div>
+    </div>
+    <div class="pipeline-arrow" id="arrow-design-dev">
+      <div class="arrow-line"></div>
+    </div>
+    <div class="pipeline-col" data-vertical="dev">
+      <div class="pipeline-vertical-label">Dev</div>
+      <div class="pipeline-card" id="dev-card"></div>
+    </div>
+  </div>
+
+  <div class="pipeline-audit-bar" id="audit-bar"></div>
+
+  <div class="pipeline-controls">
+    <div class="demo-buttons">
+      <button class="demo-btn" data-pipeline="pm">PM checklist</button>
+      <button class="demo-btn" data-pipeline="design">Design handoff</button>
+      <button class="demo-btn" data-pipeline="dev">Dev pickup</button>
+      <button class="demo-btn" data-pipeline="audit">audit trail</button>
+      <button class="demo-btn" data-pipeline="reset">reset</button>
+    </div>
+    <pre class="demo-terminal" id="pipeline-output"><span class="prompt">$</span> <span class="cmd">inv pipeline status --project clinic-checkin</span>
+<span class="out">VERTICAL  STATUS      ITEMS  TRACES
+pm        pending     0/3    —
+design    pending     0/3    —
+dev       pending     0/3    —</span>
+
+<span class="prompt">$</span> <span class="cmd">_</span></pre>
+  </div>
+</div>
+
+<script>
+  import '../scripts/pipeline-demo.ts';
+</script>
+
+<style>
+  .pipeline-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 3rem;
+  }
+
+  .pipeline-columns {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .pipeline-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .pipeline-vertical-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+  }
+
+  .pipeline-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 1.2rem;
+    min-height: 180px;
+    transition: border-color 0.4s ease;
+  }
+
+  .pipeline-card.active {
+    border-color: var(--proven);
+  }
+
+  .pipeline-arrow {
+    width: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 5rem;
+  }
+
+  .arrow-line {
+    width: 100%;
+    height: 1px;
+    background: var(--trace-line);
+    position: relative;
+    transition: background 0.4s ease;
+  }
+
+  .arrow-line::after {
+    content: '\2192';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    color: var(--trace-line);
+    transition: color 0.4s ease;
+  }
+
+  .pipeline-arrow.active .arrow-line {
+    background: var(--signal-pulse);
+  }
+
+  .pipeline-arrow.active .arrow-line::after {
+    color: var(--signal-pulse);
+  }
+
+  .pipeline-audit-bar {
+    height: 2px;
+    background: transparent;
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .pipeline-audit-bar.scanning::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 30%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--signal-pulse), transparent);
+    animation: auditSweep 1.5s ease-in-out;
+  }
+
+  @keyframes auditSweep {
+    0% { left: -30%; }
+    100% { left: 100%; }
+  }
+
+  .pipeline-controls {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .demo-terminal {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+
+  .demo-terminal :global(.cmd) { color: var(--signal-pulse); }
+  .demo-terminal :global(.out) { color: var(--text-muted); }
+  .demo-terminal :global(.s-proven) { color: var(--proven); }
+  .demo-terminal :global(.s-suspect) { color: var(--suspect); }
+  .demo-terminal :global(.s-broke) { color: var(--broke); }
+  .demo-terminal :global(.prompt) { color: var(--text-muted); }
+
+  .demo-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--trace-line);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .demo-btn:hover {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  /* Card inner content injected by JS */
+  .pipeline-card :global(.trace-ref) {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 8%, transparent);
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    margin-bottom: 0.75rem;
+    margin-right: 0.35rem;
+  }
+
+  .pipeline-card :global(.check-item) {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    animation: checkSlideIn 0.35s ease forwards;
+    opacity: 0;
+  }
+
+  .pipeline-card :global(.check-item:nth-child(1)) { animation-delay: 0ms; }
+  .pipeline-card :global(.check-item:nth-child(2)) { animation-delay: 80ms; }
+  .pipeline-card :global(.check-item:nth-child(3)) { animation-delay: 160ms; }
+  .pipeline-card :global(.check-item:nth-child(4)) { animation-delay: 240ms; }
+  .pipeline-card :global(.check-item:nth-child(5)) { animation-delay: 320ms; }
+
+  @keyframes checkSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .pipeline-card :global(.check-box) {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    border: 1.5px solid var(--border-hover);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    transition: all 0.3s ease;
+  }
+
+  .pipeline-card :global(.check-box.checked) {
+    border-color: var(--proven);
+    background: var(--proven);
+    color: var(--bg-deep);
+  }
+
+  .pipeline-card :global(.check-box.missing) {
+    border-color: var(--suspect);
+  }
+
+  @media (max-width: 768px) {
+    .pipeline-columns {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+
+    .pipeline-arrow {
+      width: 100%;
+      padding-top: 0;
+      padding: 0.5rem 0;
+      transform: rotate(90deg);
+    }
+  }
+</style>
