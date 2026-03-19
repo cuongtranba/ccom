@@ -23,6 +23,11 @@ const propCanvas = document.getElementById('propagation-viz') as HTMLCanvasEleme
 if (propCanvas) {
   const pCtx = propCanvas.getContext('2d')!;
 
+  const rootStyles = getComputedStyle(document.documentElement);
+  function cssVar(name: string): string {
+    return rootStyles.getPropertyValue(name).trim();
+  }
+
   const demoNodes: DemoNode[] = [
     { id: 'pm-us001', label: 'US-001', vertical: 'PM', x: 275, y: 60, status: 'unverified' },
     { id: 'des-s001', label: 'S-001', vertical: 'Design', x: 120, y: 220, status: 'unverified' },
@@ -47,10 +52,10 @@ if (propCanvas) {
 
   function statusColor(status: string): string {
     switch (status) {
-      case 'proven': return '#c8a840';
-      case 'suspect': return '#d08850';
-      case 'broke': return '#c86050';
-      default: return '#7090b0';
+      case 'proven': return cssVar('--proven');
+      case 'suspect': return cssVar('--suspect');
+      case 'broke': return cssVar('--broke');
+      default: return cssVar('--unverified');
     }
   }
 
@@ -62,13 +67,15 @@ if (propCanvas) {
     for (const t of demoTraces) {
       const from = getNode(t.from);
       const to = getNode(t.to);
-      pCtx.strokeStyle = 'rgba(100, 120, 110, 0.3)';
+      pCtx.strokeStyle = cssVar('--trace-line');
+      pCtx.globalAlpha = 0.5;
       pCtx.lineWidth = 1;
       pCtx.beginPath();
       pCtx.moveTo(from.x, from.y);
       pCtx.lineTo(to.x, to.y);
       pCtx.stroke();
     }
+    pCtx.globalAlpha = 1.0;
 
     activeSignals = activeSignals.filter(s => s.progress < 1);
     for (const s of activeSignals) {
@@ -78,9 +85,9 @@ if (propCanvas) {
       const x = from.x + (to.x - from.x) * s.progress;
       const y = from.y + (to.y - from.y) * s.progress;
 
-      pCtx.fillStyle = '#80c870';
+      pCtx.fillStyle = cssVar('--signal-pulse');
       pCtx.shadowBlur = 12;
-      pCtx.shadowColor = '#80c870';
+      pCtx.shadowColor = cssVar('--signal-pulse');
       pCtx.beginPath();
       pCtx.arc(x, y, 5, 0, Math.PI * 2);
       pCtx.fill();
@@ -117,9 +124,11 @@ if (propCanvas) {
       pCtx.textAlign = 'center';
       pCtx.fillText(n.label, n.x, n.y - 4);
 
-      pCtx.fillStyle = 'rgba(180,180,180,0.5)';
+      pCtx.fillStyle = cssVar('--text-muted');
+      pCtx.globalAlpha = 0.7;
       pCtx.font = '300 9px "Space Grotesk", sans-serif';
       pCtx.fillText(n.vertical, n.x, n.y + 10);
+      pCtx.globalAlpha = 1.0;
 
       pCtx.fillStyle = color;
       pCtx.font = '300 8px "JetBrains Mono", monospace';
