@@ -12,6 +12,13 @@ import (
 )
 
 func serveMCP(engine *Engine, store *Store, challengeEngine *ChallengeEngine) error {
+	s := newMCPServer(engine, store, challengeEngine)
+	return server.ServeStdio(s)
+}
+
+// newMCPServer creates the MCP server with all inventory tools registered.
+// Extracted for testability with InProcessClient.
+func newMCPServer(engine *Engine, store *Store, challengeEngine *ChallengeEngine) *server.MCPServer {
 	s := server.NewMCPServer(
 		"Inventory Network",
 		"1.0.0",
@@ -1061,9 +1068,8 @@ func serveMCP(engine *Engine, store *Store, challengeEngine *ChallengeEngine) er
 		return resultJSON(sessions)
 	})
 
-	return server.ServeStdio(s)
+	return s
 }
-
 
 func resultJSON(v any) (*mcp.CallToolResult, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
