@@ -1,0 +1,293 @@
+---
+---
+
+<div class="governance-demo">
+  <div class="cr-lifecycle" id="cr-lifecycle">
+    <div class="cr-header">
+      <span class="cr-badge draft" id="cr-badge">DRAFT</span>
+      <span class="cr-id">CR-042</span>
+    </div>
+    <h3 class="cr-title">Change check-in API from sync to async</h3>
+    <p class="cr-proposer">Proposed by: <strong>Dev Node</strong></p>
+    <div class="cr-votes" id="cr-votes"></div>
+    <div class="cr-quorum" id="cr-quorum">
+      <div class="quorum-bar">
+        <div class="quorum-fill" id="quorum-fill"></div>
+      </div>
+      <span class="quorum-text" id="quorum-text">0/3 human votes (need &gt;50%)</span>
+    </div>
+  </div>
+
+  <div class="demo-panel">
+    <div class="demo-buttons">
+      <button class="demo-btn" data-gov="draft">draft</button>
+      <button class="demo-btn" data-gov="open">open voting</button>
+      <button class="demo-btn" data-gov="vote">cast votes</button>
+      <button class="demo-btn" data-gov="approve">approve</button>
+      <button class="demo-btn" data-gov="archive">archive</button>
+      <button class="demo-btn" data-gov="reset">reset</button>
+    </div>
+    <pre class="demo-terminal" id="gov-output"><span class="prompt">$</span> <span class="cmd">inv cr show CR-042</span>
+<span class="out">CR-042  Change check-in API from sync to async
+Status: </span><span class="s-muted">DRAFT</span>
+<span class="out">Votes:  none</span>
+
+<span class="prompt">$</span> <span class="cmd">_</span></pre>
+  </div>
+</div>
+
+<script>
+  import '../scripts/governance-lifecycle.ts';
+</script>
+
+<style>
+  .governance-demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2rem, 4vw, 5rem);
+    align-items: start;
+    margin-top: 3rem;
+  }
+
+  /* ---- CR Card ---- */
+  .cr-lifecycle {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: clamp(2rem, 3vw, 3rem);
+    transition: border-color 0.4s ease, opacity 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  .cr-lifecycle.approved {
+    border-color: var(--proven);
+    box-shadow: 0 0 20px color-mix(in oklch, var(--proven) 25%, transparent);
+  }
+
+  .cr-lifecycle.archived {
+    opacity: 0.45;
+    border-color: var(--text-muted);
+  }
+
+  .cr-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .cr-badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .cr-badge.draft {
+    background: color-mix(in oklch, var(--unverified) 15%, transparent);
+    color: var(--unverified);
+    border: 1px solid color-mix(in oklch, var(--unverified) 30%, transparent);
+  }
+
+  .cr-badge.voting {
+    background: color-mix(in oklch, var(--proven) 15%, transparent);
+    color: var(--proven);
+    border: 1px solid color-mix(in oklch, var(--proven) 30%, transparent);
+  }
+
+  .cr-badge.approved {
+    background: color-mix(in oklch, var(--proven) 25%, transparent);
+    color: var(--proven);
+    border: 1px solid color-mix(in oklch, var(--proven) 50%, transparent);
+  }
+
+  .cr-badge.archived {
+    background: color-mix(in oklch, var(--text-muted) 15%, transparent);
+    color: var(--text-muted);
+    border: 1px solid color-mix(in oklch, var(--text-muted) 30%, transparent);
+  }
+
+  .cr-id {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .cr-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+
+  .cr-proposer {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .cr-proposer strong {
+    color: var(--text-secondary);
+  }
+
+  /* ---- Votes ---- */
+  .cr-votes {
+    min-height: 0;
+  }
+
+  .cr-votes :global(.vote-row) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.85rem;
+    animation: voteSlideIn 0.4s ease forwards;
+  }
+
+  @keyframes voteSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .cr-votes :global(.vote-node) {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+
+  .cr-votes :global(.vote-icon) {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .cr-votes :global(.vote-icon.approve) {
+    color: var(--proven);
+  }
+
+  .cr-votes :global(.vote-icon.revise) {
+    color: var(--suspect);
+  }
+
+  .cr-votes :global(.vote-reason) {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    flex: 1;
+  }
+
+  .cr-votes :global(.vote-ai-tag) {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    padding: 0.15rem 0.4rem;
+    background: color-mix(in oklch, var(--signal-pulse) 10%, transparent);
+    color: var(--signal-pulse);
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .cr-votes :global(.vote-advisory) {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  /* ---- Quorum ---- */
+  .cr-quorum {
+    display: none;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .cr-quorum.visible {
+    display: block;
+  }
+
+  .quorum-bar {
+    height: 6px;
+    background: var(--bg-deep);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+  }
+
+  .quorum-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--proven);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .quorum-text {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  /* ---- Terminal panel ---- */
+  .demo-panel {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
+  .demo-terminal {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+
+  .demo-terminal :global(.cmd) { color: var(--signal-pulse); }
+  .demo-terminal :global(.out) { color: var(--text-muted); }
+  .demo-terminal :global(.s-proven) { color: var(--proven); }
+  .demo-terminal :global(.s-suspect) { color: var(--suspect); }
+  .demo-terminal :global(.s-muted) { color: var(--text-muted); }
+  .demo-terminal :global(.prompt) { color: var(--text-muted); }
+
+  .demo-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--trace-line);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .demo-btn:hover {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  @media (max-width: 768px) {
+    .governance-demo { grid-template-columns: 1fr; }
+  }
+</style>
