@@ -17,5 +17,8 @@ web/.astro/
 .vscode/
 *.swp
 
+# Dokploy config (contains secrets)
+web/.dokploy.json
+
 # OS
 .DS_Store
