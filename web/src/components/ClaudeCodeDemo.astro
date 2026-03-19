@@ -1,0 +1,124 @@
+---
+---
+
+<div class="claude-demo">
+  <div class="terminal-split">
+    <div class="terminal-column">
+      <div class="terminal-label">⌘ HUMAN — CLI</div>
+      <pre class="demo-terminal split-terminal" id="human-terminal"><span class="prompt">$</span> <span class="cmd">_</span></pre>
+    </div>
+    <div class="terminal-column">
+      <div class="terminal-label"><span class="terminal-label-ai">AI</span> AGENT — MCP</div>
+      <pre class="demo-terminal split-terminal" id="ai-terminal"><span class="prompt">⟩</span> <span class="cmd">_</span></pre>
+    </div>
+  </div>
+  <div class="demo-buttons claude-buttons">
+    <button class="demo-btn" data-claude="start">session start</button>
+    <button class="demo-btn" data-claude="edit">human edits</button>
+    <button class="demo-btn" data-claude="ai">AI acts</button>
+    <button class="demo-btn" data-claude="cross">cross-node event</button>
+    <button class="demo-btn" data-claude="reset">reset</button>
+  </div>
+</div>
+
+<script>
+  import '../scripts/claude-code-demo.ts';
+</script>
+
+<style>
+  .claude-demo {
+    margin-top: 3rem;
+  }
+
+  .terminal-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .terminal-column {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .terminal-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+  }
+
+  .terminal-label-ai {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.35rem;
+    background: color-mix(in oklch, var(--signal-pulse) 15%, transparent);
+    color: var(--signal-pulse);
+    border-radius: 2px;
+  }
+
+  .split-terminal {
+    padding: 1.2rem;
+    min-height: 260px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    margin: 0;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+  }
+
+  .split-terminal :global(.cmd) { color: var(--signal-pulse); }
+  .split-terminal :global(.out) { color: var(--text-muted); }
+  .split-terminal :global(.s-proven) { color: var(--proven); }
+  .split-terminal :global(.s-suspect) { color: var(--suspect); }
+  .split-terminal :global(.event) { color: var(--suspect); }
+  .split-terminal :global(.warn) { color: var(--suspect); font-weight: bold; }
+  .split-terminal :global(.prompt) { color: var(--text-muted); }
+  .split-terminal :global(.ai-mode) { color: var(--signal-pulse); }
+
+  .claude-buttons {
+    margin-top: 1.5rem;
+  }
+
+  .demo-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--trace-line);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .demo-btn:hover {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  @media (max-width: 768px) {
+    .terminal-split {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
