@@ -53,7 +53,7 @@ func readHandshakeMsg(s network.Stream) (HandshakePayload, error) {
 		return payload, fmt.Errorf("read length: %w", err)
 	}
 	msgLen := binary.BigEndian.Uint32(lenBuf)
-	if msgLen > 4096 {
+	if msgLen > 16384 {
 		return payload, fmt.Errorf("message too large: %d", msgLen)
 	}
 	data := make([]byte, msgLen)

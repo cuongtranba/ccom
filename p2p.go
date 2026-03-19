@@ -193,13 +193,18 @@ func (p *P2PHost) dhtDiscovery(ctx context.Context, project string) {
 				if p.host.Network().Connectedness(pi.ID) == 1 { // already connected
 					continue
 				}
-				if err := p.host.Connect(ctx, pi); err != nil {
+				connectCtx, connectCancel := context.WithTimeout(ctx, 15*time.Second)
+				if err := p.host.Connect(connectCtx, pi); err != nil {
+					connectCancel()
 					log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("DHT: failed to connect to discovered peer")
 				} else {
+					connectCancel()
 					log.Info().Str("peer", pi.ID.String()).Msg("DHT: connected to discovered peer")
-					if err := p.InitiateHandshake(ctx, pi.ID); err != nil {
-						log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("DHT: handshake failed")
+					hsCtx, hsCancel := context.WithTimeout(ctx, 10*time.Second)
+					if err := p.InitiateHandshake(hsCtx, pi.ID); err != nil {
+						log.Warn().Err(err).Str("peer", pi.ID.String()).Msg("DHT: handshake failed")
 					}
+					hsCancel()
 				}
 			}
 		}
