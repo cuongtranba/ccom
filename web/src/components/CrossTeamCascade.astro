@@ -1,0 +1,98 @@
+---
+---
+
+<div class="cascade-demo">
+  <canvas id="cascade-viz" width="900" height="500"></canvas>
+
+  <div class="demo-panel">
+    <div class="demo-buttons">
+      <button class="demo-btn" data-cascade="connect">connect teams</button>
+      <button class="demo-btn" data-cascade="change">PM changes story</button>
+      <button class="demo-btn" data-cascade="resolve">resolve all</button>
+      <button class="demo-btn" data-cascade="reset">reset</button>
+    </div>
+    <pre class="demo-terminal" id="cascade-output"><span class="prompt">$</span> <span class="cmd">inv network status</span>
+<span class="out">P2P NETWORK          STATUS
+Nodes connected      0 / 5
+Discovery            idle
+Last sweep           --</span>
+
+<span class="prompt">$</span> <span class="cmd">_</span></pre>
+  </div>
+</div>
+
+<script>
+  import '../scripts/cross-team-cascade.ts';
+</script>
+
+<style>
+  .cascade-demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2rem, 4vw, 5rem);
+    align-items: start;
+    margin-top: 3rem;
+  }
+
+  #cascade-viz {
+    width: 100%;
+    aspect-ratio: 9 / 5;
+    max-width: 900px;
+  }
+
+  .demo-panel {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
+  .demo-terminal {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+
+  .demo-terminal :global(.cmd) { color: var(--signal-pulse); }
+  .demo-terminal :global(.out) { color: var(--text-muted); }
+  .demo-terminal :global(.s-proven) { color: var(--proven); }
+  .demo-terminal :global(.s-suspect) { color: var(--suspect); }
+  .demo-terminal :global(.s-broke) { color: var(--broke); }
+  .demo-terminal :global(.prompt) { color: var(--text-muted); }
+
+  .demo-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--trace-line);
+    border-radius: 4px;
+    background: var(--bg-deep);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .demo-btn:hover {
+    border-color: var(--signal-pulse);
+    color: var(--signal-pulse);
+    background: color-mix(in oklch, var(--signal-pulse) 5%, var(--bg-deep));
+  }
+
+  @media (max-width: 768px) {
+    .cascade-demo { grid-template-columns: 1fr; }
+    #cascade-viz { max-width: 100%; }
+  }
+</style>
