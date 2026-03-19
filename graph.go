@@ -16,12 +16,19 @@ type AppConfig struct {
 }
 
 var Config = pumped.Provide(func(ctx *pumped.ResolveCtx) (*AppConfig, error) {
-	return &AppConfig{
+	cfg := &AppConfig{
 		DBPath:      "inventory.db",
 		Project:     "clinic-checkin",
 		SystemLevel: zerolog.InfoLevel,
 		AgentLevel:  zerolog.InfoLevel,
-	}, nil
+	}
+	// Use the node config database path if available
+	configPath := InvDirPath() + "/config.yaml"
+	if nodeCfg, err := LoadNodeConfig(configPath); err == nil && nodeCfg.Database.Path != "" {
+		cfg.DBPath = nodeCfg.Database.Path
+		cfg.Project = nodeCfg.Node.Project
+	}
+	return cfg, nil
 })
 
 var SystemLog = pumped.Derive1(
