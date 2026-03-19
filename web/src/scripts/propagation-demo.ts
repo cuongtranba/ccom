@@ -82,6 +82,19 @@ if (propCanvas) {
     }
   }
 
+  function drawOrganicCircle(cx: number, cy: number, radius: number, segments: number = 24) {
+    pCtx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const wobble = radius + (Math.sin(angle * 5 + cx) * 1.2);
+      const px = cx + Math.cos(angle) * wobble;
+      const py = cy + Math.sin(angle) * wobble;
+      if (i === 0) pCtx.moveTo(px, py);
+      else pCtx.lineTo(px, py);
+    }
+    pCtx.closePath();
+  }
+
   function drawLoop() {
     const w = propCanvas!.width;
     const h = propCanvas!.height;
@@ -148,19 +161,19 @@ if (propCanvas) {
     for (const n of demoNodes) {
       const color = statusColor(n.status);
 
+      // Fill & stroke
       pCtx.fillStyle = color + '20';
       pCtx.strokeStyle = color;
       pCtx.lineWidth = 1.5;
-      pCtx.beginPath();
-      pCtx.arc(n.x, n.y, 28, 0, Math.PI * 2);
+      drawOrganicCircle(n.x, n.y, 28);
       pCtx.fill();
       pCtx.stroke();
 
+      // Glow for proven
       if (n.status === 'proven') {
         pCtx.shadowBlur = 15;
         pCtx.shadowColor = color;
-        pCtx.beginPath();
-        pCtx.arc(n.x, n.y, 28, 0, Math.PI * 2);
+        drawOrganicCircle(n.x, n.y, 28);
         pCtx.stroke();
         pCtx.shadowBlur = 0;
       }
