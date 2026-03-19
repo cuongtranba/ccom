@@ -6,12 +6,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/rs/zerolog/log"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
@@ -78,6 +81,9 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 
 		// Connect to IPFS bootstrap peers for DHT seeding
 		go p2pHost.connectBootstrapPeers(ctx)
+
+		// Advertise and discover peers via DHT using project rendezvous
+		go p2pHost.dhtDiscovery(ctx, cfg.Node.Project)
 	}
 
 	// Connect to configured bootstrap peers
@@ -132,6 +138,51 @@ func (p *P2PHost) connectConfiguredPeers(ctx context.Context) {
 			log.Warn().Err(err).Str("peer", pi.ID.String()).Msg("failed to connect to configured peer")
 		} else {
 			log.Info().Str("peer", pi.ID.String()).Msg("connected to configured peer")
+		}
+	}
+}
+
+// dhtDiscovery advertises this node and continuously discovers peers
+// under a project-specific rendezvous key via the Kademlia DHT.
+func (p *P2PHost) dhtDiscovery(ctx context.Context, project string) {
+	rendezvous := "inv/project/" + project
+	discovery := drouting.NewRoutingDiscovery(p.dht)
+
+	// Wait for bootstrap peers to connect before advertising
+	time.Sleep(5 * time.Second)
+
+	// Advertise ourselves
+	dutil.Advertise(ctx, discovery, rendezvous)
+	log.Info().Str("rendezvous", rendezvous).Msg("DHT: advertising on rendezvous")
+
+	// Periodically search for peers
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		peers, err := dutil.FindPeers(ctx, discovery, rendezvous)
+		if err != nil {
+			log.Debug().Err(err).Msg("DHT: find peers failed")
+		} else {
+			for _, pi := range peers {
+				if pi.ID == p.host.ID() || len(pi.Addrs) == 0 {
+					continue
+				}
+				if p.host.Network().Connectedness(pi.ID) == 1 { // already connected
+					continue
+				}
+				if err := p.host.Connect(ctx, pi); err != nil {
+					log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("DHT: failed to connect to discovered peer")
+				} else {
+					log.Info().Str("peer", pi.ID.String()).Msg("DHT: connected to discovered peer")
+				}
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
 	}
 }
