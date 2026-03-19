@@ -85,6 +85,9 @@ func NewP2PHost(ctx context.Context, ident *NodeIdentity, cfg *NodeConfig, store
 		limiter:  NewPeerRateLimiter(cfg.Security.MaxMessageRate, cfg.Security.ThrottleDuration, cfg.Security.ThrottleDuration),
 	}
 
+	// Register handshake protocol handler for incoming connections
+	p2pHost.SetupHandshakeHandler()
+
 	// Bootstrap DHT for peer discovery and relay finding
 	if cfg.Network.EnableDHT {
 		kademliaDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeAutoServer))
@@ -194,6 +197,9 @@ func (p *P2PHost) dhtDiscovery(ctx context.Context, project string) {
 					log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("DHT: failed to connect to discovered peer")
 				} else {
 					log.Info().Str("peer", pi.ID.String()).Msg("DHT: connected to discovered peer")
+					if err := p.InitiateHandshake(ctx, pi.ID); err != nil {
+						log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("DHT: handshake failed")
+					}
 				}
 			}
 		}
@@ -275,7 +281,12 @@ func (n *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
 		return
 	}
 	ctx := context.Background()
-	_ = n.host.host.Connect(ctx, pi)
+	if err := n.host.host.Connect(ctx, pi); err != nil {
+		return
+	}
+	if err := n.host.InitiateHandshake(ctx, pi.ID); err != nil {
+		log.Debug().Err(err).Str("peer", pi.ID.String()).Msg("mDNS: handshake failed")
+	}
 }
 
 // mdnsServiceName converts a project name into a valid DNS-SD service type.
