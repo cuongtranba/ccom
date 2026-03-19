@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,30 +27,57 @@ type HandshakePayload struct {
 	Addrs    []string `json:"addrs"`
 }
 
+// writeHandshakeMsg writes a length-prefixed JSON message to the stream.
+func writeHandshakeMsg(s network.Stream, payload HandshakePayload) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	// Write 4-byte big-endian length prefix
+	lenBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(data)))
+	if _, err := s.Write(lenBuf); err != nil {
+		return fmt.Errorf("write length: %w", err)
+	}
+	if _, err := s.Write(data); err != nil {
+		return fmt.Errorf("write payload: %w", err)
+	}
+	return nil
+}
+
+// readHandshakeMsg reads a length-prefixed JSON message from the stream.
+func readHandshakeMsg(s network.Stream) (HandshakePayload, error) {
+	var payload HandshakePayload
+	lenBuf := make([]byte, 4)
+	if _, err := io.ReadFull(s, lenBuf); err != nil {
+		return payload, fmt.Errorf("read length: %w", err)
+	}
+	msgLen := binary.BigEndian.Uint32(lenBuf)
+	if msgLen > 4096 {
+		return payload, fmt.Errorf("message too large: %d", msgLen)
+	}
+	data := make([]byte, msgLen)
+	if _, err := io.ReadFull(s, data); err != nil {
+		return payload, fmt.Errorf("read payload: %w", err)
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return payload, fmt.Errorf("unmarshal: %w", err)
+	}
+	return payload, nil
+}
+
 // SetupHandshakeHandler registers the stream handler for incoming handshakes.
 func (p *P2PHost) SetupHandshakeHandler() {
 	p.host.SetStreamHandler(HandshakeProtocolID, func(s network.Stream) {
 		defer s.Close()
 
-		data, err := io.ReadAll(io.LimitReader(s, 4096))
+		remote, err := readHandshakeMsg(s)
 		if err != nil {
 			log.Debug().Err(err).Msg("handshake: read failed")
 			return
 		}
 
-		var remote HandshakePayload
-		if err := json.Unmarshal(data, &remote); err != nil {
-			log.Debug().Err(err).Msg("handshake: parse failed")
-			return
-		}
-
-		// Send our payload back
-		resp, err := json.Marshal(p.buildHandshakePayload())
-		if err != nil {
-			log.Debug().Err(err).Msg("handshake: marshal response failed")
-			return
-		}
-		if _, err := s.Write(resp); err != nil {
+		if err := writeHandshakeMsg(s, p.buildHandshakePayload()); err != nil {
 			log.Debug().Err(err).Msg("handshake: write response failed")
 			return
 		}
@@ -71,26 +99,13 @@ func (p *P2PHost) InitiateHandshake(ctx context.Context, remotePeerID peer.ID) e
 	}
 	defer stream.Close()
 
-	data, err := json.Marshal(p.buildHandshakePayload())
-	if err != nil {
-		return fmt.Errorf("marshal handshake: %w", err)
-	}
-	if _, err := stream.Write(data); err != nil {
+	if err := writeHandshakeMsg(stream, p.buildHandshakePayload()); err != nil {
 		return fmt.Errorf("write handshake: %w", err)
 	}
 
-	if err := stream.CloseWrite(); err != nil {
-		return fmt.Errorf("close write: %w", err)
-	}
-
-	resp, err := io.ReadAll(io.LimitReader(stream, 4096))
+	remote, err := readHandshakeMsg(stream)
 	if err != nil {
 		return fmt.Errorf("read handshake response: %w", err)
-	}
-
-	var remote HandshakePayload
-	if err := json.Unmarshal(resp, &remote); err != nil {
-		return fmt.Errorf("parse handshake response: %w", err)
 	}
 
 	if err := p.registerDiscoveredPeer(ctx, &remote); err != nil {
