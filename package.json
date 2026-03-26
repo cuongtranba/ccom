@@ -1,0 +1,10 @@
+{
+  "name": "my-inventory",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "bun test",
+    "server": "bun run packages/server/src/index.ts",
+    "node": "bun run packages/node/src/index.ts"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@inv/server",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@inv/shared": "workspace:*",
+    "ioredis": "^5.4.2"
+  }
+}

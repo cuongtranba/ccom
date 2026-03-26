@@ -1,0 +1,9 @@
+{
+  "name": "@inv/node",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@inv/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
