@@ -11,9 +11,11 @@ inventory.db-wal
 *.png
 
 # Node modules & build artifacts
+node_modules/
 web/node_modules/
 web/dist/
 web/.astro/
+dist/
 
 # Playwright MCP logs
 .playwright-mcp/
