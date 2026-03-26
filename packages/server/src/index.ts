@@ -147,8 +147,122 @@ function parseArgs(args: string[]): { port: number; redisUrl: string } {
   return { port, redisUrl };
 }
 
+function parseRedisUrl(args: string[]): string {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--redis" && args[i + 1]) {
+      return args[i + 1];
+    }
+  }
+  return "redis://127.0.0.1:6379";
+}
+
+async function tokenCreate(args: string[]): Promise<void> {
+  let project = "";
+  let nodeId = "";
+  const redisUrl = parseRedisUrl(args);
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--project" && args[i + 1]) {
+      project = args[i + 1];
+      i++;
+    } else if (args[i] === "--node" && args[i + 1]) {
+      nodeId = args[i + 1];
+      i++;
+    }
+  }
+
+  if (!project || !nodeId) {
+    console.error("Usage: token create --project <project> --node <nodeId> [--redis <url>]");
+    process.exit(1);
+  }
+
+  const redis = new Redis(redisUrl);
+  const auth = new RedisAuth(redis);
+  try {
+    const token = await auth.createToken(project, nodeId);
+    console.log(token);
+  } finally {
+    redis.disconnect();
+  }
+}
+
+async function tokenList(args: string[]): Promise<void> {
+  let project = "";
+  const redisUrl = parseRedisUrl(args);
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--project" && args[i + 1]) {
+      project = args[i + 1];
+      i++;
+    }
+  }
+
+  if (!project) {
+    console.error("Usage: token list --project <project> [--redis <url>]");
+    process.exit(1);
+  }
+
+  const redis = new Redis(redisUrl);
+  const auth = new RedisAuth(redis);
+  try {
+    const tokens = await auth.listTokens(project);
+    if (tokens.length === 0) {
+      console.log("No tokens found.");
+    } else {
+      for (const t of tokens) {
+        console.log(`${t.nodeId}\t${t.createdAt}`);
+      }
+    }
+  } finally {
+    redis.disconnect();
+  }
+}
+
+async function tokenRevoke(args: string[]): Promise<void> {
+  const redisUrl = parseRedisUrl(args);
+
+  // Find the first positional arg (skip flags and their values)
+  let token = "";
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--redis") {
+      i++; // skip flag value
+    } else if (!args[i].startsWith("--")) {
+      token = args[i];
+      break;
+    }
+  }
+
+  if (!token) {
+    console.error("Usage: token revoke <token> [--redis <url>]");
+    process.exit(1);
+  }
+
+  const redis = new Redis(redisUrl);
+  const auth = new RedisAuth(redis);
+  try {
+    await auth.revokeToken(token);
+    console.log("Token revoked.");
+  } finally {
+    redis.disconnect();
+  }
+}
+
 const args = process.argv.slice(2);
 if (args[0] === "start") {
   const opts = parseArgs(args.slice(1));
   startServer(opts);
+} else if (args[0] === "token") {
+  const sub = args[1];
+  const rest = args.slice(2);
+
+  if (sub === "create") {
+    tokenCreate(rest);
+  } else if (sub === "list") {
+    tokenList(rest);
+  } else if (sub === "revoke") {
+    tokenRevoke(rest);
+  } else {
+    console.error("Usage: token <create|list|revoke>");
+    process.exit(1);
+  }
 }

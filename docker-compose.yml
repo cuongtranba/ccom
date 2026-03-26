@@ -1,0 +1,14 @@
+services:
+  redis:
+    image: redis:7
+    expose:
+      - "6379"
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    ports:
+      - "4400:4400"
+    depends_on:
+      - redis

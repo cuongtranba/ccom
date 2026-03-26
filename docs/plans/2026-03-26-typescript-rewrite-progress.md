@@ -30,15 +30,16 @@
 
 ### High Priority (Get it running end-to-end)
 
-- [ ] **Deploy central server to Dokploy** — build Docker image for `packages/server`, deploy to lowbit.link with Redis
-- [ ] **Create sample `inv-config.json`** — example config for running a node locally
-- [ ] **End-to-end test with 2 nodes** — start server, connect 2 nodes, verify messages route correctly
+- [x] **Remove Go code** — deleted all `.go` files, `go.mod`, `go.sum`, `proto/`, `relay/`, compiled binary, `.mcp.json`, `inventory.db*`
+- [x] **Create sample `inv-config.json`** — `inv-config.example.json` at repo root
+- [x] **Server CLI** — `token create/list/revoke` subcommands added to server entry point
+- [x] **Dockerfile + docker-compose** — `packages/server/Dockerfile` + `docker-compose.yml` (server + redis)
+- [ ] **Deploy central server to Dokploy** — push Docker image, deploy to lowbit.link with Redis
+- [x] **End-to-end test with 2 nodes** — `packages/node/test/e2e.test.ts` — 4 tests (broadcast, direct msg, echo suppression, auth rejection). Run with `E2E_DEV_TOKEN=... E2E_PM_TOKEN=... bun test packages/node/test/e2e.test.ts`
 - [ ] **Test Chat TUI manually** — run `bun run node -- ./inv-config.json`, interact with Claude, verify tools work
-- [ ] **Remove Go code** — delete all `.go` files, `go.mod`, `go.sum`, `proto/`, `relay/`, compiled binaries, `.mcp.json`
 
 ### Medium Priority (Polish)
 
-- [ ] **Server CLI** — `bun run server token create/list/revoke` commands (currently only `start` works)
 - [ ] **Node auto-registration** — when node connects, register with server if node.id is empty
 - [ ] **Reconnect drain** — verify outbox drains correctly on reconnect
 - [ ] **Cross-instance pub/sub** — test Redis pub/sub routing between multiple server instances
