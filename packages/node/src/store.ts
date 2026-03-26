@@ -1,0 +1,750 @@
+import { Database } from "bun:sqlite";
+import { randomUUID } from "crypto";
+import type {
+  Node,
+  Item,
+  Trace,
+  Signal,
+  Transition,
+  Query,
+  QueryResponse,
+  PendingAction,
+  AuditReport,
+  Vertical,
+  ItemState,
+  ItemKind,
+  TraceRelation,
+  TransitionKind,
+} from "@inv/shared";
+import { UPSTREAM_VERTICALS } from "@inv/shared";
+
+// ── Row types (snake_case DB representation) ────────────────────────────
+
+interface NodeRow {
+  id: string;
+  name: string;
+  vertical: string;
+  project: string;
+  owner: string;
+  is_ai: number;
+  created_at: string;
+}
+
+interface ItemRow {
+  id: string;
+  node_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  external_ref: string;
+  state: string;
+  evidence: string;
+  confirmed_by: string;
+  confirmed_at: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TraceRow {
+  id: string;
+  from_item_id: string;
+  from_node_id: string;
+  to_item_id: string;
+  to_node_id: string;
+  relation: string;
+  confirmed_by: string;
+  confirmed_at: string | null;
+  created_at: string;
+}
+
+interface SignalRow {
+  id: string;
+  kind: string;
+  source_item: string;
+  source_node: string;
+  target_item: string;
+  target_node: string;
+  payload: string;
+  processed: number;
+  created_at: string;
+}
+
+interface TransitionRow {
+  id: string;
+  item_id: string;
+  kind: string;
+  from_s: string;
+  to_s: string;
+  evidence: string;
+  reason: string;
+  actor: string;
+  timestamp: string;
+}
+
+interface QueryRow {
+  id: string;
+  asker_id: string;
+  asker_node: string;
+  question: string;
+  context: string;
+  target_node: string;
+  resolved: number;
+  created_at: string;
+}
+
+interface QueryResponseRow {
+  id: string;
+  query_id: string;
+  responder_id: string;
+  node_id: string;
+  answer: string;
+  is_ai: number;
+  created_at: string;
+}
+
+interface PendingActionRow {
+  id: string;
+  message_type: string;
+  envelope: string;
+  summary: string;
+  proposed: string;
+  status: string;
+  created_at: string;
+}
+
+// ── Input types for create methods ──────────────────────────────────────
+
+interface CreateNodeInput {
+  name: string;
+  vertical: Vertical;
+  project: string;
+  owner: string;
+  isAI: boolean;
+}
+
+interface CreateItemInput {
+  nodeId: string;
+  kind: ItemKind;
+  title: string;
+  body?: string;
+  externalRef?: string;
+}
+
+interface CreateTraceInput {
+  fromItemId: string;
+  fromNodeId: string;
+  toItemId: string;
+  toNodeId: string;
+  relation: TraceRelation;
+}
+
+interface CreateSignalInput {
+  kind: Signal["kind"];
+  sourceItem: string;
+  sourceNode: string;
+  targetItem: string;
+  targetNode: string;
+  payload?: string;
+}
+
+interface RecordTransitionInput {
+  itemId: string;
+  kind: TransitionKind;
+  from: ItemState;
+  to: ItemState;
+  evidence?: string;
+  reason?: string;
+  actor: string;
+}
+
+interface CreateQueryInput {
+  askerId: string;
+  askerNode: string;
+  question: string;
+  context?: string;
+  targetNode?: string;
+}
+
+interface CreateQueryResponseInput {
+  queryId: string;
+  responderId: string;
+  nodeId: string;
+  answer: string;
+  isAI: boolean;
+}
+
+interface CreatePendingActionInput {
+  messageType: string;
+  envelope: string;
+  summary: string;
+  proposed: string;
+}
+
+// ── Row mapper methods ──────────────────────────────────────────────────
+
+function mapNodeRow(row: NodeRow): Node {
+  return {
+    id: row.id,
+    name: row.name,
+    vertical: row.vertical as Vertical,
+    project: row.project,
+    owner: row.owner,
+    isAI: row.is_ai === 1,
+    createdAt: row.created_at,
+  };
+}
+
+function mapItemRow(row: ItemRow): Item {
+  return {
+    id: row.id,
+    nodeId: row.node_id,
+    kind: row.kind as ItemKind,
+    title: row.title,
+    body: row.body,
+    externalRef: row.external_ref,
+    state: row.state as ItemState,
+    evidence: row.evidence,
+    confirmedBy: row.confirmed_by,
+    confirmedAt: row.confirmed_at,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapTraceRow(row: TraceRow): Trace {
+  return {
+    id: row.id,
+    fromItemId: row.from_item_id,
+    fromNodeId: row.from_node_id,
+    toItemId: row.to_item_id,
+    toNodeId: row.to_node_id,
+    relation: row.relation as TraceRelation,
+    confirmedBy: row.confirmed_by,
+    confirmedAt: row.confirmed_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapSignalRow(row: SignalRow): Signal {
+  return {
+    id: row.id,
+    kind: row.kind as Signal["kind"],
+    sourceItem: row.source_item,
+    sourceNode: row.source_node,
+    targetItem: row.target_item,
+    targetNode: row.target_node,
+    payload: row.payload,
+    processed: row.processed === 1,
+    createdAt: row.created_at,
+  };
+}
+
+function mapTransitionRow(row: TransitionRow): Transition {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    kind: row.kind as TransitionKind,
+    from: row.from_s as ItemState,
+    to: row.to_s as ItemState,
+    evidence: row.evidence,
+    reason: row.reason,
+    actor: row.actor,
+    timestamp: row.timestamp,
+  };
+}
+
+function mapQueryRow(row: QueryRow): Query {
+  return {
+    id: row.id,
+    askerId: row.asker_id,
+    askerNode: row.asker_node,
+    question: row.question,
+    context: row.context,
+    targetNode: row.target_node,
+    resolved: row.resolved === 1,
+    createdAt: row.created_at,
+  };
+}
+
+function mapQueryResponseRow(row: QueryResponseRow): QueryResponse {
+  return {
+    id: row.id,
+    queryId: row.query_id,
+    responderId: row.responder_id,
+    nodeId: row.node_id,
+    answer: row.answer,
+    isAI: row.is_ai === 1,
+    createdAt: row.created_at,
+  };
+}
+
+function mapPendingActionRow(row: PendingActionRow): PendingAction {
+  return {
+    id: row.id,
+    messageType: row.message_type,
+    envelope: row.envelope,
+    summary: row.summary,
+    proposed: row.proposed,
+    status: row.status as PendingAction["status"],
+    createdAt: row.created_at,
+  };
+}
+
+// ── Store class ─────────────────────────────────────────────────────────
+
+export class Store {
+  private db: Database;
+
+  constructor(dbPath: string) {
+    this.db = new Database(dbPath);
+    this.db.run("PRAGMA journal_mode = WAL;");
+    this.db.run("PRAGMA foreign_keys = ON;");
+    this.migrate();
+  }
+
+  close(): void {
+    this.db.close();
+  }
+
+  // ── Migrations ──────────────────────────────────────────────────────
+
+  private migrate(): void {
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS nodes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        vertical TEXT NOT NULL,
+        project TEXT NOT NULL,
+        owner TEXT NOT NULL,
+        is_ai INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS items (
+        id TEXT PRIMARY KEY,
+        node_id TEXT NOT NULL REFERENCES nodes(id),
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT DEFAULT '',
+        external_ref TEXT DEFAULT '',
+        state TEXT DEFAULT 'unverified',
+        evidence TEXT DEFAULT '',
+        confirmed_by TEXT DEFAULT '',
+        confirmed_at TEXT,
+        version INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS traces (
+        id TEXT PRIMARY KEY,
+        from_item_id TEXT NOT NULL REFERENCES items(id),
+        from_node_id TEXT NOT NULL REFERENCES nodes(id),
+        to_item_id TEXT NOT NULL REFERENCES items(id),
+        to_node_id TEXT NOT NULL REFERENCES nodes(id),
+        relation TEXT NOT NULL,
+        confirmed_by TEXT DEFAULT '',
+        confirmed_at TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS signals (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        source_item TEXT NOT NULL,
+        source_node TEXT NOT NULL,
+        target_item TEXT NOT NULL,
+        target_node TEXT NOT NULL,
+        payload TEXT DEFAULT '',
+        processed INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS transitions (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id),
+        kind TEXT NOT NULL,
+        from_s TEXT NOT NULL,
+        to_s TEXT NOT NULL,
+        evidence TEXT DEFAULT '',
+        reason TEXT DEFAULT '',
+        actor TEXT NOT NULL,
+        timestamp TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS queries (
+        id TEXT PRIMARY KEY,
+        asker_id TEXT NOT NULL,
+        asker_node TEXT NOT NULL,
+        question TEXT NOT NULL,
+        context TEXT DEFAULT '',
+        target_node TEXT DEFAULT '',
+        resolved INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS query_responses (
+        id TEXT PRIMARY KEY,
+        query_id TEXT NOT NULL REFERENCES queries(id),
+        responder_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        is_ai INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS pending_actions (
+        id TEXT PRIMARY KEY,
+        message_type TEXT NOT NULL,
+        envelope TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        proposed TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+  }
+
+  // ── Nodes ───────────────────────────────────────────────────────────
+
+  createNode(input: CreateNodeInput): Node {
+    const id = randomUUID();
+    const stmt = this.db.query<NodeRow, [string, string, string, string, string, number]>(
+      `INSERT INTO nodes (id, name, vertical, project, owner, is_ai)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(id, input.name, input.vertical, input.project, input.owner, input.isAI ? 1 : 0);
+    if (!row) throw new Error("Failed to create node");
+    return mapNodeRow(row);
+  }
+
+  getNode(id: string): Node | null {
+    const row = this.db.query<NodeRow, [string]>(
+      "SELECT * FROM nodes WHERE id = ?",
+    ).get(id);
+    return row ? mapNodeRow(row) : null;
+  }
+
+  listNodes(project: string): Node[] {
+    const rows = this.db.query<NodeRow, [string]>(
+      "SELECT * FROM nodes WHERE project = ?",
+    ).all(project);
+    return rows.map(mapNodeRow);
+  }
+
+  // ── Items ───────────────────────────────────────────────────────────
+
+  createItem(input: CreateItemInput): Item {
+    const id = randomUUID();
+    const stmt = this.db.query<ItemRow, [string, string, string, string, string, string]>(
+      `INSERT INTO items (id, node_id, kind, title, body, external_ref)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.nodeId,
+      input.kind,
+      input.title,
+      input.body ?? "",
+      input.externalRef ?? "",
+    );
+    if (!row) throw new Error("Failed to create item");
+    return mapItemRow(row);
+  }
+
+  getItem(id: string): Item | null {
+    const row = this.db.query<ItemRow, [string]>(
+      "SELECT * FROM items WHERE id = ?",
+    ).get(id);
+    return row ? mapItemRow(row) : null;
+  }
+
+  listItems(nodeId: string): Item[] {
+    const rows = this.db.query<ItemRow, [string]>(
+      "SELECT * FROM items WHERE node_id = ?",
+    ).all(nodeId);
+    return rows.map(mapItemRow);
+  }
+
+  updateItemStatus(
+    id: string,
+    state: ItemState,
+    evidence: string,
+    confirmedBy: string,
+  ): Item {
+    const stmt = this.db.query<ItemRow, [string, string, string, string]>(
+      `UPDATE items
+       SET state = ?, evidence = ?, confirmed_by = ?,
+           confirmed_at = datetime('now'),
+           version = version + 1,
+           updated_at = datetime('now')
+       WHERE id = ?
+       RETURNING *`,
+    );
+    const row = stmt.get(state, evidence, confirmedBy, id);
+    if (!row) throw new Error(`Item not found: ${id}`);
+    return mapItemRow(row);
+  }
+
+  findItemsByExternalRef(externalRef: string): Item[] {
+    const rows = this.db.query<ItemRow, [string]>(
+      "SELECT * FROM items WHERE external_ref = ?",
+    ).all(externalRef);
+    return rows.map(mapItemRow);
+  }
+
+  // ── Traces ──────────────────────────────────────────────────────────
+
+  createTrace(input: CreateTraceInput): Trace {
+    const id = randomUUID();
+    const stmt = this.db.query<TraceRow, [string, string, string, string, string, string]>(
+      `INSERT INTO traces (id, from_item_id, from_node_id, to_item_id, to_node_id, relation)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.fromItemId,
+      input.fromNodeId,
+      input.toItemId,
+      input.toNodeId,
+      input.relation,
+    );
+    if (!row) throw new Error("Failed to create trace");
+    return mapTraceRow(row);
+  }
+
+  /** Returns all traces involving the item (either as source or target). */
+  getItemTraces(itemId: string): Trace[] {
+    const rows = this.db.query<TraceRow, [string, string]>(
+      "SELECT * FROM traces WHERE from_item_id = ? OR to_item_id = ?",
+    ).all(itemId, itemId);
+    return rows.map(mapTraceRow);
+  }
+
+  /** Finds items that depend on a given item (WHERE to_item_id = ?). */
+  getDependentTraces(itemId: string): Trace[] {
+    const rows = this.db.query<TraceRow, [string]>(
+      "SELECT * FROM traces WHERE to_item_id = ?",
+    ).all(itemId);
+    return rows.map(mapTraceRow);
+  }
+
+  /** Finds upstream traces originating from a given item (WHERE from_item_id = ?). */
+  getUpstreamTraces(itemId: string): Trace[] {
+    const rows = this.db.query<TraceRow, [string]>(
+      "SELECT * FROM traces WHERE from_item_id = ?",
+    ).all(itemId);
+    return rows.map(mapTraceRow);
+  }
+
+  // ── Signals ─────────────────────────────────────────────────────────
+
+  createSignal(input: CreateSignalInput): Signal {
+    const id = randomUUID();
+    const stmt = this.db.query<SignalRow, [string, string, string, string, string, string, string]>(
+      `INSERT INTO signals (id, kind, source_item, source_node, target_item, target_node, payload)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.kind,
+      input.sourceItem,
+      input.sourceNode,
+      input.targetItem,
+      input.targetNode,
+      input.payload ?? "",
+    );
+    if (!row) throw new Error("Failed to create signal");
+    return mapSignalRow(row);
+  }
+
+  markSignalProcessed(id: string): void {
+    this.db.query("UPDATE signals SET processed = 1 WHERE id = ?").run(id);
+  }
+
+  // ── Transitions ─────────────────────────────────────────────────────
+
+  recordTransition(input: RecordTransitionInput): Transition {
+    const id = randomUUID();
+    const stmt = this.db.query<TransitionRow, [string, string, string, string, string, string, string, string]>(
+      `INSERT INTO transitions (id, item_id, kind, from_s, to_s, evidence, reason, actor)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.itemId,
+      input.kind,
+      input.from,
+      input.to,
+      input.evidence ?? "",
+      input.reason ?? "",
+      input.actor,
+    );
+    if (!row) throw new Error("Failed to record transition");
+    return mapTransitionRow(row);
+  }
+
+  getItemTransitions(itemId: string): Transition[] {
+    const rows = this.db.query<TransitionRow, [string]>(
+      "SELECT * FROM transitions WHERE item_id = ? ORDER BY timestamp",
+    ).all(itemId);
+    return rows.map(mapTransitionRow);
+  }
+
+  // ── Queries ─────────────────────────────────────────────────────────
+
+  createQuery(input: CreateQueryInput): Query {
+    const id = randomUUID();
+    const stmt = this.db.query<QueryRow, [string, string, string, string, string, string]>(
+      `INSERT INTO queries (id, asker_id, asker_node, question, context, target_node)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.askerId,
+      input.askerNode,
+      input.question,
+      input.context ?? "",
+      input.targetNode ?? "",
+    );
+    if (!row) throw new Error("Failed to create query");
+    return mapQueryRow(row);
+  }
+
+  createQueryResponse(input: CreateQueryResponseInput): QueryResponse {
+    const id = randomUUID();
+    const stmt = this.db.query<QueryResponseRow, [string, string, string, string, string, number]>(
+      `INSERT INTO query_responses (id, query_id, responder_id, node_id, answer, is_ai)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.queryId,
+      input.responderId,
+      input.nodeId,
+      input.answer,
+      input.isAI ? 1 : 0,
+    );
+    if (!row) throw new Error("Failed to create query response");
+    return mapQueryResponseRow(row);
+  }
+
+  // ── Pending Actions ─────────────────────────────────────────────────
+
+  createPendingAction(input: CreatePendingActionInput): PendingAction {
+    const id = randomUUID();
+    const stmt = this.db.query<PendingActionRow, [string, string, string, string, string]>(
+      `INSERT INTO pending_actions (id, message_type, envelope, summary, proposed)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.messageType,
+      input.envelope,
+      input.summary,
+      input.proposed,
+    );
+    if (!row) throw new Error("Failed to create pending action");
+    return mapPendingActionRow(row);
+  }
+
+  listPendingActions(): PendingAction[] {
+    const rows = this.db.query<PendingActionRow, []>(
+      "SELECT * FROM pending_actions WHERE status = 'pending' ORDER BY created_at",
+    ).all();
+    return rows.map(mapPendingActionRow);
+  }
+
+  updatePendingActionStatus(id: string, status: PendingAction["status"]): void {
+    this.db.query("UPDATE pending_actions SET status = ? WHERE id = ?").run(status, id);
+  }
+
+  // ── Audit ───────────────────────────────────────────────────────────
+
+  audit(nodeId: string): AuditReport {
+    const node = this.getNode(nodeId);
+    if (!node) throw new Error(`Node not found: ${nodeId}`);
+
+    const items = this.listItems(nodeId);
+
+    const unverified: string[] = [];
+    const proven: string[] = [];
+    const suspect: string[] = [];
+    const broke: string[] = [];
+    const orphans: string[] = [];
+    const missingUpstreamRefs: string[] = [];
+
+    const upstreamVerticals = UPSTREAM_VERTICALS[node.vertical];
+
+    for (const item of items) {
+      // Categorize by state
+      switch (item.state) {
+        case "unverified":
+          unverified.push(item.id);
+          break;
+        case "proven":
+          proven.push(item.id);
+          break;
+        case "suspect":
+          suspect.push(item.id);
+          break;
+        case "broke":
+          broke.push(item.id);
+          break;
+      }
+
+      // Check for orphans (items with no traces at all)
+      const traces = this.getItemTraces(item.id);
+      if (traces.length === 0) {
+        orphans.push(item.id);
+      }
+
+      // Check for missing upstream references
+      if (upstreamVerticals.length > 0) {
+        const incomingTraces = this.getDependentTraces(item.id);
+        const hasUpstreamTrace = incomingTraces.some((t) => {
+          const fromNode = this.getNode(t.fromNodeId);
+          return fromNode !== null && upstreamVerticals.includes(fromNode.vertical);
+        });
+        if (!hasUpstreamTrace) {
+          missingUpstreamRefs.push(item.id);
+        }
+      }
+    }
+
+    return {
+      nodeId,
+      totalItems: items.length,
+      unverified,
+      proven,
+      suspect,
+      broke,
+      orphans,
+      missingUpstreamRefs,
+    };
+  }
+}
