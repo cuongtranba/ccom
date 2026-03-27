@@ -6,7 +6,9 @@ export type EventType =
   | "query_ask"
   | "query_respond"
   | "ack"
-  | "error";
+  | "error"
+  | "permission_request"
+  | "permission_verdict";
 
 type EventHandler = (data: unknown) => void;
 
