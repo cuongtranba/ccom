@@ -45,7 +45,7 @@ export class WSHandlers {
         // no-op
         break;
       case "error":
-        console.error(`Remote error [${payload.code}]: ${payload.message}`);
+        // Remote errors are forwarded via eventBus.emit below
         break;
     }
 
@@ -58,8 +58,12 @@ export class WSHandlers {
     try {
       this.engine.propagateChange(payload.itemId);
     } catch (err) {
-      // Item may not exist locally — this is expected in distributed scenarios
-      console.warn(`signal_change: could not propagate for item ${payload.itemId}:`, err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.eventBus.emit("error", {
+        type: "error",
+        code: "SIGNAL_CHANGE_FAILED",
+        message: `signal_change for item ${payload.itemId}: ${message}`,
+      });
     }
   }
 
@@ -69,7 +73,12 @@ export class WSHandlers {
     try {
       this.engine.sweep(payload.externalRef);
     } catch (err) {
-      console.error(`sweep failed for ref ${payload.externalRef}:`, err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.eventBus.emit("error", {
+        type: "error",
+        code: "SWEEP_FAILED",
+        message: `sweep for ref ${payload.externalRef}: ${message}`,
+      });
     }
   }
 
@@ -86,7 +95,12 @@ export class WSHandlers {
         state: item.state,
       });
     } catch (err) {
-      console.warn(`trace_resolve_request: item ${payload.itemId} not found locally:`, err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.eventBus.emit("error", {
+        type: "error",
+        code: "TRACE_RESOLVE_FAILED",
+        message: `trace_resolve_request for item ${payload.itemId}: ${message}`,
+      });
     }
   }
 
@@ -101,13 +115,18 @@ export class WSHandlers {
         question: payload.question,
       });
     } catch (err) {
-      console.error("Failed to create query:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.eventBus.emit("error", {
+        type: "error",
+        code: "QUERY_ASK_FAILED",
+        message: `query_ask: ${message}`,
+      });
     }
   }
 
   private handleQueryRespond(
     payload: Extract<MessagePayload, { type: "query_respond" }>,
   ): void {
-    console.log(`Query response from ${payload.responderId}: ${payload.answer}`);
+    // No-op: response is forwarded via eventBus.emit at the end of handle()
   }
 }

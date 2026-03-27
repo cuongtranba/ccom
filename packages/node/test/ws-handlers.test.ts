@@ -81,6 +81,23 @@ describe("WSHandlers", () => {
     expect(emitted).toBe(true);
   });
 
+  it("emits error event when trace_resolve_request fails", () => {
+    const errors: unknown[] = [];
+    eventBus.on("error", (data) => errors.push(data));
+
+    const envelope = makeEnvelope({
+      type: "trace_resolve_request",
+      itemId: "nonexistent",
+    });
+
+    handlers.handle(envelope);
+
+    const err = errors.find(
+      (e) => (e as { code?: string }).code === "TRACE_RESOLVE_FAILED",
+    );
+    expect(err).toBeTruthy();
+  });
+
   it("handle sweep calls engine.sweep and emits event", () => {
     let emittedData: unknown = null;
     eventBus.on("sweep", (data) => {
@@ -221,16 +238,18 @@ describe("WSHandlers", () => {
     eventBus.on("signal_change", () => firedEvents.push("signal_change"));
     eventBus.on("sweep", () => firedEvents.push("sweep"));
     eventBus.on("trace_resolve_request", () => firedEvents.push("trace_resolve_request"));
+    eventBus.on("trace_resolve_response", () => firedEvents.push("trace_resolve_response"));
     eventBus.on("query_ask", () => firedEvents.push("query_ask"));
     eventBus.on("query_respond", () => firedEvents.push("query_respond"));
     eventBus.on("ack", () => firedEvents.push("ack"));
     eventBus.on("error", () => firedEvents.push("error"));
 
     const node = engine.registerNode("n", "dev", "p", "o", false);
+    const item = engine.addItem(node.id, "decision", "T", "", "");
 
-    handlers.handle(makeEnvelope({ type: "signal_change", itemId: "x", oldState: "a", newState: "b" }));
+    handlers.handle(makeEnvelope({ type: "signal_change", itemId: item.id, oldState: "a", newState: "b" }));
     handlers.handle(makeEnvelope({ type: "sweep", externalRef: "r", newValue: "v" }));
-    handlers.handle(makeEnvelope({ type: "trace_resolve_request", itemId: "x" }));
+    handlers.handle(makeEnvelope({ type: "trace_resolve_request", itemId: item.id }));
     handlers.handle(makeEnvelope({ type: "query_ask", question: "q", askerId: "a" }, node.id, "t"));
     handlers.handle(makeEnvelope({ type: "query_respond", answer: "a", responderId: "r" }));
     handlers.handle(makeEnvelope({ type: "ack", originalMessageId: "m" }));
@@ -239,6 +258,7 @@ describe("WSHandlers", () => {
     expect(firedEvents).toEqual([
       "signal_change",
       "sweep",
+      "trace_resolve_response",
       "trace_resolve_request",
       "query_ask",
       "query_respond",
