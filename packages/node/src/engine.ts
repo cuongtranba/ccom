@@ -324,6 +324,61 @@ export class Engine {
     return this.store.updateChangeRequestStatus(crId, "archived");
   }
 
+  // ── Challenges ──────────────────────────────────────────────────────
+
+  createChallenge(
+    challengerNode: string,
+    challengerId: string,
+    targetItemId: string,
+    reason: string,
+  ): ChangeRequest {
+    this.getItem(targetItemId); // validate
+    return this.store.createChangeRequest({
+      proposerNode: challengerNode,
+      proposerId: challengerId,
+      targetItemId,
+      description: `Challenge: ${reason}`,
+    });
+  }
+
+  upholdChallenge(crId: string): { cr: ChangeRequest; signals: Signal[] } {
+    const cr = this.getChangeRequest(crId);
+    if (cr.status !== "approved") {
+      throw new Error(`Cannot uphold challenge in "${cr.status}" status — must be approved`);
+    }
+
+    // Mark the challenged item as suspect
+    const item = this.getItem(cr.targetItemId);
+    if (item.state === "proven") {
+      this.store.updateItemStatus(cr.targetItemId, "suspect", `Challenge upheld: ${cr.description}`, "challenge-system");
+      this.store.recordTransition({
+        itemId: cr.targetItemId,
+        kind: "suspect",
+        from: "proven",
+        to: "suspect",
+        evidence: cr.description,
+        reason: "Challenge upheld by vote",
+        actor: "challenge-system",
+      });
+    }
+
+    // Apply and propagate
+    this.crSm.apply(cr.status, "apply");
+    const updated = this.store.updateChangeRequestStatus(crId, "applied");
+    const signals = this.propagator.propagateChange(cr.targetItemId);
+
+    return { cr: updated, signals };
+  }
+
+  dismissChallenge(crId: string): ChangeRequest {
+    const cr = this.getChangeRequest(crId);
+    if (cr.status !== "rejected") {
+      throw new Error(`Cannot dismiss challenge in "${cr.status}" status — must be rejected`);
+    }
+    this.crSm.apply(cr.status, "archive");
+    return this.store.updateChangeRequestStatus(crId, "archived");
+  }
+
   private getChangeRequest(id: string): ChangeRequest {
     const cr = this.store.getChangeRequest(id);
     if (!cr) throw new Error(`Change request not found: ${id}`);

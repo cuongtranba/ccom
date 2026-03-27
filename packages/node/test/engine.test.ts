@@ -661,4 +661,73 @@ describe("Engine", () => {
       expect(() => engine.applyProposal(cr.id)).toThrow();
     });
   });
+
+  // ── Challenges ────────────────────────────────────────────────────────
+
+  describe("Challenges", () => {
+    let pmNode: ReturnType<typeof engine.registerNode>;
+    let devNode: ReturnType<typeof engine.registerNode>;
+    let qaNode: ReturnType<typeof engine.registerNode>;
+    let devopsNode: ReturnType<typeof engine.registerNode>;
+    let apiSpec: Item;
+    let testCase: Item;
+
+    beforeEach(() => {
+      pmNode = engine.registerNode("pm-node", "pm", "proj", "alice", false);
+      devNode = engine.registerNode("dev-node", "dev", "proj", "cuong", false);
+      qaNode = engine.registerNode("qa-node", "qa", "proj", "diana", false);
+      devopsNode = engine.registerNode("devops-node", "devops", "proj", "eve", false);
+
+      apiSpec = engine.addItem(devNode.id, "api-spec", "Check-In API");
+      engine.verifyItem(apiSpec.id, "Code reviewed", "cuong");
+
+      testCase = engine.addItem(qaNode.id, "test-case", "TC: QR scan");
+      engine.verifyItem(testCase.id, "Test passes", "diana");
+      engine.addTrace(testCase.id, apiSpec.id, "proven_by", "diana");
+    });
+
+    it("creates a challenge as a CR targeting the item", () => {
+      const challenge = engine.createChallenge(qaNode.id, "diana", apiSpec.id, "Bug found");
+      expect(challenge.status).toBe("draft");
+      expect(challenge.targetItemId).toBe(apiSpec.id);
+      expect(challenge.description).toContain("Bug found");
+    });
+
+    it("upheld challenge marks item suspect and propagates", () => {
+      const challenge = engine.createChallenge(qaNode.id, "diana", apiSpec.id, "Missing validation");
+      engine.submitProposal(challenge.id);
+      engine.openVoting(challenge.id);
+      engine.castVote(challenge.id, pmNode.id, "pm", true, "Confirmed");
+      engine.castVote(challenge.id, devopsNode.id, "devops", true, "Agreed");
+      engine.resolveVoting(challenge.id);
+
+      const result = engine.upholdChallenge(challenge.id);
+      expect(engine.getItem(apiSpec.id).state).toBe("suspect");
+      expect(result.signals.length).toBeGreaterThanOrEqual(1);
+      expect(engine.getItem(testCase.id).state).toBe("suspect");
+    });
+
+    it("dismissed challenge leaves items unchanged", () => {
+      const challenge = engine.createChallenge(qaNode.id, "diana", apiSpec.id, "Timeout concern");
+      engine.submitProposal(challenge.id);
+      engine.openVoting(challenge.id);
+      engine.castVote(challenge.id, pmNode.id, "pm", false, "Fine");
+      engine.castVote(challenge.id, devNode.id, "dev", false, "By design");
+      engine.resolveVoting(challenge.id);
+
+      engine.dismissChallenge(challenge.id);
+      expect(engine.getItem(apiSpec.id).state).toBe("proven");
+      expect(engine.getItem(testCase.id).state).toBe("proven");
+    });
+
+    it("cannot uphold a rejected challenge", () => {
+      const challenge = engine.createChallenge(qaNode.id, "diana", apiSpec.id, "Concern");
+      engine.submitProposal(challenge.id);
+      engine.openVoting(challenge.id);
+      engine.castVote(challenge.id, devNode.id, "dev", false, "No");
+      engine.resolveVoting(challenge.id);
+
+      expect(() => engine.upholdChallenge(challenge.id)).toThrow();
+    });
+  });
 });
