@@ -5,6 +5,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { Logger } from "./logger";
 import { Store } from "./store";
 import { StateMachine } from "./state";
 import { SignalPropagator } from "./signal";
@@ -663,8 +664,9 @@ Use the inv_* tools to manage inventory, propose changes, vote, challenge items,
 
 if (import.meta.main) {
   const configPath = process.argv[2] ?? "./inv-config.json";
+  const log = new Logger("channel-server");
   startChannelServer(configPath).catch((err) => {
-    console.error("Channel server fatal error:", err);
+    log.error("Channel server fatal error", { error: String(err) });
     process.exit(1);
   });
 }

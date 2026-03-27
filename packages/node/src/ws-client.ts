@@ -4,6 +4,7 @@ import {
   type Envelope,
   type MessagePayload,
 } from "@inv/shared";
+import { Logger } from "./logger";
 
 export interface WSClientConfig {
   serverUrl: string;
@@ -18,6 +19,7 @@ export class WSClient {
   private reconnectDelay = 1000;
   private maxReconnectDelay = 30000;
   private shouldReconnect = true;
+  private log = new Logger("ws-client");
 
   constructor(private config: WSClientConfig) {}
 
@@ -38,7 +40,7 @@ export class WSClient {
           const envelope = parseEnvelope(raw);
           this.messageHandler(envelope);
         } catch (err) {
-          console.error("Failed to parse incoming message:", err);
+          this.log.error("Failed to parse incoming message", { error: String(err) });
         }
       };
 
@@ -47,7 +49,7 @@ export class WSClient {
         if (this.shouldReconnect) {
           setTimeout(() => {
             this.connect().catch((err) => {
-              console.error("Reconnection failed:", err);
+              this.log.error("Reconnection failed", { error: String(err) });
             });
           }, this.reconnectDelay);
           this.reconnectDelay = Math.min(
@@ -58,7 +60,7 @@ export class WSClient {
       };
 
       this.ws.onerror = (event) => {
-        console.error("WebSocket error:", event);
+        this.log.error("WebSocket error");
         if (!this.connected) {
           reject(new Error("WebSocket connection failed"));
         }
