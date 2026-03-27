@@ -10,6 +10,9 @@ import type {
   QueryResponse,
   PendingAction,
   AuditReport,
+  ChangeRequest,
+  Vote,
+  VoteTally,
 } from "@inv/shared";
 
 describe("Store", () => {
@@ -423,6 +426,161 @@ describe("Store", () => {
 
       const report = store.audit(pmNode.id);
       expect(report.missingUpstreamRefs).toHaveLength(0);
+    });
+  });
+
+  // ── Change Requests ─────────────────────────────────────────────────────
+
+  describe("change requests", () => {
+    let pmNode: Node;
+    let devNode: Node;
+
+    beforeEach(() => {
+      pmNode = store.createNode({ name: "PM", vertical: "pm", project: "p1", owner: "alice", isAI: false });
+      devNode = store.createNode({ name: "Dev", vertical: "dev", project: "p1", owner: "bob", isAI: false });
+    });
+
+    it("creates a CR in draft status", () => {
+      const cr = store.createChangeRequest({
+        proposerNode: pmNode.id,
+        proposerId: "alice",
+        targetItemId: "item-123",
+        description: "Update the PRD scope",
+      });
+
+      expect(cr.id).toBeDefined();
+      expect(cr.proposerNode).toBe(pmNode.id);
+      expect(cr.proposerId).toBe("alice");
+      expect(cr.targetItemId).toBe("item-123");
+      expect(cr.description).toBe("Update the PRD scope");
+      expect(cr.status).toBe("draft");
+      expect(cr.createdAt).toBeDefined();
+      expect(cr.updatedAt).toBeDefined();
+    });
+
+    it("updates CR status", () => {
+      const cr = store.createChangeRequest({
+        proposerNode: pmNode.id,
+        proposerId: "alice",
+        targetItemId: "item-123",
+        description: "Change scope",
+      });
+      expect(cr.status).toBe("draft");
+
+      const updated = store.updateChangeRequestStatus(cr.id, "proposed");
+      expect(updated.status).toBe("proposed");
+      expect(updated.id).toBe(cr.id);
+      expect(updated.updatedAt).toBeDefined();
+    });
+
+    it("gets CR by id", () => {
+      const cr = store.createChangeRequest({
+        proposerNode: pmNode.id,
+        proposerId: "alice",
+        targetItemId: "item-123",
+        description: "Some change",
+      });
+
+      const fetched = store.getChangeRequest(cr.id);
+      expect(fetched).toEqual(cr);
+
+      const missing = store.getChangeRequest("nonexistent");
+      expect(missing).toBeNull();
+    });
+
+    it("lists CRs by status", () => {
+      store.createChangeRequest({
+        proposerNode: pmNode.id,
+        proposerId: "alice",
+        targetItemId: "item-1",
+        description: "CR 1",
+      });
+      const cr2 = store.createChangeRequest({
+        proposerNode: devNode.id,
+        proposerId: "bob",
+        targetItemId: "item-2",
+        description: "CR 2",
+      });
+      store.updateChangeRequestStatus(cr2.id, "proposed");
+
+      const drafts = store.listChangeRequests("draft");
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0].description).toBe("CR 1");
+
+      const proposed = store.listChangeRequests("proposed");
+      expect(proposed).toHaveLength(1);
+      expect(proposed[0].description).toBe("CR 2");
+
+      const all = store.listChangeRequests();
+      expect(all).toHaveLength(2);
+    });
+  });
+
+  // ── Votes ───────────────────────────────────────────────────────────────
+
+  describe("votes", () => {
+    let pmNode: Node;
+    let devNode: Node;
+    let qaNode: Node;
+    let crId: string;
+
+    beforeEach(() => {
+      pmNode = store.createNode({ name: "PM", vertical: "pm", project: "p1", owner: "alice", isAI: false });
+      devNode = store.createNode({ name: "Dev", vertical: "dev", project: "p1", owner: "bob", isAI: false });
+      qaNode = store.createNode({ name: "QA", vertical: "qa", project: "p1", owner: "carol", isAI: false });
+
+      const cr = store.createChangeRequest({
+        proposerNode: pmNode.id,
+        proposerId: "alice",
+        targetItemId: "item-1",
+        description: "Change something",
+      });
+      crId = cr.id;
+    });
+
+    it("creates a vote for a CR", () => {
+      const vote = store.createVote({
+        crId,
+        nodeId: devNode.id,
+        vertical: "dev",
+        approve: true,
+        reason: "Looks good",
+      });
+
+      expect(vote.id).toBeDefined();
+      expect(vote.crId).toBe(crId);
+      expect(vote.nodeId).toBe(devNode.id);
+      expect(vote.vertical).toBe("dev");
+      expect(vote.approve).toBe(true);
+      expect(vote.reason).toBe("Looks good");
+      expect(vote.createdAt).toBeDefined();
+    });
+
+    it("lists votes for a CR", () => {
+      store.createVote({ crId, nodeId: devNode.id, vertical: "dev", approve: true, reason: "LGTM" });
+      store.createVote({ crId, nodeId: qaNode.id, vertical: "qa", approve: false, reason: "Needs tests" });
+
+      const votes = store.listVotes(crId);
+      expect(votes).toHaveLength(2);
+    });
+
+    it("tallies votes correctly", () => {
+      store.createVote({ crId, nodeId: devNode.id, vertical: "dev", approve: true, reason: "Yes" });
+      store.createVote({ crId, nodeId: qaNode.id, vertical: "qa", approve: false, reason: "No" });
+      store.createVote({ crId, nodeId: pmNode.id, vertical: "pm", approve: true, reason: "Agree" });
+
+      const tally = store.tallyVotes(crId);
+      expect(tally.approved).toBe(2);
+      expect(tally.rejected).toBe(1);
+      expect(tally.total).toBe(3);
+    });
+
+    it("prevents duplicate votes from same node (UNIQUE constraint)", () => {
+      store.createVote({ crId, nodeId: devNode.id, vertical: "dev", approve: true, reason: "First vote" });
+
+      expect(() => {
+        store.createVote({ crId, nodeId: devNode.id, vertical: "dev", approve: false, reason: "Second vote" });
+      }).toThrow();
     });
   });
 });

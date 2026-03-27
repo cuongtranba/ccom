@@ -15,6 +15,10 @@ import type {
   ItemKind,
   TraceRelation,
   TransitionKind,
+  ChangeRequest,
+  Vote,
+  VoteTally,
+  CRStatus,
 } from "@inv/shared";
 import { UPSTREAM_VERTICALS } from "@inv/shared";
 
@@ -113,6 +117,27 @@ interface PendingActionRow {
   created_at: string;
 }
 
+interface ChangeRequestRow {
+  id: string;
+  proposer_node: string;
+  proposer_id: string;
+  target_item_id: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface VoteRow {
+  id: string;
+  cr_id: string;
+  node_id: string;
+  vertical: string;
+  approve: number;
+  reason: string;
+  created_at: string;
+}
+
 // ── Input types for create methods ──────────────────────────────────────
 
 interface CreateNodeInput {
@@ -179,6 +204,21 @@ interface CreatePendingActionInput {
   envelope: string;
   summary: string;
   proposed: string;
+}
+
+interface CreateChangeRequestInput {
+  proposerNode: string;
+  proposerId: string;
+  targetItemId: string;
+  description: string;
+}
+
+interface CreateVoteInput {
+  crId: string;
+  nodeId: string;
+  vertical: Vertical;
+  approve: boolean;
+  reason: string;
 }
 
 // ── Row mapper methods ──────────────────────────────────────────────────
@@ -288,6 +328,31 @@ function mapPendingActionRow(row: PendingActionRow): PendingAction {
     summary: row.summary,
     proposed: row.proposed,
     status: row.status as PendingAction["status"],
+    createdAt: row.created_at,
+  };
+}
+
+function mapChangeRequestRow(row: ChangeRequestRow): ChangeRequest {
+  return {
+    id: row.id,
+    proposerNode: row.proposer_node,
+    proposerId: row.proposer_id,
+    targetItemId: row.target_item_id,
+    description: row.description,
+    status: row.status as CRStatus,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapVoteRow(row: VoteRow): Vote {
+  return {
+    id: row.id,
+    crId: row.cr_id,
+    nodeId: row.node_id,
+    vertical: row.vertical as Vertical,
+    approve: row.approve === 1,
+    reason: row.reason,
     createdAt: row.created_at,
   };
 }
@@ -417,6 +482,32 @@ export class Store {
         proposed TEXT NOT NULL,
         status TEXT DEFAULT 'pending',
         created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS change_requests (
+        id TEXT PRIMARY KEY,
+        proposer_node TEXT NOT NULL,
+        proposer_id TEXT NOT NULL,
+        target_item_id TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT DEFAULT 'draft',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS votes (
+        id TEXT PRIMARY KEY,
+        cr_id TEXT NOT NULL REFERENCES change_requests(id),
+        node_id TEXT NOT NULL,
+        vertical TEXT NOT NULL,
+        approve INTEGER NOT NULL,
+        reason TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(cr_id, node_id)
       )
     `);
   }
@@ -681,6 +772,94 @@ export class Store {
 
   updatePendingActionStatus(id: string, status: PendingAction["status"]): void {
     this.db.query("UPDATE pending_actions SET status = ? WHERE id = ?").run(status, id);
+  }
+
+  // ── Change Requests ────────────────────────────────────────────────
+
+  createChangeRequest(input: CreateChangeRequestInput): ChangeRequest {
+    const id = randomUUID();
+    const stmt = this.db.query<ChangeRequestRow, [string, string, string, string, string]>(
+      `INSERT INTO change_requests (id, proposer_node, proposer_id, target_item_id, description)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(id, input.proposerNode, input.proposerId, input.targetItemId, input.description);
+    if (!row) throw new Error("Failed to create change request");
+    return mapChangeRequestRow(row);
+  }
+
+  getChangeRequest(id: string): ChangeRequest | null {
+    const row = this.db.query<ChangeRequestRow, [string]>(
+      "SELECT * FROM change_requests WHERE id = ?",
+    ).get(id);
+    return row ? mapChangeRequestRow(row) : null;
+  }
+
+  updateChangeRequestStatus(id: string, status: CRStatus): ChangeRequest {
+    const stmt = this.db.query<ChangeRequestRow, [string, string]>(
+      `UPDATE change_requests
+       SET status = ?, updated_at = datetime('now')
+       WHERE id = ?
+       RETURNING *`,
+    );
+    const row = stmt.get(status, id);
+    if (!row) throw new Error(`Change request not found: ${id}`);
+    return mapChangeRequestRow(row);
+  }
+
+  listChangeRequests(status?: CRStatus): ChangeRequest[] {
+    if (status) {
+      const rows = this.db.query<ChangeRequestRow, [string]>(
+        "SELECT * FROM change_requests WHERE status = ? ORDER BY created_at",
+      ).all(status);
+      return rows.map(mapChangeRequestRow);
+    }
+    const rows = this.db.query<ChangeRequestRow, []>(
+      "SELECT * FROM change_requests ORDER BY created_at",
+    ).all();
+    return rows.map(mapChangeRequestRow);
+  }
+
+  // ── Votes ──────────────────────────────────────────────────────────
+
+  createVote(input: CreateVoteInput): Vote {
+    const id = randomUUID();
+    const stmt = this.db.query<VoteRow, [string, string, string, string, number, string]>(
+      `INSERT INTO votes (id, cr_id, node_id, vertical, approve, reason)
+       VALUES (?, ?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(
+      id,
+      input.crId,
+      input.nodeId,
+      input.vertical,
+      input.approve ? 1 : 0,
+      input.reason,
+    );
+    if (!row) throw new Error("Failed to create vote");
+    return mapVoteRow(row);
+  }
+
+  listVotes(crId: string): Vote[] {
+    const rows = this.db.query<VoteRow, [string]>(
+      "SELECT * FROM votes WHERE cr_id = ? ORDER BY created_at",
+    ).all(crId);
+    return rows.map(mapVoteRow);
+  }
+
+  tallyVotes(crId: string): VoteTally {
+    const votes = this.listVotes(crId);
+    let approved = 0;
+    let rejected = 0;
+    for (const vote of votes) {
+      if (vote.approve) {
+        approved++;
+      } else {
+        rejected++;
+      }
+    }
+    return { approved, rejected, total: votes.length };
   }
 
   // ── Audit ───────────────────────────────────────────────────────────
