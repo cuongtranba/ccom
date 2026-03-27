@@ -530,4 +530,135 @@ describe("Engine", () => {
       expect(result.matchedItems).toHaveLength(2);
     });
   });
+
+  // ── Proposals & Voting ────────────────────────────────────────────────
+
+  describe("Proposals and Voting", () => {
+    let pmNode: ReturnType<typeof engine.registerNode>;
+    let designNode: ReturnType<typeof engine.registerNode>;
+    let devNode: ReturnType<typeof engine.registerNode>;
+    let qaNode: ReturnType<typeof engine.registerNode>;
+    let devopsNode: ReturnType<typeof engine.registerNode>;
+    let prd: Item;
+    let screenSpec: Item;
+
+    beforeEach(() => {
+      pmNode = engine.registerNode("pm-node", "pm", "proj", "alice", false);
+      designNode = engine.registerNode("design-node", "design", "proj", "bob", false);
+      devNode = engine.registerNode("dev-node", "dev", "proj", "cuong", false);
+      qaNode = engine.registerNode("qa-node", "qa", "proj", "diana", false);
+      devopsNode = engine.registerNode("devops-node", "devops", "proj", "eve", false);
+
+      prd = engine.addItem(pmNode.id, "prd", "Clinic PRD");
+      engine.verifyItem(prd.id, "Approved", "alice");
+
+      screenSpec = engine.addItem(designNode.id, "screen-spec", "QR Screen");
+      engine.verifyItem(screenSpec.id, "Reviewed", "bob");
+      engine.addTrace(screenSpec.id, prd.id, "traced_from", "bob");
+    });
+
+    it("creates a proposal in draft status", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Update PRD");
+      expect(cr.status).toBe("draft");
+      expect(cr.targetItemId).toBe(prd.id);
+    });
+
+    it("submits a draft proposal to proposed", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      const submitted = engine.submitProposal(cr.id);
+      expect(submitted.status).toBe("proposed");
+    });
+
+    it("opens voting on a proposed CR", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      engine.submitProposal(cr.id);
+      const voting = engine.openVoting(cr.id);
+      expect(voting.status).toBe("voting");
+    });
+
+    it("casts a vote on a voting CR", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      const vote = engine.castVote(cr.id, devNode.id, "dev", true, "LGTM");
+      expect(vote.approve).toBe(true);
+    });
+
+    it("throws when voting on non-voting CR", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      expect(() => engine.castVote(cr.id, devNode.id, "dev", true, "No")).toThrow();
+    });
+
+    it("resolves approved by majority", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, designNode.id, "design", true, "Yes");
+      engine.castVote(cr.id, devNode.id, "dev", true, "Yes");
+      engine.castVote(cr.id, qaNode.id, "qa", false, "No");
+
+      const resolved = engine.resolveVoting(cr.id);
+      expect(resolved.status).toBe("approved");
+    });
+
+    it("resolves rejected by majority", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Test");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, designNode.id, "design", false, "No");
+      engine.castVote(cr.id, devNode.id, "dev", false, "No");
+      engine.castVote(cr.id, qaNode.id, "qa", true, "Yes");
+
+      const resolved = engine.resolveVoting(cr.id);
+      expect(resolved.status).toBe("rejected");
+    });
+
+    it("tie-breaking: uses upstream vertical authority", () => {
+      const cr = engine.createProposal(designNode.id, "bob", screenSpec.id, "Redesign");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, pmNode.id, "pm", true, "Good idea");
+      engine.castVote(cr.id, devNode.id, "dev", false, "Too much work");
+      engine.castVote(cr.id, qaNode.id, "qa", false, "Risk");
+      engine.castVote(cr.id, devopsNode.id, "devops", true, "No impact");
+
+      const resolved = engine.resolveVoting(cr.id);
+      expect(resolved.status).toBe("approved");
+    });
+
+    it("applies approved proposal and propagates changes", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Change");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, devNode.id, "dev", true, "OK");
+      engine.resolveVoting(cr.id);
+
+      const result = engine.applyProposal(cr.id);
+      expect(result.cr.status).toBe("applied");
+      expect(result.signals.length).toBeGreaterThanOrEqual(1);
+      expect(engine.getItem(screenSpec.id).state).toBe("suspect");
+    });
+
+    it("archives an applied proposal", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Change");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, devNode.id, "dev", true, "OK");
+      engine.resolveVoting(cr.id);
+      engine.applyProposal(cr.id);
+
+      const archived = engine.archiveProposal(cr.id);
+      expect(archived.status).toBe("archived");
+    });
+
+    it("cannot apply a rejected proposal", () => {
+      const cr = engine.createProposal(pmNode.id, "alice", prd.id, "Bad idea");
+      engine.submitProposal(cr.id);
+      engine.openVoting(cr.id);
+      engine.castVote(cr.id, devNode.id, "dev", false, "No");
+      engine.resolveVoting(cr.id);
+
+      expect(() => engine.applyProposal(cr.id)).toThrow();
+    });
+  });
 });

@@ -10,9 +10,14 @@ import type {
   TraceRelation,
   Vertical,
   TransitionKind,
+  ChangeRequest,
+  Vote,
+  CRTransitionKind,
 } from "@inv/shared";
+import { UPSTREAM_VERTICALS } from "@inv/shared";
 import type { Store } from "./store";
 import type { StateMachine } from "./state";
+import { CRStateMachine } from "./state";
 import type { SignalPropagator } from "./signal";
 
 export interface SweepResult {
@@ -23,6 +28,8 @@ export interface SweepResult {
 }
 
 export class Engine {
+  private crSm = new CRStateMachine();
+
   constructor(
     private store: Store,
     private sm: StateMachine,
@@ -241,5 +248,99 @@ export class Engine {
       affectedItems,
       signalsCreated: allSignals.length,
     };
+  }
+
+  // ── Proposals & Voting ──────────────────────────────────────────────
+
+  createProposal(
+    proposerNode: string,
+    proposerId: string,
+    targetItemId: string,
+    description: string,
+  ): ChangeRequest {
+    this.getItem(targetItemId); // validate item exists
+    return this.store.createChangeRequest({ proposerNode, proposerId, targetItemId, description });
+  }
+
+  submitProposal(crId: string): ChangeRequest {
+    const cr = this.getChangeRequest(crId);
+    this.crSm.apply(cr.status, "submit");
+    return this.store.updateChangeRequestStatus(crId, "proposed");
+  }
+
+  openVoting(crId: string): ChangeRequest {
+    const cr = this.getChangeRequest(crId);
+    this.crSm.apply(cr.status, "open_voting");
+    return this.store.updateChangeRequestStatus(crId, "voting");
+  }
+
+  castVote(
+    crId: string,
+    nodeId: string,
+    vertical: Vertical,
+    approve: boolean,
+    reason: string,
+  ): Vote {
+    const cr = this.getChangeRequest(crId);
+    if (cr.status !== "voting") {
+      throw new Error(`Cannot vote on CR in "${cr.status}" status`);
+    }
+    return this.store.createVote({ crId, nodeId, vertical, approve, reason });
+  }
+
+  resolveVoting(crId: string): ChangeRequest {
+    const cr = this.getChangeRequest(crId);
+    if (cr.status !== "voting") {
+      throw new Error(`Cannot resolve CR in "${cr.status}" status`);
+    }
+
+    const tally = this.store.tallyVotes(crId);
+
+    let approved: boolean;
+    if (tally.approved > tally.rejected) {
+      approved = true;
+    } else if (tally.rejected > tally.approved) {
+      approved = false;
+    } else {
+      approved = this.tieBreak(cr);
+    }
+
+    const kind: CRTransitionKind = approved ? "approve" : "reject";
+    this.crSm.apply(cr.status, kind);
+    return this.store.updateChangeRequestStatus(crId, approved ? "approved" : "rejected");
+  }
+
+  applyProposal(crId: string): { cr: ChangeRequest; signals: Signal[] } {
+    const cr = this.getChangeRequest(crId);
+    this.crSm.apply(cr.status, "apply");
+    const updated = this.store.updateChangeRequestStatus(crId, "applied");
+    const signals = this.propagator.propagateChange(cr.targetItemId);
+    return { cr: updated, signals };
+  }
+
+  archiveProposal(crId: string): ChangeRequest {
+    const cr = this.getChangeRequest(crId);
+    this.crSm.apply(cr.status, "archive");
+    return this.store.updateChangeRequestStatus(crId, "archived");
+  }
+
+  private getChangeRequest(id: string): ChangeRequest {
+    const cr = this.store.getChangeRequest(id);
+    if (!cr) throw new Error(`Change request not found: ${id}`);
+    return cr;
+  }
+
+  private tieBreak(cr: ChangeRequest): boolean {
+    const proposerNode = this.store.getNode(cr.proposerNode);
+    if (!proposerNode) return false;
+
+    const upstreams = UPSTREAM_VERTICALS[proposerNode.vertical];
+    const votes = this.store.listVotes(cr.id);
+    for (const vote of votes) {
+      if (upstreams.includes(vote.vertical) && vote.approve) {
+        return true;
+      }
+    }
+    return false;
   }
 }
