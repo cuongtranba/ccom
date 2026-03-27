@@ -27,6 +27,10 @@ dist/
 
 # Dokploy config (contains secrets)
 web/.dokploy.json
+packages/server/.dokploy.json
+
+# Node instance directories (contain tokens + local DBs)
+nodes/
 
 # Node config (contains tokens)
 inv-config.json
