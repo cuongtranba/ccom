@@ -5,6 +5,7 @@
   "scripts": {
     "test": "bun test",
     "server": "bun run packages/server/src/index.ts",
-    "node": "bun run packages/node/src/index.ts"
+    "node": "bun run packages/node/src/index.ts",
+    "init": "bun run packages/node/src/index.ts init"
   }
 }
