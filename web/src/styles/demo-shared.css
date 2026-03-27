@@ -18,13 +18,14 @@
 .demo-btn {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  padding: 0.5rem 1rem;
+  padding: 0.65rem 1.2rem;
+  min-height: 44px;
   border: 1px solid var(--trace-line);
   border-radius: 4px;
   background: var(--bg-deep);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
   letter-spacing: 0.02em;
 }
 

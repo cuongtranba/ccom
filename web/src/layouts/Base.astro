@@ -12,12 +12,16 @@ const { title } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Inventory Network — A distributed protocol where inventories are nodes, traces are synapses, and signals propagate change across teams." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
   <body>
+    <a class="skip-link" href="#content">Skip to content</a>
     <canvas id="network-canvas" aria-hidden="true"></canvas>
-    <main class="content-layer">
+    <main id="content" class="content-layer">
       <slot />
     </main>
     <script>
@@ -27,6 +31,24 @@ const { title } = Astro.props;
 </html>
 
 <style>
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: var(--bg-surface);
+    color: var(--signal-pulse);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    border: 1px solid var(--signal-pulse);
+    border-radius: 4px;
+    text-decoration: none;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+
   #network-canvas {
     position: fixed;
     inset: 0;

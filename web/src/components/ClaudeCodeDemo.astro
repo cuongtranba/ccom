@@ -1,28 +1,66 @@
 ---
+import AsciinemaPlayer from './AsciinemaPlayer.astro';
 ---
 
 <div class="claude-demo">
-  <div class="terminal-split">
-    <div class="terminal-column">
-      <div class="terminal-label">⌘ HUMAN — CLI</div>
-      <pre class="demo-terminal split-terminal" id="human-terminal" aria-live="polite"><span class="prompt">$</span> <span class="cmd">_</span></pre>
-    </div>
-    <div class="terminal-column">
-      <div class="terminal-label"><span class="terminal-label-ai">AI</span> AGENT — MCP</div>
-      <pre class="demo-terminal split-terminal" id="ai-terminal" aria-live="polite"><span class="prompt">⟩</span> <span class="cmd">_</span></pre>
-    </div>
+  <div class="cast-tabs">
+    <button class="cast-tab active" data-cast="session">MCP session</button>
+    <button class="cast-tab" data-cast="vote">proposal & vote</button>
+    <button class="cast-tab" data-cast="challenge">challenge</button>
   </div>
-  <div class="demo-buttons claude-buttons">
-    <button class="demo-btn" data-claude="start">session start</button>
-    <button class="demo-btn" data-claude="edit">human edits</button>
-    <button class="demo-btn" data-claude="ai">AI acts</button>
-    <button class="demo-btn" data-claude="cross">cross-node event</button>
-    <button class="demo-btn" data-claude="reset">reset</button>
+
+  <div class="cast-panels">
+    <div class="cast-panel active" data-panel="session">
+      <AsciinemaPlayer
+        src="/casts/mcp-session.cast"
+        title="dev node — register, list items, add trace, audit"
+        rows={20}
+        cols={92}
+        speed={1}
+        idleTimeLimit={3}
+      />
+    </div>
+    <div class="cast-panel" data-panel="vote">
+      <AsciinemaPlayer
+        src="/casts/governance-vote.cast"
+        title="dev proposes change — PM approves, QA rejects, tally shown"
+        rows={22}
+        cols={92}
+        speed={1}
+        idleTimeLimit={3}
+      />
+    </div>
+    <div class="cast-panel" data-panel="challenge">
+      <AsciinemaPlayer
+        src="/casts/challenge.cast"
+        title="QA challenges Dev's API spec — Dev resolves with evidence"
+        rows={20}
+        cols={92}
+        speed={1}
+        idleTimeLimit={3}
+      />
+    </div>
   </div>
 </div>
 
 <script>
-  import '../scripts/claude-code-demo.ts';
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.cast-tab');
+  const panels = document.querySelectorAll<HTMLElement>('.cast-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.cast;
+      tabs.forEach(t => t.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const panel = document.querySelector<HTMLElement>(`.cast-panel[data-panel="${target}"]`);
+      if (panel) panel.classList.add('active');
+    });
+  });
+</script>
+
+<script>
+  import '../scripts/asciinema-init.ts';
 </script>
 
 <style>
@@ -30,65 +68,64 @@
     margin-top: 3rem;
   }
 
-  .terminal-split {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-  }
-
-  .terminal-column {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .terminal-label {
+  .cast-tabs {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.2rem;
+    gap: 0;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cast-tab {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.08em;
+    padding: 0.65rem 1.4rem;
+    min-height: 44px;
+    background: var(--bg-surface);
     color: var(--text-muted);
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
   }
 
-  .terminal-label-ai {
-    font-size: 0.75rem;
-    padding: 0.1rem 0.35rem;
-    background: color-mix(in oklch, var(--signal-pulse) 15%, transparent);
-    color: var(--signal-pulse);
-    border-radius: 2px;
-  }
-
-  .split-terminal {
-    padding: 1.2rem;
-    min-height: 260px;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    margin: 0;
-    background: none;
-    border: none;
+  .cast-tab:hover {
     color: var(--text-secondary);
   }
 
-  .split-terminal :global(.event) { color: var(--suspect); }
-  .split-terminal :global(.warn) { color: var(--suspect); font-weight: bold; }
-  .split-terminal :global(.ai-mode) { color: var(--signal-pulse); }
-
-  .claude-buttons {
-    margin-top: 1.5rem;
+  .cast-tab:focus-visible {
+    outline: 2px solid var(--signal-pulse);
+    outline-offset: 2px;
   }
 
-  @media (max-width: 768px) {
-    .terminal-split {
-      grid-template-columns: 1fr;
+  .cast-tab.active {
+    background: var(--bg-deep);
+    color: var(--signal-pulse);
+    border-color: var(--border-subtle);
+  }
+
+  .cast-panels {
+    position: relative;
+  }
+
+  .cast-panel {
+    display: none;
+  }
+
+  .cast-panel.active {
+    display: block;
+  }
+
+  @media (max-width: 640px) {
+    .cast-tabs {
+      flex-wrap: wrap;
+    }
+
+    .cast-tab {
+      font-size: 0.7rem;
+      padding: 0.5rem 0.8rem;
     }
   }
 </style>

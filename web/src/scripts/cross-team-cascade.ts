@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
-// Cross-Team Cascade — P2P network demo
-// Shows 5 team islands discovering each other via mDNS and cascading signals
-// when PM changes a story.
+// Cross-Team Cascade — WebSocket network demo
+// Shows 5 team nodes connecting via a central WebSocket server and cascading
+// signals when PM changes a story.
 // ---------------------------------------------------------------------------
 
 import {
@@ -268,9 +268,9 @@ if (cascadeCanvas) {
   const output = document.getElementById('cascade-output')!;
 
   const INITIAL_TERMINAL = `<span class="prompt">$</span> <span class="cmd">inv network status</span>
-<span class="out">P2P NETWORK          STATUS
+<span class="out">NETWORK              STATUS
 Nodes connected      0 / 5
-Discovery            idle
+Server               idle
 Last sweep           --</span>
 
 <span class="prompt">$</span> <span class="cmd">_</span>`;
@@ -296,8 +296,8 @@ Last sweep           --</span>
   function runConnect(): void {
     const order = ['pm', 'design', 'dev', 'qa', 'devops'];
 
-    output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv network discover --mdns</span>
-<span class="out">Starting mDNS discovery on local network...</span>`;
+    output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv network connect</span>
+<span class="out">Connecting to WebSocket server...</span>`;
 
     order.forEach((id, i) => {
       setTimeout(() => {
@@ -306,12 +306,12 @@ Last sweep           --</span>
         island.discoveryPulse = 0;
         discoveryActive = true;
 
-        output.innerHTML += `\n<span class="out">  [mDNS] Found </span><span class="s-proven">${island.team}</span><span class="out"> island (${island.nodes.length} items)</span>`;
+        output.innerHTML += `\n<span class="out">  [ws] </span><span class="s-proven">${island.team}</span><span class="out"> node connected (${island.nodes.length} items)</span>`;
 
         if (i === order.length - 1) {
-          output.innerHTML += `\n\n<span class="out">P2P NETWORK          STATUS
+          output.innerHTML += `\n\n<span class="out">NETWORK              STATUS
 Nodes connected      </span><span class="s-proven">5 / 5</span><span class="out">
-Discovery            </span><span class="s-proven">active</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+Server               </span><span class="s-proven">active</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
         }
       }, 500 * (i + 1));
     });

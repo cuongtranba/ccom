@@ -1,4 +1,5 @@
 ---
+import AsciinemaPlayer from './AsciinemaPlayer.astro';
 ---
 
 <div class="network-demo">
@@ -24,10 +25,23 @@ de061a81  PM Inventory      pm        duke
 
 <span class="prompt">$</span> <span class="cmd">_</span></pre>
   </div>
+
+  <div class="cast-companion">
+    <AsciinemaPlayer
+      src="/casts/cross-node-signal.cast"
+      title="PM marks PRD suspect — signals cascade to Dev, Design, QA"
+      rows={20}
+      cols={92}
+      speed={1}
+      idleTimeLimit={3}
+      autoPlay={false}
+    />
+  </div>
 </div>
 
 <script>
   import '../scripts/propagation-demo.ts';
+  import '../scripts/asciinema-init.ts';
 </script>
 
 <style>
@@ -43,6 +57,11 @@ de061a81  PM Inventory      pm        duke
     width: 100%;
     aspect-ratio: 1;
     max-width: 550px;
+  }
+
+  .cast-companion {
+    grid-column: 1 / -1;
+    margin-top: 2rem;
   }
 
   @media (max-width: 768px) {

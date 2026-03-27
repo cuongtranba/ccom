@@ -2,99 +2,74 @@
 import Base from '../layouts/Base.astro';
 import SectionHeader from '../components/SectionHeader.astro';
 import StateMachine from '../components/StateMachine.astro';
-import PropagationDemo from '../components/PropagationDemo.astro';
 import CrossTeamCascade from '../components/CrossTeamCascade.astro';
-import GovernanceLifecycle from '../components/GovernanceLifecycle.astro';
 import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
-import PipelineDemo from '../components/PipelineDemo.astro';
 ---
 
 <Base title="Inventory Network — A Living Protocol">
 
   <!-- HERO -->
   <section class="hero">
-    <p class="hero-eyebrow">Inventory Network Protocol v1.0</p>
+    <p class="hero-eyebrow">Inventory Network Protocol</p>
     <h1 class="hero-title">
-      Each team owns its <span class="highlight">source of truth.</span>
-      The network keeps them <span class="highlight">alive.</span>
+      You don't need another tool.<br />
+      You need a <span class="highlight">protocol.</span>
     </h1>
     <p class="hero-sub">
-      A distributed protocol where inventories are nodes, traces are synapses,
-      and signals propagate change across teams — automatically.
-      Human and AI agents participate as equals.
+      AI generates output. Teams pass it around. Nobody knows what's actually proven.
+      Inventory Network makes every artifact earn its status — verified by evidence,
+      challenged by peers, proven by consensus.
     </p>
   </section>
 
-  <!-- STATE MACHINE -->
+  <!-- MANIFESTO -->
+  <section class="manifesto">
+    <blockquote class="manifesto-quote">
+      Confluence pages go stale. Jira tickets lie. AI hallucinates and nobody checks.
+      The problem is not tooling. It is that <strong>nothing in your pipeline has to prove it is true.</strong>
+    </blockquote>
+  </section>
+
+  <!-- THE PROTOCOL -->
   <section class="section">
     <SectionHeader
-      label="01 — The Lifecycle"
-      title="Every item has a pulse"
-      description="Items enter as unverified. Evidence makes them proven. When upstream changes, they become suspect — automatically. Click a state to see the transitions fire."
+      label="01 — The Foundation"
+      title="Four states. Zero trust."
+      description="Every artifact starts unverified. Evidence moves it to proven. Upstream changes mark it suspect. Failures break it. No status is permanent. No status is assumed."
     />
     <StateMachine />
   </section>
 
-  <!-- NEURAL PROPAGATION -->
-  <section class="section">
+  <!-- THE NETWORK -->
+  <section class="section section-wide">
     <SectionHeader
-      label="02 — Neural Propagation"
-      title="Change one node. Watch the network respond."
-      description="When PM updates a user story, signals travel through traces and automatically mark affected items in Design and Dev as suspect. Like neurons firing across synapses."
-    />
-    <PropagationDemo />
-  </section>
-
-  <!-- P2P NETWORK CASCADE -->
-  <section class="section">
-    <SectionHeader
-      label="03 — P2P Network"
-      title="One team changes. Five teams know."
-      description="Each vertical runs its own inventory node. The P2P network connects them — discovery is automatic, propagation is instant, and no central server decides what's true."
+      label="02 — The Network"
+      title="One team changes. Every team knows."
+      description="Signals cascade through the trace graph automatically. PM updates a story, Dev's API spec goes suspect, QA's test cases need re-validation. No Slack thread. No forgotten stakeholder."
     />
     <CrossTeamCascade />
   </section>
 
-  <!-- GOVERNANCE -->
+  <!-- AI ACCOUNTABILITY -->
   <section class="section">
     <SectionHeader
-      label="04 — Governance"
-      title="No change lands without consensus."
-      description="Cross-inventory changes go through a formal lifecycle. Affected nodes vote. AI participates with reasons — but only humans decide quorum."
-    />
-    <GovernanceLifecycle />
-  </section>
-
-  <!-- CLAUDE CODE -->
-  <section class="section">
-    <SectionHeader
-      label="05 — AI as First-Class Citizen"
-      title="Same engine. Same network. Different interface."
-      description="Claude Code connects via MCP — the same protocol, the same state. AI detects file changes, suggests verifications, and acts autonomously on its own node. Governance still requires human confirmation."
+      label="03 — AI Accountability"
+      title="Same protocol. Same proof. No shortcuts."
+      description="Claude connects via 19 MCP tools — same rules as every human node. It proposes changes that require votes. It gets challenged when evidence is weak. Autonomy where safe, human approval where it matters."
     />
     <ClaudeCodeDemo />
   </section>
 
-  <!-- PIPELINE -->
-  <section class="section">
-    <SectionHeader
-      label="06 — The Pipeline"
-      title="Every vertical references upstream. Every handoff leaves a trace."
-      description="PM defines the requirements. Designer references them. Dev references both. The protocol enforces these connections — no orphan work, no lost context."
-    />
-    <PipelineDemo />
-  </section>
-
   <!-- CTA -->
   <section class="cta-section">
-    <SectionHeader
-      label="07 — Start"
-      title="Own your inventory."
-      description="Each team decides its own structure, its own workflow. The protocol handles the connections."
-    />
-    <div class="cta-badge">
-      coming soon
+    <div class="cta-content">
+      <p class="cta-label">Start proving.</p>
+      <h2 class="cta-title">Four commands. Your first node is live.</h2>
     </div>
+    <pre class="cta-commands"><span class="cta-prompt">$</span> docker-compose up -d
+<span class="cta-prompt">$</span> bun run server token create --project my-project --node dev
+<span class="cta-prompt">$</span> bun run init
+<span class="cta-prompt">$</span> claude</pre>
   </section>
 
 </Base>
@@ -122,12 +97,12 @@ import PipelineDemo from '../components/PipelineDemo.astro';
   }
 
   .hero-title {
-    font-size: clamp(3rem, 8vw, 7rem);
+    font-size: clamp(2.8rem, 7vw, 6rem);
     font-weight: 600;
-    line-height: 0.95;
-    letter-spacing: -0.01em;
-    max-width: 14ch;
-    margin-bottom: 2rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    max-width: 18ch;
+    margin-bottom: 2.5rem;
     opacity: 0;
     animation: fadeSlideUp 0.8s ease-out 0.5s forwards;
   }
@@ -135,33 +110,91 @@ import PipelineDemo from '../components/PipelineDemo.astro';
   .hero-title .highlight { color: var(--proven); }
 
   .hero-sub {
-    font-size: clamp(1rem, 1.8vw, 1.35rem);
+    font-size: clamp(1rem, 1.6vw, 1.25rem);
     font-weight: 300;
     color: var(--text-secondary);
-    max-width: 50ch;
-    margin-bottom: 3rem;
+    max-width: 52ch;
+    line-height: 1.7;
     opacity: 0;
     animation: fadeSlideUp 0.8s ease-out 0.7s forwards;
   }
 
+  /* ---- MANIFESTO ---- */
+  .manifesto {
+    padding: clamp(4rem, 8vh, 8rem) clamp(2rem, 8vw, 10rem);
+  }
+
+  .manifesto-quote {
+    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 48ch;
+    line-height: 1.7;
+    border-left: 2px solid var(--suspect);
+    padding-left: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .manifesto-quote strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* ---- SECTIONS ---- */
   .section {
     padding: clamp(4rem, 10vh, 8rem) clamp(2rem, 8vw, 10rem);
   }
 
-  .cta-section {
-    padding: clamp(6rem, 15vh, 12rem) clamp(2rem, 8vw, 10rem);
+  .section-wide {
+    padding-left: clamp(2rem, 5vw, 6rem);
+    padding-right: clamp(2rem, 5vw, 6rem);
   }
 
-  .cta-badge {
+  /* ---- CTA ---- */
+  .cta-section {
+    padding: clamp(6rem, 15vh, 12rem) clamp(2rem, 8vw, 10rem);
+    display: flex;
+    gap: clamp(3rem, 6vw, 6rem);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .cta-content {
+    flex: 1;
+    min-width: 240px;
+  }
+
+  .cta-label {
     font-family: var(--font-mono);
-    font-size: clamp(0.85rem, 1.2vw, 1rem);
-    padding: 0.75rem 2rem;
+    font-size: 0.75rem;
+    color: var(--signal-pulse);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .cta-title {
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .cta-commands {
+    font-family: var(--font-mono);
+    font-size: clamp(0.8rem, 1.1vw, 0.95rem);
+    padding: 1.5rem 2rem;
     background: var(--bg-surface);
     border: 1px solid var(--trace-line);
     border-radius: 6px;
     color: var(--text-secondary);
-    display: inline-block;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
+    line-height: 2;
+    max-width: 42ch;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .cta-prompt {
+    color: var(--signal-pulse);
+    user-select: none;
   }
 </style>

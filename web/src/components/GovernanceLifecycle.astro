@@ -1,4 +1,5 @@
 ---
+import AsciinemaPlayer from './AsciinemaPlayer.astro';
 ---
 
 <div class="governance-demo">
@@ -34,10 +35,23 @@ Status: </span><span class="s-muted">DRAFT</span>
 
 <span class="prompt">$</span> <span class="cmd">_</span></pre>
   </div>
+
+  <div class="cast-companion">
+    <AsciinemaPlayer
+      src="/casts/governance-vote.cast"
+      title="Dev proposes WebSocket switch — PM approves, QA rejects, tally shown"
+      rows={22}
+      cols={92}
+      speed={1}
+      idleTimeLimit={3}
+      autoPlay={false}
+    />
+  </div>
 </div>
 
 <script>
   import '../scripts/governance-lifecycle.ts';
+  import '../scripts/asciinema-init.ts';
 </script>
 
 <style>
@@ -233,6 +247,11 @@ Status: </span><span class="s-muted">DRAFT</span>
     font-family: var(--font-mono);
     font-size: 0.72rem;
     color: var(--text-muted);
+  }
+
+  .cast-companion {
+    grid-column: 1 / -1;
+    margin-top: 2rem;
   }
 
   @media (max-width: 768px) {
