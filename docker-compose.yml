@@ -10,5 +10,7 @@ services:
       dockerfile: packages/server/Dockerfile
     ports:
       - "4400:4400"
+    environment:
+      - ADMIN_KEY=${ADMIN_KEY:-}
     depends_on:
       - redis

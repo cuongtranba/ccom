@@ -35,6 +35,18 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   const outbox = new RedisOutbox(redis);
   const instanceId = randomUUID();
   const hub = new RedisHub(redis, outbox, instanceId);
+  const adminKey = process.env.ADMIN_KEY || "";
+
+  function requireAdmin(req: Request): Response | null {
+    if (!adminKey) {
+      return Response.json({ error: "ADMIN_KEY not configured" }, { status: 503 });
+    }
+    const header = req.headers.get("Authorization") || "";
+    if (header !== `Bearer ${adminKey}`) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return null;
+  }
 
   // Map from "projectId:nodeId" to the wrapped HubWebSocket for lifecycle management
   const wsMap = new Map<string, ReturnType<typeof wrapBunWs>>();
@@ -48,6 +60,43 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       if (url.pathname === "/metrics") {
         return Response.json(hub.getMetrics());
       }
+
+      // ── Token management API (admin-key protected) ───────────
+
+      if (url.pathname === "/api/token/create" && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const body = await req.json() as { project?: string; nodeId?: string };
+        if (!body.project || !body.nodeId) {
+          return Response.json({ error: "Missing project or nodeId" }, { status: 400 });
+        }
+        const token = await auth.createToken(body.project, body.nodeId);
+        return Response.json({ token, project: body.project, nodeId: body.nodeId });
+      }
+
+      if (url.pathname === "/api/token/list" && req.method === "GET") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const project = url.searchParams.get("project");
+        if (!project) {
+          return Response.json({ error: "Missing project query param" }, { status: 400 });
+        }
+        const tokens = await auth.listTokens(project);
+        return Response.json({ project, tokens });
+      }
+
+      if (url.pathname === "/api/token/revoke" && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const body = await req.json() as { token?: string };
+        if (!body.token) {
+          return Response.json({ error: "Missing token" }, { status: 400 });
+        }
+        await auth.revokeToken(body.token);
+        return Response.json({ revoked: true });
+      }
+
+      // ── WebSocket upgrade ────────────────────────────────────
 
       if (url.pathname === "/ws") {
         const token = url.searchParams.get("token");
