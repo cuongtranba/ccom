@@ -1,28 +1,6 @@
-import type { ItemState, TransitionKind } from "@inv/shared";
+import type { ItemState, TransitionKind, CRStatus, CRTransitionKind } from "@inv/shared";
 
-/**
- * CR (Change Request) lifecycle statuses.
- * Defined locally since CR is not part of V1 shared scope.
- */
-export type CRStatus =
-  | "draft"
-  | "proposed"
-  | "voting"
-  | "approved"
-  | "rejected"
-  | "applied"
-  | "archived";
-
-/**
- * CR transition kinds that drive the CR state machine.
- */
-export type CRTransitionKind =
-  | "submit"
-  | "open_voting"
-  | "approve"
-  | "reject"
-  | "apply"
-  | "archive";
+export type { CRStatus, CRTransitionKind };
 
 interface TransitionRule<S extends string, K extends string> {
   from: S;
