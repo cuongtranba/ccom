@@ -24,6 +24,23 @@
 
 **Total: 183 tests, 0 failures**
 
+### Channel Integration (2026-03-27)
+
+| # | Task | Tests | Commit | Status |
+|---|------|-------|--------|--------|
+| 1 | ToolArgs type + permission message types | 4 | `041d523` | Done |
+| 2 | Permission events in EventBus | — | `1d83a7b` | Done |
+| 3 | Permission handling in WSHandlers | — | `48e4815` | Done |
+| 4 | Swap Agent SDK for MCP SDK | — | `657951e` | Done |
+| 5 | MCP channel server with tools + permission relay | 3 | `f342573` | Done |
+| 6 | `inv init` CLI wizard | 3 | `551912e` | Done |
+| 7 | CLI router entry point | — | `eaf8dbf` | Done |
+| 8 | Remove agent.ts + tui.ts | — | `4f724e8` | Done |
+| 9 | Init script + gitignore updates | — | `5e241d1` | Done |
+| 10 | Scenario tests (all roles, vote/challenge, multi-node E2E) | 74 | — | Done |
+
+**Total: 267 tests, 4 skipped, 0 failures (749 expect() calls across 17 files)**
+
 ---
 
 ## TODO — Remaining Work
@@ -36,7 +53,7 @@
 - [x] **Dockerfile + docker-compose** — `packages/server/Dockerfile` + `docker-compose.yml` (server + redis)
 - [ ] **Deploy central server to Dokploy** — push Docker image, deploy to lowbit.link with Redis
 - [x] **End-to-end test with 2 nodes** — `packages/node/test/e2e.test.ts` — 4 tests (broadcast, direct msg, echo suppression, auth rejection). Run with `E2E_DEV_TOKEN=... E2E_PM_TOKEN=... bun test packages/node/test/e2e.test.ts`
-- [ ] **Test Chat TUI manually** — run `bun run node -- ./inv-config.json`, interact with Claude, verify tools work
+- [x] **Channel integration** — replaced Chat TUI + Agent SDK with MCP channel server. Run `bun run init` to set up, then `claude` to start
 
 ### Medium Priority (Polish)
 
@@ -63,8 +80,8 @@
 ```
 packages/
 ├── shared/src/          # Types + message envelope
-│   ├── types.ts         # Node, Item, Trace, Signal, etc.
-│   ├── messages.ts      # Envelope, MessagePayload, createEnvelope, parseEnvelope
+│   ├── types.ts         # Node, Item, Trace, Signal, ToolArgs, etc.
+│   ├── messages.ts      # Envelope, MessagePayload (incl. permission_request/verdict)
 │   └── index.ts         # Re-exports
 ├── server/src/          # Central server (deploy to Dokploy)
 │   ├── auth.ts          # RedisAuth — token CRUD
@@ -80,9 +97,9 @@ packages/
     ├── event-bus.ts     # Typed pub/sub for network events
     ├── ws-client.ts     # WebSocket connection + auto-reconnect
     ├── ws-handlers.ts   # Message dispatch to engine
-    ├── agent.ts         # Claude SDK wrapper with 6 inventory tools
-    ├── tui.ts           # readline Chat TUI with live events
-    └── index.ts         # Wires everything, starts TUI
+    ├── channel.ts       # MCP channel server — tools + permission relay
+    ├── cli.ts           # inv init wizard — generates configs
+    └── index.ts         # CLI router: "init" → wizard, default → channel server
 ```
 
 ## How to Run
@@ -97,13 +114,12 @@ bun test packages/
 # Start server (needs Redis)
 bun run server start --port 8080 --redis redis://localhost:6379
 
-# Start node (needs config file)
-bun run node -- ./inv-config.json
+# Set up a new node (interactive wizard)
+bun run init
 
-# Example inv-config.json:
-# {
-#   "node": { "name": "dev-inventory", "vertical": "dev", "project": "clinic-checkin", "owner": "cuong" },
-#   "server": { "url": "ws://localhost:8080/ws", "token": "your-token" },
-#   "database": { "path": "./inventory.db" }
-# }
+# Start Claude Code with channel integration
+claude
+
+# Or start channel server directly (needs inv-config.json)
+bun run node -- ./inv-config.json
 ```
