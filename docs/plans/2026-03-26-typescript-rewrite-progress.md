@@ -70,7 +70,7 @@
 - [x] **Create sample `inv-config.json`** — `inv-config.example.json` at repo root
 - [x] **Server CLI** — `token create/list/revoke` subcommands added to server entry point
 - [x] **Dockerfile + docker-compose** — `packages/server/Dockerfile` + `docker-compose.yml` (server + redis)
-- [ ] **Deploy central server to Dokploy** — push Docker image, deploy to lowbit.link with Redis
+- [x] **Deploy central server to Dokploy** — deployed as Compose service to `inv-server.apps.quickable.co` (server + Redis)
 - [x] **End-to-end test with 2 nodes** — `packages/node/test/e2e.test.ts` — 4 tests (broadcast, direct msg, echo suppression, auth rejection). Run with `E2E_DEV_TOKEN=... E2E_PM_TOKEN=... bun test packages/node/test/e2e.test.ts`
 - [x] **Channel integration** — replaced Chat TUI + Agent SDK with MCP channel server. Run `bun run init` to set up, then `claude` to start
 
