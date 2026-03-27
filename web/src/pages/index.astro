@@ -60,16 +60,18 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
     <ClaudeCodeDemo />
   </section>
 
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="cta-content">
-      <p class="cta-label">Start proving.</p>
-      <h2 class="cta-title">Four commands. Your first node is live.</h2>
+  <!-- CTA — THE THUMPER -->
+  <section class="thumper-section">
+    <p class="thumper-label">Early access</p>
+
+    <div class="thumper-seismic">
+      <div class="seismic-line"></div>
+      <a class="thumper-button" href="https://tally.so/r/wQ7y6N" target="_blank" rel="noopener">
+        Join the waitlist
+      </a>
+      <div class="seismic-line"></div>
     </div>
-    <pre class="cta-commands"><span class="cta-prompt">$</span> docker-compose up -d
-<span class="cta-prompt">$</span> bun run server token create --project my-project --node dev
-<span class="cta-prompt">$</span> bun run init
-<span class="cta-prompt">$</span> claude</pre>
+
   </section>
 
 </Base>
@@ -149,52 +151,134 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
     padding-right: clamp(2rem, 5vw, 6rem);
   }
 
-  /* ---- CTA ---- */
-  .cta-section {
-    padding: clamp(6rem, 15vh, 12rem) clamp(2rem, 8vw, 10rem);
+  /* ---- THUMPER ---- */
+  .thumper-section {
+    padding: clamp(10rem, 22vh, 18rem) clamp(2rem, 8vw, 10rem);
     display: flex;
-    gap: clamp(3rem, 6vw, 6rem);
+    flex-direction: column;
     align-items: center;
-    flex-wrap: wrap;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
   }
 
-  .cta-content {
-    flex: 1;
-    min-width: 240px;
-  }
-
-  .cta-label {
+  .thumper-label {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--signal-pulse);
+    font-size: 0.72rem;
     letter-spacing: 0.3em;
     text-transform: uppercase;
-    margin-bottom: 1rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
   }
 
-  .cta-title {
-    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+  /* Seismic composition: line — button — line */
+  .thumper-seismic {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 720px;
   }
 
-  .cta-commands {
+  .seismic-line {
+    flex: 1;
+    height: 1px;
+    position: relative;
+    background: oklch(0.30 0.03 65 / 0.4);
+    overflow: visible;
+  }
+
+  .seismic-line::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    height: 3px;
+    width: 60px;
+    border-radius: 2px;
+    background: var(--signal-pulse);
+    opacity: 0.7;
+    animation: seismic-trace 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .seismic-line:first-child::after {
+    right: 0;
+    animation-name: seismic-trace-left;
+  }
+
+  .seismic-line:last-child::after {
+    left: 0;
+    animation-name: seismic-trace-right;
+  }
+
+  @keyframes seismic-trace-left {
+    0% { transform: translateX(40px); opacity: 0; }
+    20% { opacity: 0.8; }
+    80% { opacity: 0.8; }
+    100% { transform: translateX(-100%); opacity: 0; }
+  }
+
+  @keyframes seismic-trace-right {
+    0% { transform: translateX(-40px); opacity: 0; }
+    20% { opacity: 0.8; }
+    80% { opacity: 0.8; }
+    100% { transform: translateX(100%); opacity: 0; }
+  }
+
+  /* The button */
+  .thumper-button {
     font-family: var(--font-mono);
-    font-size: clamp(0.8rem, 1.1vw, 0.95rem);
-    padding: 1.5rem 2rem;
-    background: var(--bg-surface);
-    border: 1px solid var(--trace-line);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    line-height: 2;
-    max-width: 42ch;
-    overflow-x: auto;
-    flex-shrink: 0;
+    font-size: clamp(0.72rem, 1vw, 0.85rem);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 1.1rem 2.8rem;
+    min-height: 44px;
+    white-space: nowrap;
+    color: var(--text-primary);
+    text-decoration: none;
+    background: transparent;
+    border: 1px solid oklch(0.40 0.08 65 / 0.6);
+    position: relative;
+    z-index: 1;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .cta-prompt {
-    color: var(--signal-pulse);
-    user-select: none;
+  .thumper-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: oklch(0.55 0.12 65 / 0);
+    transition: background 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: -1;
+  }
+
+  .thumper-button:hover {
+    border-color: var(--signal-pulse);
+    color: var(--bg-deep);
+    letter-spacing: 0.22em;
+  }
+
+  .thumper-button:hover::before {
+    background: var(--signal-pulse);
+  }
+
+  .thumper-button:focus-visible {
+    outline: 2px solid var(--signal-pulse);
+    outline-offset: 4px;
+  }
+
+  /* Hover on section intensifies the seismic lines */
+  .thumper-section:hover .seismic-line::after {
+    animation-duration: 1.8s;
+    opacity: 1;
+  }
+
+  @media (max-width: 640px) {
+    .thumper-seismic {
+      max-width: 100%;
+    }
+
+    .thumper-button {
+      padding: 1rem 2rem;
+    }
   }
 </style>
