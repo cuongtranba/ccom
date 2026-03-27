@@ -45,6 +45,10 @@ export function startServer(options: { port: number; redisUrl: string }): void {
     async fetch(req, server) {
       const url = new URL(req.url);
 
+      if (url.pathname === "/metrics") {
+        return Response.json(hub.getMetrics());
+      }
+
       if (url.pathname === "/ws") {
         const token = url.searchParams.get("token");
         if (!token) {

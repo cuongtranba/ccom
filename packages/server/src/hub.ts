@@ -8,9 +8,25 @@ export interface HubWebSocket {
   readyState: number;
 }
 
+export interface HubMetrics {
+  messages_routed: number;
+  messages_enqueued: number;
+  messages_cross_instance: number;
+  connections_active: number;
+  drains_total: number;
+  drain_messages_total: number;
+}
+
 export class RedisHub {
   private localConns = new Map<string, HubWebSocket>();
   private subRedis: Redis;
+  private counters = {
+    messages_routed: 0,
+    messages_enqueued: 0,
+    messages_cross_instance: 0,
+    drains_total: 0,
+    drain_messages_total: 0,
+  };
 
   constructor(
     private redis: Redis,
@@ -71,6 +87,7 @@ export class RedisHub {
   /** Delivers a message to a specific node: local ws.send, remote pub/sub, or outbox if offline. */
   private async deliverTo(projectId: string, nodeId: string, message: string): Promise<void> {
     const connKey = `${projectId}:${nodeId}`;
+    this.counters.messages_routed++;
 
     // Try local delivery first
     const ws = this.localConns.get(connKey);
@@ -85,19 +102,31 @@ export class RedisHub {
       // Publish to the project channel for cross-instance routing
       const routeMessage = JSON.stringify({ targetNode: nodeId, payload: message });
       await this.redis.publish(`route:${projectId}`, routeMessage);
+      this.counters.messages_cross_instance++;
       return;
     }
 
     // Node is offline — enqueue in outbox
     await this.outbox.enqueue(projectId, nodeId, message);
+    this.counters.messages_enqueued++;
   }
 
   /** Drains the outbox for a node and sends all queued messages to the WebSocket. */
   async drainOutbox(projectId: string, nodeId: string, ws: HubWebSocket): Promise<void> {
     const messages = await this.outbox.drain(projectId, nodeId);
+    this.counters.drains_total++;
+    this.counters.drain_messages_total += messages.length;
     for (const msg of messages) {
       ws.send(msg);
     }
+  }
+
+  /** Returns a snapshot of hub metrics. */
+  getMetrics(): HubMetrics {
+    return {
+      ...this.counters,
+      connections_active: this.localConns.size,
+    };
   }
 
   /** Cleans up the subscriber Redis connection. */

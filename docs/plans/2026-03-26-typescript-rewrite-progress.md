@@ -58,7 +58,7 @@
 | 11 | Verify ToolArgs completeness (19 tools) | — | — | Done |
 | 12 | Full test suite + progress update | — | — | Done |
 
-**Total: 330 tests, 4 skipped, 0 failures (912 expect() calls across 18 files)**
+**Total: 334 tests, 4 skipped, 0 failures (925 expect() calls across 18 files)**
 
 ---
 
@@ -77,8 +77,8 @@
 ### Medium Priority (Polish)
 
 - [x] **Node auto-registration** — when node connects, register with server if node.id is empty; persists ID back to config file
-- [ ] **Reconnect drain** — verify outbox drains correctly on reconnect
-- [ ] **Cross-instance pub/sub** — test Redis pub/sub routing between multiple server instances
+- [x] **Reconnect drain** — full cycle test: route to offline node → outbox → reconnect → drain delivers all in order
+- [x] **Cross-instance pub/sub** — two RedisHub instances routing via Redis pub/sub (100ms async delivery verified)
 - [x] **Error handling** — structured error events emitted via EventBus (SIGNAL_CHANGE_FAILED, SWEEP_FAILED, etc.)
 - [x] **Logging** — structured JSON logger replacing console.log/error/warn
 
@@ -89,8 +89,8 @@
 - [x] Pairing sessions — invite/join/end/list
 - [x] Checklist feature — add/check/uncheck/list per item
 - [x] Kind mapping — vertical-to-vertical kind translation
-- [ ] Observability/metrics
-- [ ] Web UI for pending actions
+- [x] Observability/metrics — `GET /metrics` JSON endpoint; HubMetrics: messages_routed, messages_enqueued, messages_cross_instance, connections_active, drains_total, drain_messages_total
+- [x] Web UI for pending actions — `packages/dashboard` (Astro SSR, Dune UI, bun:sqlite, API routes for approve/reject/vote)
 
 ---
 
