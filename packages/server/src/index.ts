@@ -1,6 +1,12 @@
 import { randomUUID } from "crypto";
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import Redis from "ioredis";
 import { parseEnvelope } from "@inv/shared";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const adminHtml = readFileSync(resolve(__dirname, "admin.html"), "utf-8");
 import { RedisAuth } from "./auth";
 import { RedisOutbox } from "./outbox";
 import { RedisHub } from "./hub";
@@ -56,6 +62,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
 
     async fetch(req, server) {
       const url = new URL(req.url);
+
+      if (url.pathname === "/admin") {
+        return new Response(adminHtml, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
 
       if (url.pathname === "/metrics") {
         return Response.json(hub.getMetrics());
