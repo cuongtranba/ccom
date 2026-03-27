@@ -4,7 +4,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { Store } from "./store";
 import { StateMachine } from "./state";
 import { SignalPropagator } from "./signal";
@@ -551,6 +551,12 @@ export async function startChannelServer(configPath: string): Promise<void> {
       config.node.isAI,
     );
     config.node.id = node.id;
+
+    // Persist the node ID back to config file
+    const updatedRaw = JSON.parse(readFileSync(configPath, "utf-8"));
+    if (!updatedRaw.node) updatedRaw.node = {};
+    updatedRaw.node.id = node.id;
+    writeFileSync(configPath, JSON.stringify(updatedRaw, null, 2) + "\n");
   }
 
   // 4. Create EventBus, WSHandlers, WSClient
