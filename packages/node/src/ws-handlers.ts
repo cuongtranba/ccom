@@ -29,6 +29,12 @@ export class WSHandlers {
       case "query_respond":
         this.handleQueryRespond(payload);
         break;
+      case "permission_request":
+        // Forwarded to Claude Code via channel server's EventBus listener
+        break;
+      case "permission_verdict":
+        // Forwarded to Claude Code via channel server's EventBus listener
+        break;
       case "ack":
         // no-op
         break;
