@@ -1,173 +1,142 @@
 # inv — Inventory Network
 
-A distributed inventory protocol for teams and AI agents. Each vertical (PM, Design, Dev, QA, DevOps) owns an independent inventory of artifacts with traces, lifecycle states, and reconciliation logs.
+A distributed inventory network for software teams and AI agents. Each team member (PM, design, dev, QA, devops) runs a local node that owns their slice of project artifacts — PRDs, ADRs, tickets, test plans — with automatic state propagation across the network when dependencies change.
 
 Built for the Constitution framework (`tini-works/const`).
 
+## How it works
+
+- Each node owns a local **SQLite database** of items and traces
+- Items have a 4-state lifecycle: `unverified → proven → suspect → broke`
+- When an item changes, all downstream items are automatically marked `suspect`
+- Nodes communicate via a central **WebSocket server** (Redis-backed, multi-instance)
+- Each node exposes **19 MCP tools** so Claude can manage the inventory on your behalf
+- Human-in-the-loop: configurable autonomy — Claude can auto-handle some actions and queue others for approval
+
 ## Prerequisites
 
-- Go 1.25+ ([install](https://go.dev/doc/install))
-- GCC (required by `go-sqlite3` CGO dependency)
-  - macOS: `xcode-select --install`
-  - Ubuntu/Debian: `sudo apt install build-essential`
-
-## Install
-
-### From source
-
-```bash
-git clone https://github.com/tini-works/my-inventory.git
-cd my-inventory
-go build -o inv .
-```
-
-Move to PATH:
-
-```bash
-sudo mv inv /usr/local/bin/
-```
-
-### One-liner (build + install)
-
-```bash
-go install github.com/tini-works/my-inventory@latest
-```
-
-> Note: CGO must be enabled. If you get linker errors, run `CGO_ENABLED=1 go install ...`
-
-## Verify
-
-```bash
-inv --help
-```
+- [Bun](https://bun.sh) 1.0+
+- [Docker](https://docker.com) (for the central server)
+- A Redis instance (included in docker-compose)
 
 ## Quick Start
 
-```bash
-# Register nodes for your team
-inv node add --name "dev-inventory" --vertical dev --project clinic-checkin --owner cuong
-inv node add --name "pm-inventory" --vertical pm --project clinic-checkin --owner duke
-
-# Add items to a node
-inv item add --node <node-id> --kind adr --title "WebSocket for real-time updates"
-inv item add --node <node-id> --kind api-spec --title "Check-in API v2"
-
-# Create traces between items
-inv trace add --from <item-id> --to <item-id> --relation traced_from --actor cuong
-
-# Verify an item with evidence
-inv verify <item-id> --evidence "Load test passed" --actor cuong
-
-# Check what breaks if something changes
-inv impact <item-id>
-
-# Audit a node's health
-inv audit <node-id>
-
-# Change requests with voting
-inv cr create --title "Switch to WebSocket" --proposer cuong --node <node-id>
-inv cr submit <cr-id>
-inv cr vote <cr-id> --node <other-node-id> --voter duke --decision approve --reason "Aligns with goals"
-inv cr resolve <cr-id>
-
-# Ask questions across the network
-inv ask --asker cuong --node <node-id> --question "What uses the check-in API?"
-```
-
-## MCP Server (AI Agent Integration)
-
-Start the MCP server for use with Claude Code, Cursor, or any MCP-compatible client:
+### 1. Start the central server
 
 ```bash
-inv mcp
+docker-compose up -d
 ```
 
-### Setup with Claude Code
-
-The repo includes a `.mcp.json` that auto-configures the inventory MCP server. Just build and open Claude Code:
+### 2. Create a token for your node
 
 ```bash
-go build -o inv .
-claude
+bun run server token create --project my-project --node my-node
 ```
 
-Claude Code will detect `.mcp.json` and connect to the inventory server automatically. Run `/mcp` inside Claude Code to verify the server is active.
-
-### Alternative setup
-
-**CLI command (if `inv` is on your PATH):**
+### 3. Set up your node
 
 ```bash
-claude mcp add --transport stdio --scope project inventory -- inv mcp
+bun run init
+# Follow the wizard — writes inv-config.json
 ```
 
-For all your projects (global):
+### 4. Connect Claude
 
 ```bash
-claude mcp add --transport stdio --scope user inventory -- inv mcp
+bun run node    # starts the MCP server on stdio
+claude          # Claude connects automatically via .mcp.json
 ```
 
-**Verify:**
+### 5. Dashboard (optional)
 
 ```bash
-claude mcp list              # List all configured servers
-claude mcp get inventory     # Check inventory server config
+cd packages/dashboard && bun run dev
+# Open http://localhost:4322
 ```
 
-### Available MCP Tools
+## Packages
 
-| Tool | Description |
+```
+packages/
+├── shared/       # Types + message envelope
+├── server/       # Central WebSocket server (deploy to Dokploy)
+├── node/         # Node client — engine, store, MCP server
+└── dashboard/    # Astro SSR action center UI
+```
+
+## MCP Tools
+
+19 tools available to Claude:
+
+| Group | Tools |
 |---|---|
-| `inv_register_node` | Register a new node in the network |
-| `inv_add_item` | Add an item to a node's inventory |
-| `inv_add_trace` | Create a trace between two items |
-| `inv_verify` | Verify an item with evidence |
-| `inv_impact` | Show what would be affected if an item changes |
-| `inv_audit` | Audit a node's inventory health |
-| `inv_create_cr` | Create a change request |
-| `inv_vote` | Vote on a change request |
-| `inv_ask` | Ask a question to the network |
-| `inv_list_nodes` | List all nodes in a project |
-| `inv_list_items` | List all items in a node |
+| Core | `inv_add_item`, `inv_add_trace`, `inv_verify`, `inv_mark_broken`, `inv_sweep`, `inv_impact`, `inv_audit` |
+| Network | `inv_list_nodes`, `inv_network_status`, `inv_register_node`, `inv_pending_events`, `inv_session_status` |
+| Proposals | `inv_proposal_create`, `inv_proposal_vote` |
+| Challenges | `inv_challenge_create`, `inv_challenge_list`, `inv_challenge_respond` |
+| Pairing | `inv_pair_invite`, `inv_pair_join`, `inv_pair_end`, `inv_pair_list` |
+| Checklist | `inv_checklist_add`, `inv_checklist_check`, `inv_checklist_uncheck`, `inv_checklist_list` |
 
 ## Item Lifecycle
 
 ```
-unverified ──verify──> proven ──suspect──> suspect ──re_verify──> proven
-                                              │
-                                              └──break──> broke ──fix──> proven
+unverified → proven → suspect → broke
 ```
 
-## Run Tests
+When a node propagates a change, all items that trace to the changed item are automatically marked `suspect`.
+
+## Autonomy Config
+
+`inv-config.json` controls which actions Claude handles automatically vs. queues for human approval:
+
+```json
+{
+  "node": { "id": "...", "name": "dev-node", "vertical": "dev", "project": "my-project" },
+  "server": { "url": "ws://localhost:4400/ws", "token": "..." },
+  "autonomy": {
+    "auto": ["signal_change", "trace_resolve", "sweep", "query_respond"],
+    "approval": ["proposal_vote", "challenge_respond", "pair_invite", "cr_create"]
+  }
+}
+```
+
+Approval-required actions are queued in SQLite and visible in the dashboard at `localhost:4322`.
+
+## V2 Features
+
+- **Change Requests & Voting** — cross-vertical change proposals with tie-breaking by vertical rank
+- **Challenges** — dispute an item's state; other verticals vote uphold/dismiss
+- **Pairing Sessions** — collaborative sessions between two nodes
+- **Checklists** — per-item task lists
+- **Kind Mapping** — translate item kinds across verticals (e.g. `dev:adr` → `pm:decision`)
+- **Observability** — `GET /metrics` on the server returns live counters
+
+## Server CLI
 
 ```bash
-go test -v ./...
+bun run server start --port 4400 --redis redis://localhost:6379
+bun run server token create --project <proj> --node <nodeId>
+bun run server token list --project <proj>
+bun run server token revoke <token>
 ```
 
-## Project Structure
+## Tests
 
-```
-my-inventory/
-├── main.go          # CLI commands (Cobra)
-├── engine.go        # Core domain logic
-├── store.go         # SQLite persistence
-├── network.go       # Domain types (Node, Item, Trace, etc.)
-├── state.go         # Item + CR state machines
-├── signal.go        # Change propagation through trace graph
-├── graph.go         # DI wiring (pumped-go)
-├── mcp_server.go    # MCP tool handlers
-├── state_test.go    # State machine unit tests
-├── store_test.go    # Store integration tests
-├── engine_test.go   # Engine integration tests
-├── scenario_test.go # Full workflow scenario tests
-└── docs/plans/      # Design documents
+```bash
+bun test                   # full suite (334 tests)
+bun test packages/server   # server only (requires local Redis)
+bun test packages/node     # node only
 ```
 
 ## Tech Stack
 
-- **Go** — core language
-- **SQLite** (go-sqlite3) — embedded database
-- **Cobra** — CLI framework
-- **mcp-go** — MCP server protocol
-- **pumped-go** — dependency injection
-- **testify** — test suites and assertions
+- **Bun** — runtime (WebSocket, SQLite, test runner)
+- **TypeScript** — full stack
+- **Redis** — presence, routing, outbox (via ioredis)
+- **SQLite** (`bun:sqlite`) — local node database
+- **Astro 5 SSR** — dashboard
+- **@modelcontextprotocol/sdk** — MCP channel server
+
+## Architecture
+
+See [`docs/architecture.md`](docs/architecture.md) for a full walkthrough.
