@@ -41,6 +41,25 @@
 
 **Total: 267 tests, 4 skipped, 0 failures (749 expect() calls across 17 files)**
 
+### V2 Big-Bang Implementation (2026-03-27)
+
+| # | Task | Tests | Commit | Status |
+|---|------|-------|--------|--------|
+| 1 | Shared V2 types (CR, Vote, PairSession, Checklist, KindMapping) | 10 | `8760048` | Done |
+| 2 | CR and Vote store layer | 8 | `1f8d6fc` | Done |
+| 3 | Pairing, Checklist, Kind Mapping store layer | 11 | `17922fd` | Done |
+| 4 | Proposal/Voting engine methods | 11 | `d8246e3` | Done |
+| 5 | Challenge engine methods | 4 | `7dee1ac` | Done |
+| 6 | Pairing, Checklist, Kind Mapping engine methods | 9 | `53ef941` | Done |
+| 7 | V2 MCP tools + EventBus + WSHandlers (12 new tools) | 6 | `86489cc` | Done |
+| 8 | Node auto-registration (persist ID to config) | 1 | `e3744a9` | Done |
+| 9 | Error handling — structured error events | 2 | `ae0d24a` | Done |
+| 10 | Structured JSON logger | 3 | `8ecb4ac` | Done |
+| 11 | Verify ToolArgs completeness (19 tools) | — | — | Done |
+| 12 | Full test suite + progress update | — | — | Done |
+
+**Total: 330 tests, 4 skipped, 0 failures (912 expect() calls across 18 files)**
+
 ---
 
 ## TODO — Remaining Work
@@ -57,20 +76,20 @@
 
 ### Medium Priority (Polish)
 
-- [ ] **Node auto-registration** — when node connects, register with server if node.id is empty
+- [x] **Node auto-registration** — when node connects, register with server if node.id is empty; persists ID back to config file
 - [ ] **Reconnect drain** — verify outbox drains correctly on reconnect
 - [ ] **Cross-instance pub/sub** — test Redis pub/sub routing between multiple server instances
-- [ ] **Error handling** — add proper error responses back to sender (error envelope)
-- [ ] **Logging** — replace console.log with structured logging
+- [x] **Error handling** — structured error events emitted via EventBus (SIGNAL_CHANGE_FAILED, SWEEP_FAILED, etc.)
+- [x] **Logging** — structured JSON logger replacing console.log/error/warn
 
-### V2 Features (Deferred)
+### V2 Features
 
-- [ ] Proposals/voting system
-- [ ] Challenge system
-- [ ] Pairing sessions
-- [ ] Checklist feature
+- [x] Proposals/voting system — full lifecycle with tie-breaking via upstream verticals
+- [x] Challenge system — uphold marks item suspect + cascades, dismiss archives
+- [x] Pairing sessions — invite/join/end/list
+- [x] Checklist feature — add/check/uncheck/list per item
+- [x] Kind mapping — vertical-to-vertical kind translation
 - [ ] Observability/metrics
-- [ ] Kind mapping
 - [ ] Web UI for pending actions
 
 ---
@@ -97,7 +116,8 @@ packages/
     ├── event-bus.ts     # Typed pub/sub for network events
     ├── ws-client.ts     # WebSocket connection + auto-reconnect
     ├── ws-handlers.ts   # Message dispatch to engine
-    ├── channel.ts       # MCP channel server — tools + permission relay
+    ├── logger.ts        # Structured JSON logger (stderr)
+    ├── channel.ts       # MCP channel server — 19 tools + permission relay
     ├── cli.ts           # inv init wizard — generates configs
     └── index.ts         # CLI router: "init" → wizard, default → channel server
 ```
