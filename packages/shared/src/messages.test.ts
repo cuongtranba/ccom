@@ -88,6 +88,8 @@ describe("parseEnvelope", () => {
       { type: "query_respond", answer: "A", responderId: "r1" },
       { type: "ack", originalMessageId: "m1" },
       { type: "error", code: "ERR", message: "bad" },
+      { type: "permission_request", requestId: "r1", tool: "inv_audit" } as MessagePayload,
+      { type: "permission_verdict", requestId: "r1", allowed: true } as MessagePayload,
     ];
 
     for (const payload of payloads) {
@@ -114,5 +116,73 @@ describe("parseEnvelope", () => {
   test("throws on missing payload", () => {
     const invalid = JSON.stringify({ messageId: "m1" });
     expect(() => parseEnvelope(invalid)).toThrow("Invalid envelope");
+  });
+});
+
+describe("permission_request envelope", () => {
+  test("round-trips permission_request with inv_mark_broken args", () => {
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", {
+      type: "permission_request",
+      requestId: "req-1",
+      tool: "inv_mark_broken",
+      itemId: "item-1",
+      reason: "broken in prod",
+    });
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload.type).toBe("permission_request");
+    if (parsed.payload.type === "permission_request") {
+      expect(parsed.payload.tool).toBe("inv_mark_broken");
+      expect(parsed.payload.requestId).toBe("req-1");
+    }
+  });
+
+  test("round-trips permission_request with inv_add_item args", () => {
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", {
+      type: "permission_request",
+      requestId: "req-2",
+      tool: "inv_add_item",
+      name: "New API Spec",
+      kind: "api-spec",
+      vertical: "dev",
+    });
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    if (parsed.payload.type === "permission_request") {
+      expect(parsed.payload.tool).toBe("inv_add_item");
+      if (parsed.payload.tool === "inv_add_item") {
+        expect(parsed.payload.name).toBe("New API Spec");
+        expect(parsed.payload.kind).toBe("api-spec");
+        expect(parsed.payload.vertical).toBe("dev");
+      }
+    }
+  });
+});
+
+describe("permission_verdict envelope", () => {
+  test("round-trips permission_verdict allowed", () => {
+    const envelope = createEnvelope("node-b", "node-a", "proj-1", {
+      type: "permission_verdict",
+      requestId: "req-1",
+      allowed: true,
+    });
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload.type).toBe("permission_verdict");
+    if (parsed.payload.type === "permission_verdict") {
+      expect(parsed.payload.allowed).toBe(true);
+      expect(parsed.payload.requestId).toBe("req-1");
+    }
+  });
+
+  test("round-trips permission_verdict denied with reason", () => {
+    const envelope = createEnvelope("node-b", "node-a", "proj-1", {
+      type: "permission_verdict",
+      requestId: "req-1",
+      allowed: false,
+      reason: "Not authorized for this action",
+    });
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    if (parsed.payload.type === "permission_verdict") {
+      expect(parsed.payload.allowed).toBe(false);
+      expect(parsed.payload.reason).toBe("Not authorized for this action");
+    }
   });
 });

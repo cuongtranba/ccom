@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { ToolArgs } from "./types";
 
 export interface Envelope {
   messageId: string;
@@ -17,6 +18,8 @@ export type MessagePayload =
   | { type: "query_ask"; question: string; askerId: string }
   | { type: "query_respond"; answer: string; responderId: string }
   | { type: "ack"; originalMessageId: string }
+  | ({ type: "permission_request"; requestId: string } & ToolArgs)
+  | { type: "permission_verdict"; requestId: string; allowed: boolean; reason?: string }
   | { type: "error"; code: string; message: string };
 
 export function createEnvelope(

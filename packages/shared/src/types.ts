@@ -130,3 +130,12 @@ export const UPSTREAM_VERTICALS: Record<Vertical, Vertical[]> = {
   qa: ["dev"],
   devops: ["dev", "qa"],
 };
+
+export type ToolArgs =
+  | { tool: "inv_add_item"; name: string; kind: ItemKind; vertical: Vertical; externalRef?: string }
+  | { tool: "inv_add_trace"; fromItemId: string; toItemId: string; relation: TraceRelation }
+  | { tool: "inv_verify"; itemId: string }
+  | { tool: "inv_mark_broken"; itemId: string; reason?: string }
+  | { tool: "inv_audit" }
+  | { tool: "inv_ask"; question: string; targetNode?: string }
+  | { tool: "inv_reply"; message: string; targetNode: string };
