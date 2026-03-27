@@ -134,12 +134,148 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["message", "targetNode"],
     },
   },
+  {
+    name: "inv_proposal_create",
+    description: "Create a change request proposal for an item. Starts as draft, submits, and opens for voting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetItemId: { type: "string", description: "Item UUID to propose changes for" },
+        description: { type: "string", description: "Description of the proposed change" },
+      },
+      required: ["targetItemId", "description"],
+    },
+  },
+  {
+    name: "inv_proposal_vote",
+    description: "Vote on a proposal that is in voting status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        crId: { type: "string", description: "Change request UUID" },
+        approve: { type: "boolean", description: "true to approve, false to reject" },
+        reason: { type: "string", description: "Reason for your vote" },
+      },
+      required: ["crId", "approve", "reason"],
+    },
+  },
+  {
+    name: "inv_challenge_create",
+    description: "Challenge a proven item. Creates a CR that goes through voting. If upheld, item becomes suspect.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetItemId: { type: "string", description: "Item UUID to challenge" },
+        reason: { type: "string", description: "Reason for the challenge" },
+      },
+      required: ["targetItemId", "reason"],
+    },
+  },
+  {
+    name: "inv_challenge_respond",
+    description: "Vote on an active challenge.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        challengeId: { type: "string", description: "Challenge (CR) UUID" },
+        approve: { type: "boolean", description: "true to uphold challenge, false to dismiss" },
+        reason: { type: "string", description: "Reason" },
+      },
+      required: ["challengeId", "approve", "reason"],
+    },
+  },
+  {
+    name: "inv_pair_invite",
+    description: "Invite another node to a pairing session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetNode: { type: "string", description: "Target node UUID to pair with" },
+      },
+      required: ["targetNode"],
+    },
+  },
+  {
+    name: "inv_pair_join",
+    description: "Accept a pending pairing session invitation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sessionId: { type: "string", description: "Pair session UUID" },
+      },
+      required: ["sessionId"],
+    },
+  },
+  {
+    name: "inv_pair_end",
+    description: "End an active pairing session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sessionId: { type: "string", description: "Pair session UUID" },
+      },
+      required: ["sessionId"],
+    },
+  },
+  {
+    name: "inv_pair_list",
+    description: "List active pairing sessions for this node.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "inv_checklist_add",
+    description: "Add a checklist item to an inventory item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        itemId: { type: "string", description: "Parent inventory item UUID" },
+        text: { type: "string", description: "Checklist item text" },
+      },
+      required: ["itemId", "text"],
+    },
+  },
+  {
+    name: "inv_checklist_check",
+    description: "Mark a checklist item as checked.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        checklistItemId: { type: "string", description: "Checklist item UUID" },
+      },
+      required: ["checklistItemId"],
+    },
+  },
+  {
+    name: "inv_checklist_uncheck",
+    description: "Uncheck a checklist item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        checklistItemId: { type: "string", description: "Checklist item UUID" },
+      },
+      required: ["checklistItemId"],
+    },
+  },
+  {
+    name: "inv_checklist_list",
+    description: "List all checklist items for an inventory item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        itemId: { type: "string", description: "Parent inventory item UUID" },
+      },
+      required: ["itemId"],
+    },
+  },
 ];
 
 // ── Tool Handler Builder ──────────────────────────────────────────────
 
 interface ToolCallArgs {
-  [key: string]: string | undefined;
+  [key: string]: string | boolean | undefined;
 }
 
 interface ToolResult {
@@ -257,6 +393,127 @@ export function buildToolHandlers(
           }, null, 2));
         }
 
+        case "inv_proposal_create": {
+          const cr = engine.createProposal(config.node.id, config.node.owner, args.targetItemId ?? "", args.description ?? "");
+          engine.submitProposal(cr.id);
+          engine.openVoting(cr.id);
+          if (wsClient?.connected) {
+            wsClient.broadcast({
+              type: "proposal_create",
+              crId: cr.id,
+              targetItemId: args.targetItemId ?? "",
+              description: args.description ?? "",
+              proposerNode: config.node.id,
+            });
+          }
+          return text(JSON.stringify({ crId: cr.id, status: "voting" }, null, 2));
+        }
+
+        case "inv_proposal_vote": {
+          const nodeInfo = engine.getNode(config.node.id);
+          const vote = engine.castVote(args.crId ?? "", config.node.id, nodeInfo.vertical, args.approve === "true" || args.approve === true, args.reason ?? "");
+          if (wsClient?.connected) {
+            wsClient.broadcast({
+              type: "proposal_vote",
+              crId: args.crId ?? "",
+              approve: vote.approve,
+              reason: args.reason ?? "",
+            });
+          }
+          return text(JSON.stringify({ voted: true, crId: args.crId, approve: vote.approve }, null, 2));
+        }
+
+        case "inv_challenge_create": {
+          const cr = engine.createChallenge(config.node.id, config.node.owner, args.targetItemId ?? "", args.reason ?? "");
+          engine.submitProposal(cr.id);
+          engine.openVoting(cr.id);
+          if (wsClient?.connected) {
+            wsClient.broadcast({
+              type: "challenge_create",
+              challengeId: cr.id,
+              targetItemId: args.targetItemId ?? "",
+              reason: args.reason ?? "",
+              challengerNode: config.node.id,
+            });
+          }
+          return text(JSON.stringify({ challengeId: cr.id, status: "voting" }, null, 2));
+        }
+
+        case "inv_challenge_respond": {
+          const nodeInfo = engine.getNode(config.node.id);
+          const vote = engine.castVote(args.challengeId ?? "", config.node.id, nodeInfo.vertical, args.approve === "true" || args.approve === true, args.reason ?? "");
+          if (wsClient?.connected) {
+            wsClient.broadcast({
+              type: "proposal_vote",
+              crId: args.challengeId ?? "",
+              approve: vote.approve,
+              reason: args.reason ?? "",
+            });
+          }
+          return text(JSON.stringify({ voted: true, challengeId: args.challengeId, approve: vote.approve }, null, 2));
+        }
+
+        case "inv_pair_invite": {
+          const session = engine.invitePair(config.node.id, args.targetNode ?? "", config.node.project);
+          if (wsClient?.connected) {
+            wsClient.sendMessage(args.targetNode ?? "", {
+              type: "pair_invite",
+              sessionId: session.id,
+              initiatorNode: config.node.id,
+            });
+          }
+          return text(JSON.stringify({ sessionId: session.id, status: "pending" }, null, 2));
+        }
+
+        case "inv_pair_join": {
+          const session = engine.joinPair(args.sessionId ?? "");
+          if (wsClient?.connected) {
+            wsClient.sendMessage(session.initiatorNode, {
+              type: "pair_respond",
+              sessionId: session.id,
+              accepted: true,
+            });
+          }
+          return text(JSON.stringify({ sessionId: session.id, status: "active" }, null, 2));
+        }
+
+        case "inv_pair_end": {
+          const session = engine.endPair(args.sessionId ?? "");
+          if (wsClient?.connected) {
+            const partner = session.initiatorNode === config.node.id ? session.partnerNode : session.initiatorNode;
+            wsClient.sendMessage(partner, {
+              type: "pair_end",
+              sessionId: session.id,
+            });
+          }
+          return text(JSON.stringify({ sessionId: session.id, status: "ended" }, null, 2));
+        }
+
+        case "inv_pair_list": {
+          const sessions = engine.listPairSessions(config.node.id);
+          return text(JSON.stringify(sessions, null, 2));
+        }
+
+        case "inv_checklist_add": {
+          const cl = engine.addChecklistItem(args.itemId ?? "", args.text ?? "");
+          return text(JSON.stringify(cl, null, 2));
+        }
+
+        case "inv_checklist_check": {
+          engine.checkChecklistItem(args.checklistItemId ?? "");
+          return text(JSON.stringify({ checked: true, checklistItemId: args.checklistItemId }, null, 2));
+        }
+
+        case "inv_checklist_uncheck": {
+          engine.uncheckChecklistItem(args.checklistItemId ?? "");
+          return text(JSON.stringify({ unchecked: true, checklistItemId: args.checklistItemId }, null, 2));
+        }
+
+        case "inv_checklist_list": {
+          const items = engine.listChecklist(args.itemId ?? "");
+          return text(JSON.stringify(items, null, 2));
+        }
+
         default:
           return text(JSON.stringify({ error: `Unknown tool: ${name}` }));
       }
@@ -337,12 +594,14 @@ export async function startChannelServer(configPath: string): Promise<void> {
 Events from the inventory network arrive as <channel source="inventory"> tags. These include:
 - signal_change: an item changed state
 - sweep: an external reference triggered a sweep
-- query_ask: another node is asking a question
-- query_respond: an answer to a previous question
-- permission_request: another node needs approval for an action
-- permission_verdict: approval/denial for a previous request
+- query_ask/query_respond: Q&A between nodes
+- permission_request/permission_verdict: approval workflows
+- proposal_create/proposal_vote/proposal_result: change request voting
+- challenge_create: a node challenges an item
+- pair_invite/pair_respond/pair_end: pairing session events
+- checklist_update: checklist item checked/unchecked
 
-Use the inv_* tools to manage inventory. Reply to network messages with inv_reply.`,
+Use the inv_* tools to manage inventory, propose changes, vote, challenge items, pair with other nodes, and manage checklists.`,
     },
   );
 
@@ -366,6 +625,14 @@ Use the inv_* tools to manage inventory. Reply to network messages with inv_repl
     "query_respond",
     "permission_request",
     "permission_verdict",
+    "proposal_create",
+    "proposal_vote",
+    "proposal_result",
+    "challenge_create",
+    "pair_invite",
+    "pair_respond",
+    "pair_end",
+    "checklist_update",
     "error",
   ] as const;
 

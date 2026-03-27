@@ -8,7 +8,15 @@ export type EventType =
   | "ack"
   | "error"
   | "permission_request"
-  | "permission_verdict";
+  | "permission_verdict"
+  | "proposal_create"
+  | "proposal_vote"
+  | "proposal_result"
+  | "challenge_create"
+  | "pair_invite"
+  | "pair_respond"
+  | "pair_end"
+  | "checklist_update";
 
 type EventHandler = (data: unknown) => void;
 
