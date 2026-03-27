@@ -131,6 +131,77 @@ export const UPSTREAM_VERTICALS: Record<Vertical, Vertical[]> = {
   devops: ["dev", "qa"],
 };
 
+export type CRStatus =
+  | "draft"
+  | "proposed"
+  | "voting"
+  | "approved"
+  | "rejected"
+  | "applied"
+  | "archived";
+
+export type CRTransitionKind =
+  | "submit"
+  | "open_voting"
+  | "approve"
+  | "reject"
+  | "apply"
+  | "archive";
+
+export interface ChangeRequest {
+  id: string;
+  proposerNode: string;
+  proposerId: string;
+  targetItemId: string;
+  description: string;
+  status: CRStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Vote {
+  id: string;
+  crId: string;
+  nodeId: string;
+  vertical: Vertical;
+  approve: boolean;
+  reason: string;
+  createdAt: string;
+}
+
+export interface VoteTally {
+  approved: number;
+  rejected: number;
+  total: number;
+}
+
+export interface PairSession {
+  id: string;
+  initiatorNode: string;
+  partnerNode: string;
+  project: string;
+  status: "pending" | "active" | "ended";
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface ChecklistItem {
+  id: string;
+  itemId: string;
+  text: string;
+  checked: boolean;
+  createdAt: string;
+}
+
+export interface KindMapping {
+  id: string;
+  fromVertical: Vertical;
+  fromKind: ItemKind;
+  toVertical: Vertical;
+  toKind: ItemKind;
+  createdAt: string;
+}
+
 export type ToolArgs =
   | { tool: "inv_add_item"; name: string; kind: ItemKind; vertical: Vertical; externalRef?: string }
   | { tool: "inv_add_trace"; fromItemId: string; toItemId: string; relation: TraceRelation }
@@ -138,4 +209,16 @@ export type ToolArgs =
   | { tool: "inv_mark_broken"; itemId: string; reason?: string }
   | { tool: "inv_audit" }
   | { tool: "inv_ask"; question: string; targetNode?: string }
-  | { tool: "inv_reply"; message: string; targetNode: string };
+  | { tool: "inv_reply"; message: string; targetNode: string }
+  | { tool: "inv_proposal_create"; targetItemId: string; description: string }
+  | { tool: "inv_proposal_vote"; crId: string; approve: boolean; reason: string }
+  | { tool: "inv_challenge_create"; targetItemId: string; reason: string }
+  | { tool: "inv_challenge_respond"; challengeId: string; approve: boolean; reason: string }
+  | { tool: "inv_pair_invite"; targetNode: string }
+  | { tool: "inv_pair_end"; sessionId: string }
+  | { tool: "inv_pair_join"; sessionId: string }
+  | { tool: "inv_pair_list" }
+  | { tool: "inv_checklist_add"; itemId: string; text: string }
+  | { tool: "inv_checklist_check"; checklistItemId: string }
+  | { tool: "inv_checklist_uncheck"; checklistItemId: string }
+  | { tool: "inv_checklist_list"; itemId: string };

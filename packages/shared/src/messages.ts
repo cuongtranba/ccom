@@ -20,6 +20,14 @@ export type MessagePayload =
   | { type: "ack"; originalMessageId: string }
   | ({ type: "permission_request"; requestId: string } & ToolArgs)
   | { type: "permission_verdict"; requestId: string; allowed: boolean; reason?: string }
+  | { type: "proposal_create"; crId: string; targetItemId: string; description: string; proposerNode: string }
+  | { type: "proposal_vote"; crId: string; approve: boolean; reason: string }
+  | { type: "proposal_result"; crId: string; approved: boolean; tally: { approved: number; rejected: number; total: number } }
+  | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string }
+  | { type: "pair_invite"; sessionId: string; initiatorNode: string }
+  | { type: "pair_respond"; sessionId: string; accepted: boolean }
+  | { type: "pair_end"; sessionId: string }
+  | { type: "checklist_update"; itemId: string; checklistItemId: string; checked: boolean }
   | { type: "error"; code: string; message: string };
 
 export function createEnvelope(

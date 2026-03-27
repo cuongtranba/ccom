@@ -90,6 +90,14 @@ describe("parseEnvelope", () => {
       { type: "error", code: "ERR", message: "bad" },
       { type: "permission_request", requestId: "r1", tool: "inv_audit" } as MessagePayload,
       { type: "permission_verdict", requestId: "r1", allowed: true } as MessagePayload,
+      { type: "proposal_create", crId: "cr-1", targetItemId: "i1", description: "change it", proposerNode: "n1" },
+      { type: "proposal_vote", crId: "cr-1", approve: true, reason: "looks good" },
+      { type: "proposal_result", crId: "cr-1", approved: true, tally: { approved: 3, rejected: 1, total: 4 } },
+      { type: "challenge_create", challengeId: "ch-1", targetItemId: "i1", reason: "stale", challengerNode: "n2" },
+      { type: "pair_invite", sessionId: "ps-1", initiatorNode: "n1" },
+      { type: "pair_respond", sessionId: "ps-1", accepted: true },
+      { type: "pair_end", sessionId: "ps-1" },
+      { type: "checklist_update", itemId: "i1", checklistItemId: "cl-1", checked: true },
     ];
 
     for (const payload of payloads) {
@@ -184,5 +192,124 @@ describe("permission_verdict envelope", () => {
       expect(parsed.payload.allowed).toBe(false);
       expect(parsed.payload.reason).toBe("Not authorized for this action");
     }
+  });
+});
+
+describe("V2 message payloads", () => {
+  test("round-trips proposal_create", () => {
+    const payload: MessagePayload = {
+      type: "proposal_create",
+      crId: "cr-1",
+      targetItemId: "item-1",
+      description: "update the API spec",
+      proposerNode: "node-a",
+    };
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips proposal_vote", () => {
+    const payload: MessagePayload = {
+      type: "proposal_vote",
+      crId: "cr-1",
+      approve: true,
+      reason: "looks good to me",
+    };
+    const envelope = createEnvelope("node-b", "node-a", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips proposal_result", () => {
+    const payload: MessagePayload = {
+      type: "proposal_result",
+      crId: "cr-1",
+      approved: true,
+      tally: { approved: 3, rejected: 1, total: 4 },
+    };
+    const envelope = createEnvelope("node-a", "", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips challenge_create", () => {
+    const payload: MessagePayload = {
+      type: "challenge_create",
+      challengeId: "ch-1",
+      targetItemId: "item-2",
+      reason: "evidence is stale",
+      challengerNode: "node-c",
+    };
+    const envelope = createEnvelope("node-c", "node-a", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips pair_invite", () => {
+    const payload: MessagePayload = {
+      type: "pair_invite",
+      sessionId: "ps-1",
+      initiatorNode: "node-a",
+    };
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips pair_respond accepted", () => {
+    const payload: MessagePayload = {
+      type: "pair_respond",
+      sessionId: "ps-1",
+      accepted: true,
+    };
+    const envelope = createEnvelope("node-b", "node-a", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips pair_respond rejected", () => {
+    const payload: MessagePayload = {
+      type: "pair_respond",
+      sessionId: "ps-1",
+      accepted: false,
+    };
+    const envelope = createEnvelope("node-b", "node-a", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips pair_end", () => {
+    const payload: MessagePayload = {
+      type: "pair_end",
+      sessionId: "ps-1",
+    };
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips checklist_update", () => {
+    const payload: MessagePayload = {
+      type: "checklist_update",
+      itemId: "item-1",
+      checklistItemId: "cl-1",
+      checked: true,
+    };
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
+  });
+
+  test("round-trips checklist_update unchecked", () => {
+    const payload: MessagePayload = {
+      type: "checklist_update",
+      itemId: "item-1",
+      checklistItemId: "cl-2",
+      checked: false,
+    };
+    const envelope = createEnvelope("node-a", "node-b", "proj-1", payload);
+    const parsed = parseEnvelope(JSON.stringify(envelope));
+    expect(parsed.payload).toEqual(payload);
   });
 });
