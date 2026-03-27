@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@inv/shared": "workspace:*",
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@modelcontextprotocol/sdk": "^1.28.0"
   }
 }
