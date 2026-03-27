@@ -19,6 +19,9 @@ import type {
   Vote,
   VoteTally,
   CRStatus,
+  PairSession,
+  ChecklistItem,
+  KindMapping,
 } from "@inv/shared";
 import { UPSTREAM_VERTICALS } from "@inv/shared";
 
@@ -138,6 +141,33 @@ interface VoteRow {
   created_at: string;
 }
 
+interface PairSessionRow {
+  id: string;
+  initiator_node: string;
+  partner_node: string;
+  project: string;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+}
+
+interface ChecklistItemRow {
+  id: string;
+  item_id: string;
+  text: string;
+  checked: number;
+  created_at: string;
+}
+
+interface KindMappingRow {
+  id: string;
+  from_vertical: string;
+  from_kind: string;
+  to_vertical: string;
+  to_kind: string;
+  created_at: string;
+}
+
 // ── Input types for create methods ──────────────────────────────────────
 
 interface CreateNodeInput {
@@ -219,6 +249,24 @@ interface CreateVoteInput {
   vertical: Vertical;
   approve: boolean;
   reason: string;
+}
+
+interface CreatePairSessionInput {
+  initiatorNode: string;
+  partnerNode: string;
+  project: string;
+}
+
+interface CreateChecklistItemInput {
+  itemId: string;
+  text: string;
+}
+
+interface CreateKindMappingInput {
+  fromVertical: Vertical;
+  fromKind: ItemKind;
+  toVertical: Vertical;
+  toKind: ItemKind;
 }
 
 // ── Row mapper methods ──────────────────────────────────────────────────
@@ -353,6 +401,39 @@ function mapVoteRow(row: VoteRow): Vote {
     vertical: row.vertical as Vertical,
     approve: row.approve === 1,
     reason: row.reason,
+    createdAt: row.created_at,
+  };
+}
+
+function mapPairSessionRow(row: PairSessionRow): PairSession {
+  return {
+    id: row.id,
+    initiatorNode: row.initiator_node,
+    partnerNode: row.partner_node,
+    project: row.project,
+    status: row.status as PairSession["status"],
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+  };
+}
+
+function mapChecklistItemRow(row: ChecklistItemRow): ChecklistItem {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    text: row.text,
+    checked: row.checked === 1,
+    createdAt: row.created_at,
+  };
+}
+
+function mapKindMappingRow(row: KindMappingRow): KindMapping {
+  return {
+    id: row.id,
+    fromVertical: row.from_vertical as Vertical,
+    fromKind: row.from_kind as ItemKind,
+    toVertical: row.to_vertical as Vertical,
+    toKind: row.to_kind as ItemKind,
     createdAt: row.created_at,
   };
 }
@@ -508,6 +589,40 @@ export class Store {
         reason TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(cr_id, node_id)
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS pair_sessions (
+        id TEXT PRIMARY KEY,
+        initiator_node TEXT NOT NULL,
+        partner_node TEXT NOT NULL,
+        project TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        started_at TEXT DEFAULT (datetime('now')),
+        ended_at TEXT
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS checklists (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        checked INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS kind_mappings (
+        id TEXT PRIMARY KEY,
+        from_vertical TEXT NOT NULL,
+        from_kind TEXT NOT NULL,
+        to_vertical TEXT NOT NULL,
+        to_kind TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(from_vertical, from_kind, to_vertical)
       )
     `);
   }
@@ -860,6 +975,111 @@ export class Store {
       }
     }
     return { approved, rejected, total: votes.length };
+  }
+
+  // ── Pair Sessions ────────────────────────────────────────────────────
+
+  createPairSession(input: CreatePairSessionInput): PairSession {
+    const id = randomUUID();
+    const stmt = this.db.query<PairSessionRow, [string, string, string, string]>(
+      `INSERT INTO pair_sessions (id, initiator_node, partner_node, project)
+       VALUES (?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(id, input.initiatorNode, input.partnerNode, input.project);
+    if (!row) throw new Error("Failed to create pair session");
+    return mapPairSessionRow(row);
+  }
+
+  getPairSession(id: string): PairSession | null {
+    const row = this.db.query<PairSessionRow, [string]>(
+      "SELECT * FROM pair_sessions WHERE id = ?",
+    ).get(id);
+    return row ? mapPairSessionRow(row) : null;
+  }
+
+  updatePairSessionStatus(id: string, status: PairSession["status"]): PairSession {
+    if (status === "ended") {
+      const stmt = this.db.query<PairSessionRow, [string, string]>(
+        `UPDATE pair_sessions SET status = ?, ended_at = datetime('now') WHERE id = ? RETURNING *`,
+      );
+      const row = stmt.get(status, id);
+      if (!row) throw new Error(`Pair session not found: ${id}`);
+      return mapPairSessionRow(row);
+    }
+    const stmt = this.db.query<PairSessionRow, [string, string]>(
+      `UPDATE pair_sessions SET status = ? WHERE id = ? RETURNING *`,
+    );
+    const row = stmt.get(status, id);
+    if (!row) throw new Error(`Pair session not found: ${id}`);
+    return mapPairSessionRow(row);
+  }
+
+  listPairSessions(nodeId: string): PairSession[] {
+    const rows = this.db.query<PairSessionRow, [string, string]>(
+      "SELECT * FROM pair_sessions WHERE (initiator_node = ? OR partner_node = ?) AND status != 'ended' ORDER BY started_at",
+    ).all(nodeId, nodeId);
+    return rows.map(mapPairSessionRow);
+  }
+
+  // ── Checklists ───────────────────────────────────────────────────────
+
+  createChecklistItem(input: CreateChecklistItemInput): ChecklistItem {
+    const id = randomUUID();
+    const stmt = this.db.query<ChecklistItemRow, [string, string, string]>(
+      `INSERT INTO checklists (id, item_id, text)
+       VALUES (?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(id, input.itemId, input.text);
+    if (!row) throw new Error("Failed to create checklist item");
+    return mapChecklistItemRow(row);
+  }
+
+  getChecklistItem(id: string): ChecklistItem | null {
+    const row = this.db.query<ChecklistItemRow, [string]>(
+      "SELECT * FROM checklists WHERE id = ?",
+    ).get(id);
+    return row ? mapChecklistItemRow(row) : null;
+  }
+
+  updateChecklistItemChecked(id: string, checked: boolean): void {
+    this.db.query("UPDATE checklists SET checked = ? WHERE id = ?").run(checked ? 1 : 0, id);
+  }
+
+  listChecklistItems(itemId: string): ChecklistItem[] {
+    const rows = this.db.query<ChecklistItemRow, [string]>(
+      "SELECT * FROM checklists WHERE item_id = ? ORDER BY created_at",
+    ).all(itemId);
+    return rows.map(mapChecklistItemRow);
+  }
+
+  // ── Kind Mappings ────────────────────────────────────────────────────
+
+  createKindMapping(input: CreateKindMappingInput): KindMapping {
+    const id = randomUUID();
+    const stmt = this.db.query<KindMappingRow, [string, string, string, string, string]>(
+      `INSERT INTO kind_mappings (id, from_vertical, from_kind, to_vertical, to_kind)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING *`,
+    );
+    const row = stmt.get(id, input.fromVertical, input.fromKind, input.toVertical, input.toKind);
+    if (!row) throw new Error("Failed to create kind mapping");
+    return mapKindMappingRow(row);
+  }
+
+  getMappedKind(fromVertical: Vertical, fromKind: ItemKind, toVertical: Vertical): ItemKind | null {
+    const row = this.db.query<KindMappingRow, [string, string, string]>(
+      "SELECT * FROM kind_mappings WHERE from_vertical = ? AND from_kind = ? AND to_vertical = ?",
+    ).get(fromVertical, fromKind, toVertical);
+    return row ? (row.to_kind as ItemKind) : null;
+  }
+
+  listKindMappings(): KindMapping[] {
+    const rows = this.db.query<KindMappingRow, []>(
+      "SELECT * FROM kind_mappings ORDER BY created_at",
+    ).all();
+    return rows.map(mapKindMappingRow);
   }
 
   // ── Audit ───────────────────────────────────────────────────────────

@@ -583,4 +583,117 @@ describe("Store", () => {
       }).toThrow();
     });
   });
+
+  // ── Pair Sessions ──────────────────────────────────────────────────────
+
+  describe("pair sessions", () => {
+    let pmNode: Node;
+    let devNode: Node;
+
+    beforeEach(() => {
+      pmNode = store.createNode({ name: "PM", vertical: "pm", project: "proj", owner: "alice", isAI: false });
+      devNode = store.createNode({ name: "Dev", vertical: "dev", project: "proj", owner: "cuong", isAI: false });
+    });
+
+    it("creates a pair session in pending status", () => {
+      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
+      expect(session.id).toBeTruthy();
+      expect(session.status).toBe("pending");
+      expect(session.initiatorNode).toBe(pmNode.id);
+      expect(session.partnerNode).toBe(devNode.id);
+      expect(session.endedAt).toBeNull();
+    });
+
+    it("activates a pair session", () => {
+      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
+      const activated = store.updatePairSessionStatus(session.id, "active");
+      expect(activated.status).toBe("active");
+    });
+
+    it("ends a pair session with endedAt set", () => {
+      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
+      store.updatePairSessionStatus(session.id, "active");
+      const ended = store.updatePairSessionStatus(session.id, "ended");
+      expect(ended.status).toBe("ended");
+      expect(ended.endedAt).not.toBeNull();
+    });
+
+    it("lists active sessions for a node", () => {
+      store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
+      const ended = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
+      store.updatePairSessionStatus(ended.id, "active");
+      store.updatePairSessionStatus(ended.id, "ended");
+
+      const sessions = store.listPairSessions(pmNode.id);
+      expect(sessions).toHaveLength(1); // only the pending one, not the ended one
+    });
+  });
+
+  // ── Checklists ─────────────────────────────────────────────────────────
+
+  describe("checklists", () => {
+    let prd: Item;
+
+    beforeEach(() => {
+      const node = store.createNode({ name: "PM", vertical: "pm", project: "proj", owner: "alice", isAI: false });
+      prd = store.createItem({ nodeId: node.id, kind: "prd", title: "PRD" });
+    });
+
+    it("adds a checklist item to an inventory item", () => {
+      const cl = store.createChecklistItem({ itemId: prd.id, text: "Verify scope" });
+      expect(cl.id).toBeTruthy();
+      expect(cl.checked).toBe(false);
+      expect(cl.text).toBe("Verify scope");
+      expect(cl.itemId).toBe(prd.id);
+    });
+
+    it("checks and unchecks a checklist item", () => {
+      const cl = store.createChecklistItem({ itemId: prd.id, text: "Review API" });
+      store.updateChecklistItemChecked(cl.id, true);
+      expect(store.getChecklistItem(cl.id)!.checked).toBe(true);
+      store.updateChecklistItemChecked(cl.id, false);
+      expect(store.getChecklistItem(cl.id)!.checked).toBe(false);
+    });
+
+    it("lists checklist items for an item", () => {
+      store.createChecklistItem({ itemId: prd.id, text: "A" });
+      store.createChecklistItem({ itemId: prd.id, text: "B" });
+      const items = store.listChecklistItems(prd.id);
+      expect(items).toHaveLength(2);
+    });
+  });
+
+  // ── Kind Mappings ──────────────────────────────────────────────────────
+
+  describe("kind mappings", () => {
+    it("creates a kind mapping between verticals", () => {
+      const mapping = store.createKindMapping({
+        fromVertical: "pm",
+        fromKind: "prd",
+        toVertical: "dev",
+        toKind: "tech-design",
+      });
+      expect(mapping.id).toBeTruthy();
+      expect(mapping.fromKind).toBe("prd");
+      expect(mapping.toKind).toBe("tech-design");
+    });
+
+    it("finds mapped kind between verticals", () => {
+      store.createKindMapping({ fromVertical: "pm", fromKind: "prd", toVertical: "dev", toKind: "tech-design" });
+      const mapped = store.getMappedKind("pm", "prd", "dev");
+      expect(mapped).toBe("tech-design");
+    });
+
+    it("returns null for unmapped kind", () => {
+      const mapped = store.getMappedKind("pm", "prd", "qa");
+      expect(mapped).toBeNull();
+    });
+
+    it("lists all kind mappings", () => {
+      store.createKindMapping({ fromVertical: "pm", fromKind: "prd", toVertical: "dev", toKind: "tech-design" });
+      store.createKindMapping({ fromVertical: "design", fromKind: "screen-spec", toVertical: "dev", toKind: "api-spec" });
+      const all = store.listKindMappings();
+      expect(all).toHaveLength(2);
+    });
+  });
 });
