@@ -730,4 +730,88 @@ describe("Engine", () => {
       expect(() => engine.upholdChallenge(challenge.id)).toThrow();
     });
   });
+
+  // ── Pairing Sessions ──────────────────────────────────────────────────
+
+  describe("Pairing Sessions", () => {
+    const PROJECT = "proj";
+    let pmNode: ReturnType<typeof engine.registerNode>;
+    let devNode: ReturnType<typeof engine.registerNode>;
+
+    beforeEach(() => {
+      pmNode = engine.registerNode("pm-node", "pm", PROJECT, "alice", false);
+      devNode = engine.registerNode("dev-node", "dev", PROJECT, "cuong", false);
+    });
+
+    it("initiates a pair session", () => {
+      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
+      expect(session.status).toBe("pending");
+      expect(session.initiatorNode).toBe(pmNode.id);
+      expect(session.partnerNode).toBe(devNode.id);
+    });
+
+    it("joins a pending pair session", () => {
+      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
+      const active = engine.joinPair(session.id);
+      expect(active.status).toBe("active");
+    });
+
+    it("ends an active pair session", () => {
+      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
+      engine.joinPair(session.id);
+      const ended = engine.endPair(session.id);
+      expect(ended.status).toBe("ended");
+    });
+
+    it("lists active sessions for a node", () => {
+      engine.invitePair(pmNode.id, devNode.id, PROJECT);
+      const sessions = engine.listPairSessions(pmNode.id);
+      expect(sessions).toHaveLength(1);
+    });
+  });
+
+  // ── Checklists ────────────────────────────────────────────────────────
+
+  describe("Checklists", () => {
+    let prd: Item;
+
+    beforeEach(() => {
+      const node = engine.registerNode("pm-node", "pm", "proj", "alice", false);
+      prd = engine.addItem(node.id, "prd", "Clinic PRD");
+    });
+
+    it("adds a checklist item to an inventory item", () => {
+      const cl = engine.addChecklistItem(prd.id, "Verify scope");
+      expect(cl.text).toBe("Verify scope");
+      expect(cl.checked).toBe(false);
+    });
+
+    it("checks and unchecks a checklist item", () => {
+      const cl = engine.addChecklistItem(prd.id, "Review API");
+      engine.checkChecklistItem(cl.id);
+      expect(engine.listChecklist(prd.id)[0].checked).toBe(true);
+      engine.uncheckChecklistItem(cl.id);
+      expect(engine.listChecklist(prd.id)[0].checked).toBe(false);
+    });
+
+    it("lists checklist for an item", () => {
+      engine.addChecklistItem(prd.id, "A");
+      engine.addChecklistItem(prd.id, "B");
+      expect(engine.listChecklist(prd.id)).toHaveLength(2);
+    });
+  });
+
+  // ── Kind Mappings ─────────────────────────────────────────────────────
+
+  describe("Kind Mappings", () => {
+    it("creates and retrieves a kind mapping", () => {
+      engine.addKindMapping("pm", "prd", "dev", "tech-design");
+      const mapped = engine.getMappedKind("pm", "prd", "dev");
+      expect(mapped).toBe("tech-design");
+    });
+
+    it("returns null for unmapped kind", () => {
+      expect(engine.getMappedKind("pm", "prd", "qa")).toBeNull();
+    });
+  });
 });

@@ -13,6 +13,9 @@ import type {
   ChangeRequest,
   Vote,
   CRTransitionKind,
+  PairSession,
+  ChecklistItem,
+  KindMapping,
 } from "@inv/shared";
 import { UPSTREAM_VERTICALS } from "@inv/shared";
 import type { Store } from "./store";
@@ -377,6 +380,61 @@ export class Engine {
     }
     this.crSm.apply(cr.status, "archive");
     return this.store.updateChangeRequestStatus(crId, "archived");
+  }
+
+  // ── Pairing ─────────────────────────────────────────────────────────
+
+  invitePair(initiatorNode: string, partnerNode: string, project: string): PairSession {
+    this.getNode(initiatorNode);
+    this.getNode(partnerNode);
+    return this.store.createPairSession({ initiatorNode, partnerNode, project });
+  }
+
+  joinPair(sessionId: string): PairSession {
+    const session = this.store.getPairSession(sessionId);
+    if (!session) throw new Error(`Pair session not found: ${sessionId}`);
+    if (session.status !== "pending") throw new Error(`Session is "${session.status}", cannot join`);
+    return this.store.updatePairSessionStatus(sessionId, "active");
+  }
+
+  endPair(sessionId: string): PairSession {
+    const session = this.store.getPairSession(sessionId);
+    if (!session) throw new Error(`Pair session not found: ${sessionId}`);
+    if (session.status !== "active") throw new Error(`Session is "${session.status}", cannot end`);
+    return this.store.updatePairSessionStatus(sessionId, "ended");
+  }
+
+  listPairSessions(nodeId: string): PairSession[] {
+    return this.store.listPairSessions(nodeId);
+  }
+
+  // ── Checklists ──────────────────────────────────────────────────────
+
+  addChecklistItem(itemId: string, text: string): ChecklistItem {
+    this.getItem(itemId);
+    return this.store.createChecklistItem({ itemId, text });
+  }
+
+  checkChecklistItem(checklistItemId: string): void {
+    this.store.updateChecklistItemChecked(checklistItemId, true);
+  }
+
+  uncheckChecklistItem(checklistItemId: string): void {
+    this.store.updateChecklistItemChecked(checklistItemId, false);
+  }
+
+  listChecklist(itemId: string): ChecklistItem[] {
+    return this.store.listChecklistItems(itemId);
+  }
+
+  // ── Kind Mappings ───────────────────────────────────────────────────
+
+  addKindMapping(fromVertical: Vertical, fromKind: ItemKind, toVertical: Vertical, toKind: ItemKind): KindMapping {
+    return this.store.createKindMapping({ fromVertical, fromKind, toVertical, toKind });
+  }
+
+  getMappedKind(fromVertical: Vertical, fromKind: ItemKind, toVertical: Vertical): ItemKind | null {
+    return this.store.getMappedKind(fromVertical, fromKind, toVertical);
   }
 
   private getChangeRequest(id: string): ChangeRequest {
