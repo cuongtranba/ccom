@@ -77,11 +77,11 @@ jobs:
       - name: Publish to GitHub Packages
         run: |
           cd packages/node
-          printf '[publish]\nregistry = { url = "https://npm.pkg.github.com", token = "$npm_token" }\n\n[install.scopes]\n"@inv" = { token = "$npm_token", url = "https://npm.pkg.github.com" }\n' > bunfig.toml
-          cat bunfig.toml
+          printf '//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n@inv:registry=https://npm.pkg.github.com\n' > .npmrc
+          cat .npmrc
           bun publish
         env:
-          npm_token: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create tag
         run: |
