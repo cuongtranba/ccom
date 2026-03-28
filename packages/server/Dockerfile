@@ -32,5 +32,5 @@ RUN cd packages/server && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/
 
 EXPOSE 4400
 
-# Run migrations then start server
-CMD ["sh", "-c", "cd packages/server && bunx prisma migrate deploy && cd /app && bun run packages/server/src/index.ts start --port 4400 --redis ${REDIS_URL:-redis://redis:6379}"]
+# Wait for Postgres, run migrations, then start server
+CMD ["sh", "-c", "cd packages/server && until bunx prisma migrate deploy 2>/dev/null; do echo 'Waiting for Postgres...'; sleep 2; done && cd /app && bun run packages/server/src/index.ts start --port 4400 --redis ${REDIS_URL:-redis://redis:6379}"]
