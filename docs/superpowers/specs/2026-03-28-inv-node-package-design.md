@@ -170,9 +170,40 @@ Add an "Install" section to the root README covering:
 3. `bunx @inv/node init`
 4. Start Claude Code
 
+## GitHub CI/CD
+
+### Workflow: `.github/workflows/release-node.yml`
+
+**Trigger**: Push a git tag matching `node-v*` (e.g., `node-v0.1.0`).
+
+**Runner**: Self-hosted (`runs-on: self-hosted`).
+
+**Steps:**
+
+1. Checkout repo
+2. Setup Bun
+3. Install dependencies (`bun install`)
+4. Run tests (`bun test`)
+5. Build (`bun run build:node`)
+6. Publish to GitHub Packages (`bun publish` in `packages/node`)
+7. Create GitHub Release from the tag
+
+**Authentication**: Uses `GITHUB_TOKEN` (automatic in Actions) for GitHub Packages publish. The `publishConfig.registry` in `package.json` points to `https://npm.pkg.github.com`.
+
+**Version**: Extracted from the git tag (`node-v0.1.0` → `0.1.0`), injected into `package.json` before publish.
+
+### Release Process
+
+```bash
+# Bump version in packages/node/package.json
+# Commit
+git tag node-v0.2.0
+git push origin node-v0.2.0
+# → CI runs tests, builds, publishes, creates GitHub Release
+```
+
 ## Out of Scope
 
 - Node.js / npx support (would require replacing `bun:sqlite`)
 - Auto-update mechanism
-- CI/CD publish pipeline (can be added later)
 - Dashboard packaging (separate concern)
