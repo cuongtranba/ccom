@@ -27,6 +27,10 @@ COPY --from=admin-build /app/packages/admin/dist/ packages/admin/dist/
 # Install dependencies
 RUN bun install
 
+# Generate Prisma client
+RUN cd packages/server && bunx prisma generate
+
 EXPOSE 4400
 
-CMD ["bun", "run", "packages/server/src/index.ts", "start", "--port", "4400", "--redis", "redis://redis:6379"]
+# Run migrations then start server
+CMD ["sh", "-c", "cd packages/server && bunx prisma migrate deploy && cd /app && bun run packages/server/src/index.ts start --port 4400 --redis ${REDIS_URL:-redis://redis:6379}"]
