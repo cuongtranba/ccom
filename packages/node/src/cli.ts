@@ -51,8 +51,8 @@ export function generateMcpConfig(configPath: string): McpConfig {
   return {
     mcpServers: {
       inventory: {
-        command: "bun",
-        args: ["run", "packages/node/src/channel.ts", configPath],
+        command: "bunx",
+        args: ["@inv/node", "serve", configPath],
       },
     },
   };

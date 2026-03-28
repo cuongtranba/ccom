@@ -24,9 +24,15 @@ describe("CLI config generation", () => {
   });
 
   test("generateMcpConfig creates valid .mcp.json structure", () => {
-    const mcp = generateMcpConfig("./inv-config.json");
-    expect(mcp.mcpServers.inventory.command).toBe("bun");
-    expect(mcp.mcpServers.inventory.args).toContain("./inv-config.json");
+    const config = generateMcpConfig("./inv-config.json");
+    expect(config).toEqual({
+      mcpServers: {
+        inventory: {
+          command: "bunx",
+          args: ["@inv/node", "serve", "./inv-config.json"],
+        },
+      },
+    });
   });
 
   test("generateInvConfig handles all verticals", () => {
