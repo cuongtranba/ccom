@@ -60,6 +60,69 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
     <ClaudeCodeDemo />
   </section>
 
+  <!-- GET STARTED -->
+  <section class="section">
+    <SectionHeader
+      label="04 — Get Started"
+      title="Three steps. One command."
+      description="Register your node, grab your token, and connect to the network. The wizard handles the rest."
+    />
+
+    <div class="setup-steps">
+      <div class="setup-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3 class="step-title">Register at the admin console</h3>
+          <p class="step-desc">
+            Visit the server's admin page — no account needed. Pick your project, choose a node ID, and get your token.
+          </p>
+          <div class="step-terminal">
+            <code>https://inv-server.apps.quickable.co/admin</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3 class="step-title">Run the setup wizard</h3>
+          <p class="step-desc">
+            Enter your server URL and token. The wizard fetches your node config from the server and writes everything automatically.
+          </p>
+          <div class="step-terminal">
+            <pre><code>$ bunx @tini-works/inv-node init
+
+Server URL (ws://localhost:8080/ws): wss://inv-server.apps.quickable.co/ws
+Auth token: ********
+Database path (./inventory.db):
+
+Fetching node info from server... ✓
+  Node: my-node (my-node)
+  Vertical: dev
+  Owner: cuong
+  Projects: core-pvs-111
+
+Writing ./inv-config.json... ✓
+Writing ./.mcp.json... ✓</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3 class="step-title">Start Claude Code</h3>
+          <p class="step-desc">
+            The <code>.mcp.json</code> is auto-detected. Enable channels for real-time events from other nodes.
+          </p>
+          <div class="step-terminal">
+            <pre><code>$ claude --dangerously-load-development-channels server:inventory</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA — THE THUMPER -->
   <section class="thumper-section">
     <p class="thumper-label">Early access</p>
@@ -279,6 +342,88 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
 
     .thumper-button {
       padding: 1rem 2rem;
+    }
+  }
+
+  /* ---- GET STARTED ---- */
+  .setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2rem, 4vh, 3rem);
+    margin-top: clamp(2rem, 4vh, 3rem);
+  }
+
+  .setup-step {
+    display: flex;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: flex-start;
+  }
+
+  .step-number {
+    font-family: var(--font-mono);
+    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    font-weight: 600;
+    color: var(--signal-pulse);
+    line-height: 1;
+    min-width: 2.5rem;
+    opacity: 0.7;
+  }
+
+  .step-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-title {
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+
+  .step-desc {
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    max-width: 50ch;
+  }
+
+  .step-desc code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--proven);
+    background: oklch(0.18 0.03 65 / 0.5);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+  }
+
+  .step-terminal {
+    font-family: var(--font-mono);
+    font-size: clamp(0.72rem, 1vw, 0.82rem);
+    line-height: 1.6;
+    color: var(--text-secondary);
+    background: oklch(0.10 0.015 65);
+    border: 1px solid oklch(0.22 0.03 65 / 0.6);
+    border-left: 2px solid var(--signal-pulse);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .step-terminal code {
+    font-family: inherit;
+    color: inherit;
+  }
+
+  .step-terminal pre {
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .setup-step {
+      flex-direction: column;
+      gap: 0.75rem;
     }
   }
 </style>
