@@ -7,16 +7,17 @@ import { parseEnvelope } from "@inv/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const adminDistDir = resolve(__dirname, "../../admin/dist");
-import { RedisAuth } from "./auth";
+import { getPrisma, disconnectPrisma } from "./prisma";
+import { createRepositories } from "./repositories";
 import { RedisOutbox } from "./outbox";
 import { RedisHub } from "./hub";
 import type { HubWebSocket } from "./hub";
 import { LogBuffer } from "./log-buffer";
 
-export { RedisAuth } from "./auth";
+export { createRepositories } from "./repositories";
 export { RedisOutbox } from "./outbox";
 export { RedisHub } from "./hub";
-export type { TokenInfo } from "./auth";
+export type { TokenInfo } from "./repositories";
 export type { HubWebSocket } from "./hub";
 export type { ConnectedNode } from "./hub";
 
@@ -41,14 +42,20 @@ function wrapBunWs(ws: { send(data: string | BufferSource): number; close(): voi
 }
 
 export function startServer(options: { port: number; redisUrl: string }): void {
+  const prisma = getPrisma();
+  const repos = createRepositories(prisma);
   const redis = new Redis(options.redisUrl);
-  const auth = new RedisAuth(redis);
   const outbox = new RedisOutbox(redis);
   const instanceId = randomUUID();
   const hub = new RedisHub(redis, outbox, instanceId);
   const adminKey = process.env.ADMIN_KEY || "";
   const log = new LogBuffer(200);
   log.info("Server started", { instanceId, port: String(options.port) });
+
+  async function findProjectByName(name: string) {
+    const projects = await repos.projects.list();
+    return projects.find((p) => p.name === name) ?? null;
+  }
 
   function requireAdmin(req: Request): Response | null {
     if (!adminKey) {
@@ -115,18 +122,19 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!body.project) {
           return Response.json({ error: "Missing project" }, { status: 400 });
         }
-        const created = await auth.createProject(body.project);
-        if (!created) {
+        const exists = await repos.projects.exists(body.project);
+        if (exists) {
           return Response.json({ error: `Project "${body.project}" already exists` }, { status: 409 });
         }
+        await repos.projects.create(body.project);
         return Response.json({ project: body.project, created: true });
       }
 
       if (url.pathname === "/api/project/list" && req.method === "GET") {
         const denied = requireAdmin(req);
         if (denied) return denied;
-        const projects = await auth.listProjects();
-        return Response.json({ projects });
+        const projects = await repos.projects.list();
+        return Response.json({ projects: projects.map((p) => p.name) });
       }
 
       // ── Token management API (admin-key protected) ───────────
@@ -138,14 +146,15 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!body.project || !body.nodeId) {
           return Response.json({ error: "Missing project or nodeId" }, { status: 400 });
         }
-        if (!(await auth.projectExists(body.project))) {
+        const project = await findProjectByName(body.project);
+        if (!project) {
           return Response.json({ error: `Project "${body.project}" does not exist. Create it first.` }, { status: 400 });
         }
-        if (await auth.nodeExists(body.project, body.nodeId)) {
+        if (await repos.tokens.nodeExists(project.id, body.nodeId)) {
           return Response.json({ error: `Node "${body.nodeId}" already exists in project "${body.project}"` }, { status: 409 });
         }
-        const token = await auth.createToken(body.project, body.nodeId);
-        return Response.json({ token, project: body.project, nodeId: body.nodeId });
+        const token = await repos.tokens.create(project.id, body.nodeId);
+        return Response.json({ token: token.secret, project: body.project, nodeId: body.nodeId });
       }
 
       if (url.pathname === "/api/token/list" && req.method === "GET") {
@@ -153,10 +162,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (denied) return denied;
         const project = url.searchParams.get("project");
         if (project) {
-          const tokens = await auth.listTokens(project);
+          const projectRecord = await findProjectByName(project);
+          if (!projectRecord) return Response.json({ tokens: [] });
+          const tokens = await repos.tokens.listByProject(projectRecord.id);
           return Response.json({ tokens });
         }
-        const tokens = await auth.listAllTokens();
+        const tokens = await repos.tokens.listAll();
         return Response.json({ tokens });
       }
 
@@ -167,7 +178,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!body.token) {
           return Response.json({ error: "Missing token" }, { status: 400 });
         }
-        await auth.revokeToken(body.token);
+        await repos.tokens.revoke(body.token);
         return Response.json({ revoked: true });
       }
 
@@ -188,28 +199,37 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       if (url.pathname.startsWith("/api/project/") && req.method === "DELETE") {
         const denied = requireAdmin(req);
         if (denied) return denied;
-        const projectId = decodeURIComponent(url.pathname.slice("/api/project/".length));
-        if (!projectId) {
+        const projectName = decodeURIComponent(url.pathname.slice("/api/project/".length));
+        if (!projectName) {
           return Response.json({ error: "Missing projectId" }, { status: 400 });
         }
-        const disconnected = await hub.disconnectProject(projectId);
-        const revoked = await auth.revokeByProject(projectId);
-        log.info(`Project removed: ${projectId}`, { revoked: String(revoked), disconnected: String(disconnected) });
+        const project = await findProjectByName(projectName);
+        if (!project) {
+          return Response.json({ error: "Project not found" }, { status: 404 });
+        }
+        const disconnected = await hub.disconnectProject(projectName);
+        const revoked = await repos.tokens.revokeByProject(project.id);
+        await repos.projects.remove(project.id);
+        log.info(`Project removed: ${projectName}`, { revoked: String(revoked), disconnected: String(disconnected) });
         return Response.json({ revoked, disconnected });
       }
 
       if (url.pathname.startsWith("/api/node/") && req.method === "DELETE") {
         const denied = requireAdmin(req);
         if (denied) return denied;
-        // /api/node/:projectId/:nodeId
+        // /api/node/:projectName/:nodeId
         const parts = url.pathname.slice("/api/node/".length).split("/").map(decodeURIComponent);
         if (parts.length < 2 || !parts[0] || !parts[1]) {
           return Response.json({ error: "Missing projectId or nodeId" }, { status: 400 });
         }
-        const [projectId, nodeId] = parts;
-        const disconnected = await hub.disconnect(projectId, nodeId);
-        const revoked = await auth.revokeByNode(projectId, nodeId);
-        log.info(`Node removed: ${nodeId} from ${projectId}`, { revoked: String(revoked), disconnected: String(disconnected) });
+        const [projectName, nodeId] = parts;
+        const project = await findProjectByName(projectName);
+        if (!project) {
+          return Response.json({ error: "Project not found" }, { status: 404 });
+        }
+        const disconnected = await hub.disconnect(projectName, nodeId);
+        const revoked = await repos.tokens.revokeByNode(project.id, nodeId);
+        log.info(`Node removed: ${nodeId} from ${projectName}`, { revoked: String(revoked), disconnected: String(disconnected) });
         return Response.json({ revoked, disconnected });
       }
 
@@ -232,7 +252,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!token) {
           return Response.json({ error: "Missing token" }, { status: 401 });
         }
-        const info = await auth.validateToken(token);
+        const info = await repos.tokens.validate(token);
         if (!info) {
           return Response.json({ error: "Invalid token" }, { status: 401 });
         }
@@ -250,7 +270,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           return new Response("Missing token", { status: 401 });
         }
 
-        const info = await auth.validateToken(token);
+        const info = await repos.tokens.validate(token);
         if (!info) {
           return new Response("Invalid token", { status: 401 });
         }
@@ -323,6 +343,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     await hub.shutdown();
+    await disconnectPrisma();
     redis.disconnect();
     server.stop();
     process.exit(0);
@@ -330,6 +351,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
 
   process.on("SIGTERM", async () => {
     await hub.shutdown();
+    await disconnectPrisma();
     redis.disconnect();
     server.stop();
     process.exit(0);
@@ -355,19 +377,9 @@ function parseArgs(args: string[]): { port: number; redisUrl: string } {
   return { port, redisUrl };
 }
 
-function parseRedisUrl(args: string[]): string {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--redis" && args[i + 1]) {
-      return args[i + 1];
-    }
-  }
-  return "redis://127.0.0.1:6379";
-}
-
 async function tokenCreate(args: string[]): Promise<void> {
   let project = "";
   let nodeId = "";
-  const redisUrl = parseRedisUrl(args);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--project" && args[i + 1]) {
@@ -380,23 +392,27 @@ async function tokenCreate(args: string[]): Promise<void> {
   }
 
   if (!project || !nodeId) {
-    console.error("Usage: token create --project <project> --node <nodeId> [--redis <url>]");
+    console.error("Usage: token create --project <project> --node <nodeId>");
     process.exit(1);
   }
 
-  const redis = new Redis(redisUrl);
-  const auth = new RedisAuth(redis);
+  const prisma = getPrisma();
+  const repos = createRepositories(prisma);
   try {
-    const token = await auth.createToken(project, nodeId);
-    console.log(token);
+    const projects = await repos.projects.list();
+    let projectRecord = projects.find((p) => p.name === project);
+    if (!projectRecord) {
+      projectRecord = await repos.projects.create(project);
+    }
+    const token = await repos.tokens.create(projectRecord.id, nodeId);
+    console.log(token.secret);
   } finally {
-    redis.disconnect();
+    await disconnectPrisma();
   }
 }
 
 async function tokenList(args: string[]): Promise<void> {
   let project = "";
-  const redisUrl = parseRedisUrl(args);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--project" && args[i + 1]) {
@@ -406,14 +422,20 @@ async function tokenList(args: string[]): Promise<void> {
   }
 
   if (!project) {
-    console.error("Usage: token list --project <project> [--redis <url>]");
+    console.error("Usage: token list --project <project>");
     process.exit(1);
   }
 
-  const redis = new Redis(redisUrl);
-  const auth = new RedisAuth(redis);
+  const prisma = getPrisma();
+  const repos = createRepositories(prisma);
   try {
-    const tokens = await auth.listTokens(project);
+    const projects = await repos.projects.list();
+    const projectRecord = projects.find((p) => p.name === project);
+    if (!projectRecord) {
+      console.log("No tokens found.");
+      return;
+    }
+    const tokens = await repos.tokens.listByProject(projectRecord.id);
     if (tokens.length === 0) {
       console.log("No tokens found.");
     } else {
@@ -422,36 +444,31 @@ async function tokenList(args: string[]): Promise<void> {
       }
     }
   } finally {
-    redis.disconnect();
+    await disconnectPrisma();
   }
 }
 
 async function tokenRevoke(args: string[]): Promise<void> {
-  const redisUrl = parseRedisUrl(args);
-
-  // Find the first positional arg (skip flags and their values)
   let token = "";
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--redis") {
-      i++; // skip flag value
-    } else if (!args[i].startsWith("--")) {
+    if (!args[i].startsWith("--")) {
       token = args[i];
       break;
     }
   }
 
   if (!token) {
-    console.error("Usage: token revoke <token> [--redis <url>]");
+    console.error("Usage: token revoke <token>");
     process.exit(1);
   }
 
-  const redis = new Redis(redisUrl);
-  const auth = new RedisAuth(redis);
+  const prisma = getPrisma();
+  const repos = createRepositories(prisma);
   try {
-    await auth.revokeToken(token);
+    await repos.tokens.revoke(token);
     console.log("Token revoked.");
   } finally {
-    redis.disconnect();
+    await disconnectPrisma();
   }
 }
 
