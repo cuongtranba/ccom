@@ -17,6 +17,13 @@ export interface HubMetrics {
   drain_messages_total: number;
 }
 
+export interface ConnectedNode {
+  nodeId: string;
+  project: string;
+  connectedAt: string;
+  lastMessageAt: string | null;
+}
+
 export class RedisHub {
   private localConns = new Map<string, HubWebSocket>();
   private subRedis: Redis;
@@ -27,6 +34,7 @@ export class RedisHub {
     drains_total: 0,
     drain_messages_total: 0,
   };
+  private connMeta = new Map<string, { project: string; nodeId: string; connectedAt: string; lastMessageAt: string | null }>();
 
   constructor(
     private redis: Redis,
@@ -44,6 +52,12 @@ export class RedisHub {
   async register(projectId: string, nodeId: string, ws: HubWebSocket): Promise<void> {
     const connKey = `${projectId}:${nodeId}`;
     this.localConns.set(connKey, ws);
+    this.connMeta.set(connKey, {
+      project: projectId,
+      nodeId,
+      connectedAt: new Date().toISOString(),
+      lastMessageAt: null,
+    });
     await this.redis.hset(`presence:${projectId}`, nodeId, this.instanceId);
     await this.subRedis.subscribe(`route:${projectId}`);
   }
@@ -52,6 +66,7 @@ export class RedisHub {
   async unregister(projectId: string, nodeId: string): Promise<void> {
     const connKey = `${projectId}:${nodeId}`;
     this.localConns.delete(connKey);
+    this.connMeta.delete(connKey);
     await this.redis.hdel(`presence:${projectId}`, nodeId);
   }
 
@@ -69,6 +84,13 @@ export class RedisHub {
 
   /** Routes an envelope: if toNode is set, deliver to that node; otherwise broadcast to all except sender. */
   async route(envelope: Envelope): Promise<void> {
+    // Update lastMessageAt for the sender
+    const senderKey = `${envelope.projectId}:${envelope.fromNode}`;
+    const senderMeta = this.connMeta.get(senderKey);
+    if (senderMeta) {
+      senderMeta.lastMessageAt = new Date().toISOString();
+    }
+
     if (envelope.toNode) {
       await this.deliverTo(envelope.projectId, envelope.toNode, JSON.stringify(envelope));
     } else {
@@ -129,6 +151,11 @@ export class RedisHub {
     };
   }
 
+  /** Returns metadata for all locally connected nodes. */
+  listConnections(): ConnectedNode[] {
+    return Array.from(this.connMeta.values());
+  }
+
   /** Cleans up the subscriber Redis connection. */
   async shutdown(): Promise<void> {
     try {
@@ -138,6 +165,7 @@ export class RedisHub {
     }
     this.subRedis.disconnect();
     this.localConns.clear();
+    this.connMeta.clear();
   }
 
   /** Handles incoming pub/sub messages for cross-instance routing. */
