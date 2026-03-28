@@ -550,14 +550,10 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
       // All PM items are orphans (no traces)
       expect(pmAudit.orphans).toHaveLength(3);
 
-      // PM has no missing upstream refs (root vertical)
+      // missingUpstreamRefs is always empty (vertical hierarchy removed)
       expect(pmAudit.missingUpstreamRefs).toHaveLength(0);
-
-      // Design has missing upstream refs (needs PM traces)
-      expect(designAudit.missingUpstreamRefs).toHaveLength(1);
-
-      // QA has missing upstream refs (needs Dev traces)
-      expect(qaAudit.missingUpstreamRefs).toHaveLength(4);
+      expect(designAudit.missingUpstreamRefs).toHaveLength(0);
+      expect(qaAudit.missingUpstreamRefs).toHaveLength(0);
     });
   });
 

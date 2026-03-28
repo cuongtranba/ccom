@@ -613,7 +613,8 @@ describe("Engine", () => {
       expect(resolved.status).toBe("rejected");
     });
 
-    it("tie-breaking: uses upstream vertical authority", () => {
+    it("tie-breaking: rejects on tie (vertical hierarchy removed)", () => {
+      // Without UPSTREAM_VERTICALS, ties default to rejected.
       const cr = engine.createProposal(designNode.id, "bob", screenSpec.id, "Redesign");
       engine.submitProposal(cr.id);
       engine.openVoting(cr.id);
@@ -623,7 +624,7 @@ describe("Engine", () => {
       engine.castVote(cr.id, devopsNode.id, "devops", true, "No impact");
 
       const resolved = engine.resolveVoting(cr.id);
-      expect(resolved.status).toBe("approved");
+      expect(resolved.status).toBe("rejected");
     });
 
     it("applies approved proposal and propagates changes", () => {

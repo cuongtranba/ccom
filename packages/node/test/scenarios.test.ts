@@ -140,11 +140,11 @@ describe("Scenario: Full Project Lifecycle (all verticals)", () => {
       expect(updated.confirmedBy).toBe("alice");
     });
 
-    it("PM audit shows no upstream refs needed (pm has no upstream)", () => {
+    it("PM audit shows no missing upstream refs (vertical hierarchy removed)", () => {
       const report = engine.audit(pmNode.id);
       expect(report.totalItems).toBe(2);
       expect(report.unverified).toHaveLength(2);
-      expect(report.missingUpstreamRefs).toHaveLength(0); // PM has no upstream
+      expect(report.missingUpstreamRefs).toHaveLength(0);
     });
 
     it("PM items are orphans until traced", () => {
@@ -190,18 +190,11 @@ describe("Scenario: Full Project Lifecycle (all verticals)", () => {
       expect(trace.toNodeId).toBe(pmNode.id);
     });
 
-    it("Design audit flags missing upstream refs (design needs pm traces)", () => {
-      // Without traces, design items lack upstream refs
+    it("Design audit has no missing upstream refs (vertical hierarchy removed)", () => {
+      // Vertical is now a free-form string — no fixed upstream hierarchy.
+      // missingUpstreamRefs is always [] regardless of traces.
       const report = engine.audit(designNode.id);
-      expect(report.missingUpstreamRefs).toHaveLength(2);
-
-      // Audit checks for incoming traces from upstream verticals:
-      // a PM item must trace TO the design item (to_item_id = screenSpec.id)
-      engine.addTrace(userStory.id, screenSpec.id, "matched_by", "alice");
-
-      const reportAfter = engine.audit(designNode.id);
-      // screenSpec now has upstream ref (PM→screenSpec), but userFlow still doesn't
-      expect(reportAfter.missingUpstreamRefs).toHaveLength(1);
+      expect(report.missingUpstreamRefs).toHaveLength(0);
     });
 
     it("PM change propagates to Design's proven items", () => {
@@ -256,16 +249,11 @@ describe("Scenario: Full Project Lifecycle (all verticals)", () => {
       expect(traceFromDesign.toNodeId).toBe(designNode.id);
     });
 
-    it("Dev audit flags missing upstream refs (dev needs pm + design traces)", () => {
+    it("Dev audit has no missing upstream refs (vertical hierarchy removed)", () => {
+      // Vertical is now a free-form string — no fixed upstream hierarchy.
+      // missingUpstreamRefs is always [] regardless of traces.
       const report = engine.audit(devNode.id);
-      expect(report.missingUpstreamRefs).toHaveLength(3); // all 3 dev items
-
-      // Audit checks for incoming traces from upstream verticals:
-      // a PM/Design item must trace TO the dev item (to_item_id = apiSpec.id)
-      engine.addTrace(prd.id, apiSpec.id, "matched_by", "alice");
-
-      const reportAfter = engine.audit(devNode.id);
-      expect(reportAfter.missingUpstreamRefs).toHaveLength(2); // techDesign + dataModel
+      expect(report.missingUpstreamRefs).toHaveLength(0);
     });
 
     it("PM PRD change cascades PM → Design → Dev", () => {
@@ -343,16 +331,11 @@ describe("Scenario: Full Project Lifecycle (all verticals)", () => {
       expect(trace.relation).toBe("proven_by");
     });
 
-    it("QA audit flags missing upstream refs (qa needs dev traces)", () => {
+    it("QA audit has no missing upstream refs (vertical hierarchy removed)", () => {
+      // Vertical is now a free-form string — no fixed upstream hierarchy.
+      // missingUpstreamRefs is always [] regardless of traces.
       const report = engine.audit(qaNode.id);
-      expect(report.missingUpstreamRefs).toHaveLength(2); // both QA items
-
-      // Audit checks for incoming traces from upstream verticals:
-      // a Dev item must trace TO the QA item (to_item_id = testCase.id)
-      engine.addTrace(apiSpec.id, testCase.id, "proven_by", "cuong");
-
-      const reportAfter = engine.audit(qaNode.id);
-      expect(reportAfter.missingUpstreamRefs).toHaveLength(1); // testPlan still missing
+      expect(report.missingUpstreamRefs).toHaveLength(0);
     });
 
     it("Dev API change propagates to QA test items", () => {
@@ -443,16 +426,11 @@ describe("Scenario: Full Project Lifecycle (all verticals)", () => {
       expect(traceFromQA.relation).toBe("matched_by");
     });
 
-    it("DevOps audit flags missing upstream refs (devops needs dev + qa traces)", () => {
+    it("DevOps audit has no missing upstream refs (vertical hierarchy removed)", () => {
+      // Vertical is now a free-form string — no fixed upstream hierarchy.
+      // missingUpstreamRefs is always [] regardless of traces.
       const report = engine.audit(devopsNode.id);
-      expect(report.missingUpstreamRefs).toHaveLength(1); // runbook
-
-      // Audit checks for incoming traces from upstream verticals:
-      // a Dev/QA item must trace TO the DevOps item (to_item_id = runbook.id)
-      engine.addTrace(apiSpec.id, runbook.id, "matched_by", "cuong");
-
-      const reportAfter = engine.audit(devopsNode.id);
-      expect(reportAfter.missingUpstreamRefs).toHaveLength(0); // dev is upstream for devops
+      expect(report.missingUpstreamRefs).toHaveLength(0);
     });
 
     it("Dev API change cascades to DevOps runbook", () => {

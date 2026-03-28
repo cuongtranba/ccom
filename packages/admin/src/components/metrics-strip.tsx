@@ -4,7 +4,7 @@ import type { Metrics } from "@/lib/api";
 
 interface MetricsStripProps {
   metrics: Metrics | null;
-  changed: Set<keyof Metrics>;
+  changedFields: Set<keyof Metrics>;
 }
 
 const METRIC_CONFIG: { key: keyof Metrics; label: string }[] = [
@@ -16,13 +16,13 @@ const METRIC_CONFIG: { key: keyof Metrics; label: string }[] = [
   { key: "drain_messages_total", label: "Drained Msgs" },
 ];
 
-export function MetricsStrip({ metrics, changed }: MetricsStripProps) {
+export function MetricsStrip({ metrics, changedFields }: MetricsStripProps) {
   return (
-    <div className="mb-12 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px bg-sand-dim">
+    <div className="mb-10 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px bg-sand-dim">
       {METRIC_CONFIG.map(({ key, label }) => {
         const value = metrics ? metrics[key] : null;
         const isZero = value === 0;
-        const isPulsing = changed.has(key);
+        const isPulsing = changedFields.has(key);
 
         return (
           <Card key={key} className="rounded-none border-0 bg-card">

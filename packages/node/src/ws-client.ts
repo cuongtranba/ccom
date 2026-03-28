@@ -10,7 +10,7 @@ export interface WSClientConfig {
   serverUrl: string;
   token: string;
   nodeId: string;
-  projectId: string;
+  projectIds: string[];
 }
 
 export class WSClient {
@@ -75,21 +75,21 @@ export class WSClient {
     this.ws.send(JSON.stringify(envelope));
   }
 
-  sendMessage(toNode: string, payload: MessagePayload): void {
+  sendMessage(toNode: string, projectId: string, payload: MessagePayload): void {
     const envelope = createEnvelope(
       this.config.nodeId,
       toNode,
-      this.config.projectId,
+      projectId,
       payload,
     );
     this.send(envelope);
   }
 
-  broadcast(payload: MessagePayload): void {
+  broadcast(projectId: string, payload: MessagePayload): void {
     const envelope = createEnvelope(
       this.config.nodeId,
       "",
-      this.config.projectId,
+      projectId,
       payload,
     );
     this.send(envelope);

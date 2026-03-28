@@ -20,7 +20,7 @@ export interface HubMetrics {
 
 export interface ConnectedNode {
   nodeId: string;
-  project: string;
+  projects: string[];
   connectedAt: string;
   lastMessageAt: string | null;
 }
@@ -35,7 +35,7 @@ export class RedisHub {
     drains_total: 0,
     drain_messages_total: 0,
   };
-  private connMeta = new Map<string, { project: string; nodeId: string; connectedAt: string; lastMessageAt: string | null }>();
+  private connMeta = new Map<string, { nodeId: string; projects: string[]; connectedAt: string; lastMessageAt: string | null }>();
 
   constructor(
     private redis: Redis,
@@ -50,25 +50,29 @@ export class RedisHub {
   }
 
   /** Registers a node as online on this instance and stores the local WebSocket. */
-  async register(projectId: string, nodeId: string, ws: HubWebSocket): Promise<void> {
-    const connKey = `${projectId}:${nodeId}`;
-    this.localConns.set(connKey, ws);
-    this.connMeta.set(connKey, {
-      project: projectId,
+  async register(projectIds: string[], nodeId: string, ws: HubWebSocket): Promise<void> {
+    for (const projectId of projectIds) {
+      const connKey = `${projectId}:${nodeId}`;
+      this.localConns.set(connKey, ws);
+      await this.redis.hset(`presence:${projectId}`, nodeId, this.instanceId);
+      await this.subRedis.subscribe(`route:${projectId}`);
+    }
+    this.connMeta.set(nodeId, {
       nodeId,
+      projects: projectIds,
       connectedAt: new Date().toISOString(),
       lastMessageAt: null,
     });
-    await this.redis.hset(`presence:${projectId}`, nodeId, this.instanceId);
-    await this.subRedis.subscribe(`route:${projectId}`);
   }
 
   /** Unregisters a node: removes presence and local connection. */
-  async unregister(projectId: string, nodeId: string): Promise<void> {
-    const connKey = `${projectId}:${nodeId}`;
-    this.localConns.delete(connKey);
-    this.connMeta.delete(connKey);
-    await this.redis.hdel(`presence:${projectId}`, nodeId);
+  async unregister(projectIds: string[], nodeId: string): Promise<void> {
+    for (const projectId of projectIds) {
+      const connKey = `${projectId}:${nodeId}`;
+      this.localConns.delete(connKey);
+      await this.redis.hdel(`presence:${projectId}`, nodeId);
+    }
+    this.connMeta.delete(nodeId);
   }
 
   /** Disconnects a node: closes WS and unregisters. Returns true if the node was connected locally. */
@@ -77,9 +81,14 @@ export class RedisHub {
     const ws = this.localConns.get(connKey);
     if (ws) {
       ws.close();
-      this.localConns.delete(connKey);
-      this.connMeta.delete(connKey);
-      await this.redis.hdel(`presence:${projectId}`, nodeId);
+      const meta = this.connMeta.get(nodeId);
+      if (meta) {
+        for (const pid of meta.projects) {
+          this.localConns.delete(`${pid}:${nodeId}`);
+          await this.redis.hdel(`presence:${pid}`, nodeId);
+        }
+      }
+      this.connMeta.delete(nodeId);
       return true;
     }
     // Not local — just clean up presence in case it's stale
@@ -112,8 +121,7 @@ export class RedisHub {
   /** Routes an envelope: if toNode is set, deliver to that node; otherwise broadcast to all except sender. */
   async route(envelope: Envelope): Promise<void> {
     // Update lastMessageAt for the sender
-    const senderKey = `${envelope.projectId}:${envelope.fromNode}`;
-    const senderMeta = this.connMeta.get(senderKey);
+    const senderMeta = this.connMeta.get(envelope.fromNode);
     if (senderMeta) {
       senderMeta.lastMessageAt = new Date().toISOString();
     }

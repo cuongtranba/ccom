@@ -65,7 +65,7 @@ describe("buildToolHandlers V2 tools", () => {
     nodeId = node.id;
 
     const config: NodeConfig = {
-      node: { id: nodeId, name: "test-node", vertical: "dev", project: "proj", owner: "tester", isAI: false },
+      node: { id: nodeId, name: "test-node", vertical: "dev", projects: ["proj"], owner: "tester", isAI: false },
       server: { url: "", token: "" },
       database: { path: ":memory:" },
     };
@@ -136,7 +136,7 @@ describe("auto-registration", () => {
   test("config file starts without node.id", () => {
     const configPath = join(tmpdir(), `test-config-${Date.now()}.json`);
     writeFileSync(configPath, JSON.stringify({
-      node: { name: "test-node", vertical: "dev", project: "test", owner: "tester", isAI: false },
+      node: { name: "test-node", vertical: "dev", projects: ["test"], owner: "tester", isAI: false },
       server: { url: "", token: "" },
       database: { path: ":memory:" },
     }));
