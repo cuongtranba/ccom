@@ -8,6 +8,7 @@
     "node": "bun run packages/node/src/index.ts",
     "init": "bun run packages/node/src/index.ts init",
     "build:node": "cd packages/node && bun run build",
+    "build:admin": "cd packages/admin && pnpm build",
     "publish:node": "cd packages/node && npm publish"
   }
 }

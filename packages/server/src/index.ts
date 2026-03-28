@@ -1,22 +1,24 @@
 import { randomUUID } from "crypto";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
+import { readFileSync, existsSync, statSync } from "fs";
+import { resolve, dirname, join, extname } from "path";
 import { fileURLToPath } from "url";
 import Redis from "ioredis";
 import { parseEnvelope } from "@inv/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const adminHtml = readFileSync(resolve(__dirname, "admin.html"), "utf-8");
+const adminDistDir = resolve(__dirname, "../../admin/dist");
 import { RedisAuth } from "./auth";
 import { RedisOutbox } from "./outbox";
 import { RedisHub } from "./hub";
 import type { HubWebSocket } from "./hub";
+import { LogBuffer } from "./log-buffer";
 
 export { RedisAuth } from "./auth";
 export { RedisOutbox } from "./outbox";
 export { RedisHub } from "./hub";
 export type { TokenInfo } from "./auth";
 export type { HubWebSocket } from "./hub";
+export type { ConnectedNode } from "./hub";
 
 interface WsData {
   projectId: string;
@@ -42,6 +44,8 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   const instanceId = randomUUID();
   const hub = new RedisHub(redis, outbox, instanceId);
   const adminKey = process.env.ADMIN_KEY || "";
+  const log = new LogBuffer(200);
+  log.info("Server started", { instanceId, port: String(options.port) });
 
   function requireAdmin(req: Request): Response | null {
     if (!adminKey) {
@@ -63,10 +67,33 @@ export function startServer(options: { port: number; redisUrl: string }): void {
     async fetch(req, server) {
       const url = new URL(req.url);
 
-      if (url.pathname === "/admin") {
-        return new Response(adminHtml, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+      if (url.pathname === "/admin" || url.pathname === "/admin/") {
+        const indexPath = join(adminDistDir, "index.html");
+        if (existsSync(indexPath)) {
+          return new Response(readFileSync(indexPath, "utf-8"), {
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          });
+        }
+        return new Response("Admin UI not built. Run: pnpm build:admin", { status: 404 });
+      }
+
+      if (url.pathname.startsWith("/admin/")) {
+        const filePath = join(adminDistDir, url.pathname.replace("/admin/", ""));
+        if (existsSync(filePath) && statSync(filePath).isFile()) {
+          const mimeTypes: Record<string, string> = {
+            ".js": "application/javascript",
+            ".css": "text/css",
+            ".html": "text/html",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".json": "application/json",
+          };
+          const ext = extname(filePath);
+          const contentType = mimeTypes[ext] ?? "application/octet-stream";
+          return new Response(Bun.file(filePath), {
+            headers: { "Content-Type": contentType },
+          });
+        }
       }
 
       if (url.pathname === "/metrics") {
@@ -108,6 +135,18 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json({ revoked: true });
       }
 
+      if (url.pathname === "/api/nodes" && req.method === "GET") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        return Response.json({ nodes: hub.listConnections() });
+      }
+
+      if (url.pathname === "/api/logs" && req.method === "GET") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        return Response.json({ logs: log.entries() });
+      }
+
       // ── WebSocket upgrade ────────────────────────────────────
 
       if (url.pathname === "/ws") {
@@ -144,6 +183,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         wsMap.set(connKey, wrapped);
         await hub.register(projectId, nodeId, wrapped);
         await hub.drainOutbox(projectId, nodeId, wrapped);
+        log.info(`Node connected: ${nodeId}`, { projectId, nodeId });
       },
 
       async message(ws, msg) {
@@ -153,6 +193,10 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           await hub.route(envelope);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Unknown error";
+          log.error(`Parse error from ${ws.data.nodeId}: ${errorMsg}`, {
+            projectId: ws.data.projectId,
+            nodeId: ws.data.nodeId,
+          });
           ws.send(
             JSON.stringify({
               messageId: randomUUID(),
@@ -171,6 +215,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         const connKey = `${projectId}:${nodeId}`;
         wsMap.delete(connKey);
         await hub.unregister(projectId, nodeId);
+        log.info(`Node disconnected: ${nodeId}`, { projectId, nodeId });
       },
     },
   });
