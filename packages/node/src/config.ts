@@ -5,7 +5,7 @@ export interface NodeConfig {
     id: string;
     name: string;
     vertical: Vertical;
-    project: string;
+    projects: string[];
     owner: string;
     isAI: boolean;
   };
@@ -28,7 +28,7 @@ export function defaultConfig(): NodeConfig {
       id: "",
       name: "",
       vertical: "dev",
-      project: "",
+      projects: [],
       owner: "",
       isAI: false,
     },
