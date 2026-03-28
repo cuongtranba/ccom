@@ -74,10 +74,10 @@ jobs:
           jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' package.json > package.json.tmp
           mv package.json.tmp package.json
 
-      - name: Publish to GitHub Packages
-        run: cd packages/node && bun publish --registry https://npm.pkg.github.com --tolerate-republish
+      - name: Publish to npm
+        run: cd packages/node && bun publish --tolerate-republish
         env:
-          NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create tag
         run: |

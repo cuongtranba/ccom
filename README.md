@@ -25,23 +25,6 @@ Built for the Constitution framework (`tini-works/const`).
 
 ### Option A: Published package (recommended)
 
-Configure the `@tini-works` scope to resolve from GitHub Packages:
-
-```toml
-# ~/.bunfig.toml
-[install.scopes]
-"@tini-works" = { token = "$GH_TOKEN", url = "https://npm.pkg.github.com" }
-```
-
-Or via `.npmrc`:
-
-```ini
-@tini-works:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-```
-
-Then set up your node:
-
 ```bash
 bunx @tini-works/inv-node init
 # Follow the wizard — writes inv-config.json + .mcp.json
