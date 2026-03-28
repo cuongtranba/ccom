@@ -29,7 +29,7 @@ describe("CLI config generation", () => {
       mcpServers: {
         inventory: {
           command: "bunx",
-          args: ["@inv/node", "serve", "./inv-config.json"],
+          args: ["@tini-works/inv-node", "serve", "./inv-config.json"],
         },
       },
     });

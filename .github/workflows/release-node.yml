@@ -1,4 +1,4 @@
-name: Release @inv/node
+name: Release @tini-works/inv-node
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Run tests
         run: bun test
 
-      - name: Build @inv/node
+      - name: Build @tini-works/inv-node
         run: bun run build:node
 
       - name: Verify build output
@@ -49,23 +49,23 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build @inv/node
+      - name: Build @tini-works/inv-node
         run: bun run build:node
 
       - name: Determine next version
         id: version
         run: |
-          # Get latest @inv/node@ tag, default to 0.1.0 if none exists
-          LATEST_TAG=$(git tag -l '@inv/node@*' --sort=-v:refname | head -1)
+          # Get latest inv-node@ tag, default to 0.1.0 if none exists
+          LATEST_TAG=$(git tag -l 'inv-node@*' --sort=-v:refname | head -1)
           if [ -z "$LATEST_TAG" ]; then
             NEXT_VERSION="0.1.0"
           else
-            CURRENT_VERSION="${LATEST_TAG#@inv/node@}"
+            CURRENT_VERSION="${LATEST_TAG#inv-node@}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
             NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
           echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=@inv/node@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=inv-node@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "Next version: $NEXT_VERSION"
 
       - name: Set package version
@@ -90,5 +90,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "@inv/node ${{ steps.version.outputs.version }}"
+          name: "@tini-works/inv-node ${{ steps.version.outputs.version }}"
           generate_release_notes: true

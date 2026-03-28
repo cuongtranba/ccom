@@ -18,8 +18,8 @@ async function main(): Promise<void> {
     default:
       console.error(`Unknown command: ${command}`);
       console.error("Usage:");
-      console.error("  @inv/node init              Set up a new node");
-      console.error("  @inv/node serve [config]    Start MCP server");
+      console.error("  inv-node init              Set up a new node");
+      console.error("  inv-node serve [config]    Start MCP server");
       process.exit(1);
   }
 }

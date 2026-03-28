@@ -1,5 +1,5 @@
 {
-  "name": "@inv/node",
+  "name": "@tini-works/inv-node",
   "version": "0.1.0",
   "bin": {
     "inv-node": "./dist/cli.js"
