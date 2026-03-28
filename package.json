@@ -6,6 +6,8 @@
     "test": "bun test",
     "server": "bun run packages/server/src/index.ts",
     "node": "bun run packages/node/src/index.ts",
-    "init": "bun run packages/node/src/index.ts init"
+    "init": "bun run packages/node/src/index.ts init",
+    "build:node": "cd packages/node && bun run build",
+    "publish:node": "cd packages/node && npm publish"
   }
 }
