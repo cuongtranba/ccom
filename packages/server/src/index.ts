@@ -199,6 +199,23 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json({ disconnected });
       }
 
+      // ── Node-facing API (token-authenticated) ─────────────
+
+      if (url.pathname === "/api/online" && req.method === "GET") {
+        const token = url.searchParams.get("token");
+        if (!token) {
+          return Response.json({ error: "Missing token" }, { status: 401 });
+        }
+        const info = await auth.validateToken(token);
+        if (!info) {
+          return Response.json({ error: "Invalid token" }, { status: 401 });
+        }
+        const online = await hub.listOnline(info.projectId);
+        // Exclude the requesting node itself
+        const others = online.filter((id) => id !== info.nodeId);
+        return Response.json({ nodes: others, project: info.projectId });
+      }
+
       // ── WebSocket upgrade ────────────────────────────────────
 
       if (url.pathname === "/ws") {

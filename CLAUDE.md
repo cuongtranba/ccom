@@ -35,7 +35,7 @@ Claude → MCP stdio → channel.ts → Engine → Store (SQLite)
                                    WSClient → Central Server (Redis-backed) → Other Nodes
 ```
 
-- `channel.ts` — MCP server exposing 19 tools via `@modelcontextprotocol/sdk` stdio transport
+- `channel.ts` — MCP server exposing 20 tools via `@modelcontextprotocol/sdk` stdio transport
 - `engine.ts` — orchestrates store + state machines + signal propagation (40+ methods)
 - `store.ts` — SQLite CRUD via `bun:sqlite` prepared statements (13 tables, 50+ methods)
 - `ws-client.ts` — WebSocket with exponential backoff reconnect

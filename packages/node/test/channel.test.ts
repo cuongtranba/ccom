@@ -10,8 +10,8 @@ import { Engine } from "../src/engine";
 import type { NodeConfig } from "../src/config";
 
 describe("channel tool definitions", () => {
-  test("defines 19 tools", () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(19);
+  test("defines 20 tools", () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(20);
   });
 
   test("all tools have name, description, inputSchema", () => {
@@ -44,6 +44,7 @@ describe("channel tool definitions", () => {
       "inv_checklist_check",
       "inv_checklist_uncheck",
       "inv_checklist_list",
+      "inv_online_nodes",
     ]);
   });
 });
@@ -76,52 +77,58 @@ describe("buildToolHandlers V2 tools", () => {
     store.close();
   });
 
-  test("inv_proposal_create creates a proposal in voting", () => {
+  test("inv_proposal_create creates a proposal in voting", async () => {
     const item = engine.addItem(nodeId, "prd", "Test PRD");
-    const result = handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change scope" });
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change scope" });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.crId).toBeTruthy();
     expect(parsed.status).toBe("voting");
   });
 
-  test("inv_checklist_add adds a checklist item", () => {
+  test("inv_checklist_add adds a checklist item", async () => {
     const item = engine.addItem(nodeId, "prd", "Test PRD");
-    const result = handleTool("inv_checklist_add", { itemId: item.id, text: "Review scope" });
+    const result = await handleTool("inv_checklist_add", { itemId: item.id, text: "Review scope" });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.text).toBe("Review scope");
     expect(parsed.checked).toBe(false);
   });
 
-  test("inv_checklist_check and uncheck toggle state", () => {
+  test("inv_checklist_check and uncheck toggle state", async () => {
     const item = engine.addItem(nodeId, "prd", "Test PRD");
-    const addResult = handleTool("inv_checklist_add", { itemId: item.id, text: "Check me" });
+    const addResult = await handleTool("inv_checklist_add", { itemId: item.id, text: "Check me" });
     const clId = JSON.parse(addResult.content[0].text).id;
 
-    handleTool("inv_checklist_check", { checklistItemId: clId });
-    const listResult = handleTool("inv_checklist_list", { itemId: item.id });
+    await handleTool("inv_checklist_check", { checklistItemId: clId });
+    const listResult = await handleTool("inv_checklist_list", { itemId: item.id });
     const items = JSON.parse(listResult.content[0].text);
     expect(items[0].checked).toBe(true);
 
-    handleTool("inv_checklist_uncheck", { checklistItemId: clId });
-    const listResult2 = handleTool("inv_checklist_list", { itemId: item.id });
+    await handleTool("inv_checklist_uncheck", { checklistItemId: clId });
+    const listResult2 = await handleTool("inv_checklist_list", { itemId: item.id });
     const items2 = JSON.parse(listResult2.content[0].text);
     expect(items2[0].checked).toBe(false);
   });
 
-  test("inv_pair_invite creates a pending session", () => {
+  test("inv_pair_invite creates a pending session", async () => {
     const partner = engine.registerNode("partner", "pm", "proj", "alice", false);
-    const result = handleTool("inv_pair_invite", { targetNode: partner.id });
+    const result = await handleTool("inv_pair_invite", { targetNode: partner.id });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.sessionId).toBeTruthy();
     expect(parsed.status).toBe("pending");
   });
 
-  test("inv_pair_list lists sessions", () => {
+  test("inv_pair_list lists sessions", async () => {
     const partner = engine.registerNode("partner", "pm", "proj", "alice", false);
-    handleTool("inv_pair_invite", { targetNode: partner.id });
-    const result = handleTool("inv_pair_list", {});
+    await handleTool("inv_pair_invite", { targetNode: partner.id });
+    const result = await handleTool("inv_pair_list", {});
     const sessions = JSON.parse(result.content[0].text);
     expect(sessions).toHaveLength(1);
+  });
+
+  test("inv_online_nodes returns error when not configured", async () => {
+    const result = await handleTool("inv_online_nodes", {});
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBe("Not configured for network");
   });
 });
 

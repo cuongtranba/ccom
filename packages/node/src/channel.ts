@@ -271,6 +271,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["itemId"],
     },
   },
+  {
+    name: "inv_online_nodes",
+    description:
+      "List all other nodes currently online in this project. Use this to discover who you can communicate with.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
 ];
 
 // ── Tool Handler Builder ──────────────────────────────────────────────
@@ -287,8 +296,8 @@ export function buildToolHandlers(
   engine: Engine,
   config: NodeConfig,
   wsClient: WSClient | null,
-): (name: string, args: ToolCallArgs) => ToolResult {
-  return (name: string, args: ToolCallArgs): ToolResult => {
+): (name: string, args: ToolCallArgs) => Promise<ToolResult> {
+  return async (name: string, args: ToolCallArgs): Promise<ToolResult> => {
     const text = (s: string): ToolResult => ({
       content: [{ type: "text", text: s }],
     });
@@ -513,6 +522,27 @@ export function buildToolHandlers(
         case "inv_checklist_list": {
           const items = engine.listChecklist(args.itemId ?? "");
           return text(JSON.stringify(items, null, 2));
+        }
+
+        case "inv_online_nodes": {
+          if (!config.server.url || !config.server.token) {
+            return text(JSON.stringify({ error: "Not configured for network" }));
+          }
+          // Convert ws(s)://host/ws to http(s)://host/api/online
+          const httpUrl = config.server.url
+            .replace(/^ws/, "http")
+            .replace(/\/ws$/, "/api/online");
+          const res = await fetch(`${httpUrl}?token=${config.server.token}`);
+          if (!res.ok) {
+            const err = await res.json() as { error?: string };
+            return text(JSON.stringify({ error: err.error ?? `HTTP ${res.status}` }));
+          }
+          const data = await res.json() as { nodes: string[]; project: string };
+          return text(JSON.stringify({
+            project: data.project,
+            onlineNodes: data.nodes,
+            count: data.nodes.length,
+          }, null, 2));
         }
 
         default:
