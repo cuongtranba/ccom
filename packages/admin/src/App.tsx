@@ -1,9 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useMetrics } from "@/hooks/use-metrics";
-import { useProjects } from "@/hooks/use-projects";
-import { useTokens } from "@/hooks/use-tokens";
-import { useNodes } from "@/hooks/use-nodes";
-import { useLogs } from "@/hooks/use-logs";
+import { useMetrics, useProjects, useTokens, useNodes, useLogs } from "@/hooks/queries";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
 import { ProjectCreateForm } from "@/components/project-create-form";
