@@ -52,7 +52,7 @@ export function generateMcpConfig(configPath: string): McpConfig {
     mcpServers: {
       inventory: {
         command: "bunx",
-        args: ["@tini-works/inv-node", "serve", configPath],
+        args: ["@tini-works/inv-node@latest", "serve", configPath],
       },
     },
   };
