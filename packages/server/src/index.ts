@@ -78,7 +78,10 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       }
 
       if (url.pathname.startsWith("/admin/")) {
-        const filePath = join(adminDistDir, url.pathname.replace("/admin/", ""));
+        const filePath = resolve(adminDistDir, url.pathname.replace("/admin/", ""));
+        if (!filePath.startsWith(adminDistDir + "/")) {
+          return new Response("Forbidden", { status: 403 });
+        }
         if (existsSync(filePath) && statSync(filePath).isFile()) {
           const mimeTypes: Record<string, string> = {
             ".js": "application/javascript",

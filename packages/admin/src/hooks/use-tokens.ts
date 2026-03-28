@@ -62,10 +62,17 @@ export function useTokens(adminKey: string) {
   const revoke = useCallback(
     async (token: string) => {
       if (!adminKey) return;
-      await revokeToken(adminKey, token);
-      // Refresh list after revoke
-      if (currentProject) {
-        await loadTokens(currentProject);
+      try {
+        await revokeToken(adminKey, token);
+        // Refresh list after revoke
+        if (currentProject) {
+          await loadTokens(currentProject);
+        }
+      } catch (err) {
+        setCreateResult({
+          type: "error",
+          message: err instanceof Error ? err.message : "Revoke failed",
+        });
       }
     },
     [adminKey, currentProject, loadTokens],
