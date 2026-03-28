@@ -116,6 +116,11 @@ function createSimNode(
     router.route(envelope);
   };
 
+  // Wire up auto-response so handlers can send replies back through the router
+  wsHandlers.setSendFn((toNode, payload) => {
+    send(toNode, payload);
+  });
+
   return { node, store, engine, eventBus, wsHandlers, events, send, broadcast };
 }
 
@@ -199,7 +204,10 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
   // ── Cross-Node Query/Response ─────────────────────────────────────────
 
   describe("Cross-node query and response", () => {
-    it("Dev asks PM a question, PM responds", () => {
+    it("Dev asks PM a question, PM auto-responds with items", () => {
+      // PM has some items
+      pm.engine.addItem(pm.node.id, "prd", "Check-In PRD", "", "JIRA-101");
+
       // Dev asks PM
       dev.send(pm.node.id, {
         type: "query_ask",
@@ -211,19 +219,31 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
       const pmQuestions = pm.events.filter((e) => e.type === "query_ask");
       expect(pmQuestions).toHaveLength(1);
 
-      // PM responds
+      // Dev receives auto-response from PM (items list)
+      const devAutoAnswers = dev.events.filter((e) => e.type === "query_respond");
+      expect(devAutoAnswers).toHaveLength(1);
+      const autoPayload = devAutoAnswers[0].data as { answer: string };
+      const autoAnswer = JSON.parse(autoPayload.answer);
+      expect(autoAnswer.count).toBe(1);
+      expect(autoAnswer.items[0].title).toBe("Check-In PRD");
+
+      // PM can also send a manual response
       pm.send(dev.node.id, {
         type: "query_respond",
         answer: "Base64-encoded appointment UUID",
         responderId: pm.node.id,
       });
 
-      // Dev receives the answer
-      const devAnswers = dev.events.filter((e) => e.type === "query_respond");
-      expect(devAnswers).toHaveLength(1);
+      // Dev now has 2 responses (auto + manual)
+      const devAllAnswers = dev.events.filter((e) => e.type === "query_respond");
+      expect(devAllAnswers).toHaveLength(2);
     });
 
-    it("QA broadcasts question, all nodes receive it", () => {
+    it("QA broadcasts question, all nodes auto-respond", () => {
+      // Each node has items
+      pm.engine.addItem(pm.node.id, "prd", "PRD", "", "");
+      dev.engine.addItem(dev.node.id, "api-spec", "API", "", "");
+
       qa.broadcast({
         type: "query_ask",
         question: "Anyone seen intermittent 500s on /check-in?",
@@ -235,7 +255,11 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
       expect(dev.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
       expect(devops.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
 
-      // Dev and DevOps both respond
+      // QA receives auto-responses from all 4 nodes
+      const qaAutoAnswers = qa.events.filter((e) => e.type === "query_respond");
+      expect(qaAutoAnswers).toHaveLength(4);
+
+      // Dev and DevOps can also send manual responses
       dev.send(qa.node.id, {
         type: "query_respond",
         answer: "Yes, it's a known race condition in the queue handler",
@@ -248,8 +272,9 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
         responderId: devops.node.id,
       });
 
-      const qaAnswers = qa.events.filter((e) => e.type === "query_respond");
-      expect(qaAnswers).toHaveLength(2);
+      // QA now has 6 responses total (4 auto + 2 manual)
+      const qaAllAnswers = qa.events.filter((e) => e.type === "query_respond");
+      expect(qaAllAnswers).toHaveLength(6);
     });
   });
 
@@ -385,6 +410,13 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
       expect(responseData.title).toBe("Check-In PRD");
       expect(responseData.kind).toBe("prd");
       expect(responseData.state).toBe("proven");
+
+      // Dev also receives the trace_resolve_response via sendFn → router
+      const devResponses = dev.events.filter((e) => e.type === "trace_resolve_response");
+      expect(devResponses).toHaveLength(1);
+      const devResponseData = devResponses[0].data as { itemId: string; title: string };
+      expect(devResponseData.itemId).toBe(prd.id);
+      expect(devResponseData.title).toBe("Check-In PRD");
     });
 
     it("trace resolve for nonexistent item does not crash", () => {

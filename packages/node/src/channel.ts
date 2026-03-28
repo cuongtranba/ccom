@@ -578,6 +578,12 @@ export async function startChannelServer(configPath: string): Promise<void> {
       wsHandlers.handle(envelope);
     });
 
+    wsHandlers.setSendFn((toNode, payload) => {
+      if (wsClient?.connected) {
+        wsClient.sendMessage(toNode, payload);
+      }
+    });
+
     try {
       await wsClient.connect();
     } catch {
@@ -643,6 +649,7 @@ Use the inv_* tools to manage inventory, propose changes, vote, challenge items,
     "error",
   ] as const;
 
+  const log = new Logger("channel-bridge");
   for (const eventType of channelEvents) {
     eventBus.on(eventType, (data) => {
       mcp.notification({
@@ -651,7 +658,12 @@ Use the inv_* tools to manage inventory, propose changes, vote, challenge items,
           content: JSON.stringify(data),
           meta: { source: "inventory", eventType },
         },
-      } as Parameters<typeof mcp.notification>[0]);
+      } as Parameters<typeof mcp.notification>[0]).catch((err) => {
+        log.error("Failed to send channel notification", {
+          eventType,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     });
   }
 

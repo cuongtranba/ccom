@@ -3,12 +3,20 @@ import type { Engine } from "./engine";
 import type { Store } from "./store";
 import type { EventBus, EventType } from "./event-bus";
 
+export type SendFn = (toNode: string, payload: MessagePayload) => void;
+
 export class WSHandlers {
+  private sendFn: SendFn | null = null;
+
   constructor(
     private engine: Engine,
     private store: Store,
     private eventBus: EventBus,
   ) {}
+
+  setSendFn(fn: SendFn): void {
+    this.sendFn = fn;
+  }
 
   handle(envelope: Envelope): void {
     const { payload } = envelope;
@@ -21,7 +29,7 @@ export class WSHandlers {
         this.handleSweep(payload);
         break;
       case "trace_resolve_request":
-        this.handleTraceResolveRequest(payload);
+        this.handleTraceResolveRequest(envelope, payload);
         break;
       case "query_ask":
         this.handleQueryAsk(envelope, payload);
@@ -49,7 +57,10 @@ export class WSHandlers {
         break;
     }
 
-    this.eventBus.emit(payload.type as EventType, payload);
+    this.eventBus.emit(payload.type as EventType, {
+      ...payload,
+      fromNode: envelope.fromNode,
+    });
   }
 
   private handleSignalChange(
@@ -83,17 +94,24 @@ export class WSHandlers {
   }
 
   private handleTraceResolveRequest(
+    envelope: Envelope,
     payload: Extract<MessagePayload, { type: "trace_resolve_request" }>,
   ): void {
     try {
       const item = this.engine.getItem(payload.itemId);
-      this.eventBus.emit("trace_resolve_response", {
+      const response: Extract<MessagePayload, { type: "trace_resolve_response" }> = {
         type: "trace_resolve_response",
         itemId: item.id,
         title: item.title,
         kind: item.kind,
         state: item.state,
-      });
+      };
+      this.eventBus.emit("trace_resolve_response", response);
+
+      // Send response back to the requesting node
+      if (this.sendFn) {
+        this.sendFn(envelope.fromNode, response);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.eventBus.emit("error", {
@@ -114,6 +132,24 @@ export class WSHandlers {
         askerNode: envelope.fromNode,
         question: payload.question,
       });
+
+      // Auto-respond with local items summary
+      if (this.sendFn) {
+        const nodes = this.store.listNodes(envelope.projectId);
+        const allItems = nodes.flatMap((n) => this.store.listItems(n.id));
+        const summary = allItems.map((i) => ({
+          id: i.id,
+          kind: i.kind,
+          title: i.title,
+          state: i.state,
+          externalRef: i.externalRef || undefined,
+        }));
+        this.sendFn(envelope.fromNode, {
+          type: "query_respond",
+          answer: JSON.stringify({ items: summary, count: summary.length }),
+          responderId: payload.askerId,
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.eventBus.emit("error", {

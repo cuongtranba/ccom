@@ -116,6 +116,7 @@ describe("WSHandlers", () => {
       type: "sweep",
       externalRef: "EXT-1",
       newValue: "changed",
+      fromNode: "node-a",
     });
   });
 
@@ -160,7 +161,7 @@ describe("WSHandlers", () => {
   });
 
   it("handle query_ask creates query in store and emits event", () => {
-    const node = engine.registerNode("n", "dev", "p", "o", false);
+    const node = engine.registerNode("n", "dev", "proj-1", "o", false);
 
     let emitted = false;
     eventBus.on("query_ask", () => {
@@ -180,6 +181,62 @@ describe("WSHandlers", () => {
     handlers.handle(envelope);
 
     expect(emitted).toBe(true);
+  });
+
+  it("handle query_ask auto-responds with local items via sendFn", () => {
+    const node = engine.registerNode("n", "dev", "proj-1", "o", false);
+    engine.addItem(node.id, "decision", "Item A", "", "");
+    engine.addItem(node.id, "api-spec", "Item B", "", "REF-1");
+
+    const sent: Array<{ toNode: string; payload: unknown }> = [];
+    handlers.setSendFn((toNode, payload) => {
+      sent.push({ toNode, payload });
+    });
+
+    const envelope = makeEnvelope(
+      {
+        type: "query_ask",
+        question: "List all items",
+        askerId: "pm-node-id",
+      },
+      "pm-node-id",
+      node.id,
+    );
+
+    handlers.handle(envelope);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].toNode).toBe("pm-node-id");
+    const payload = sent[0].payload as { type: string; answer: string; responderId: string };
+    expect(payload.type).toBe("query_respond");
+    const answer = JSON.parse(payload.answer);
+    expect(answer.count).toBe(2);
+    expect(answer.items).toHaveLength(2);
+  });
+
+  it("handle trace_resolve_request sends response back via sendFn", () => {
+    const node = engine.registerNode("n", "dev", "proj-1", "o", false);
+    const item = engine.addItem(node.id, "decision", "My Item", "", "");
+
+    const sent: Array<{ toNode: string; payload: unknown }> = [];
+    handlers.setSendFn((toNode, payload) => {
+      sent.push({ toNode, payload });
+    });
+
+    const envelope = makeEnvelope(
+      { type: "trace_resolve_request", itemId: item.id },
+      "requester-node",
+      node.id,
+    );
+
+    handlers.handle(envelope);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].toNode).toBe("requester-node");
+    const payload = sent[0].payload as { type: string; itemId: string; title: string };
+    expect(payload.type).toBe("trace_resolve_response");
+    expect(payload.itemId).toBe(item.id);
+    expect(payload.title).toBe("My Item");
   });
 
   it("handle query_respond emits event", () => {
@@ -244,7 +301,7 @@ describe("WSHandlers", () => {
     eventBus.on("ack", () => firedEvents.push("ack"));
     eventBus.on("error", () => firedEvents.push("error"));
 
-    const node = engine.registerNode("n", "dev", "p", "o", false);
+    const node = engine.registerNode("n", "dev", "proj-1", "o", false);
     const item = engine.addItem(node.id, "decision", "T", "", "");
 
     handlers.handle(makeEnvelope({ type: "signal_change", itemId: item.id, oldState: "a", newState: "b" }));
