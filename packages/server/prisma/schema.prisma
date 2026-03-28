@@ -8,22 +8,33 @@ generator client {
 }
 
 model Project {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  tokens    Token[]
+  id        String         @id @default(uuid())
+  name      String         @unique
+  createdAt DateTime       @default(now()) @map("created_at")
+  tokens    TokenProject[]
 
   @@map("projects")
 }
 
 model Token {
-  id        String   @id @default(uuid())
-  projectId String   @map("project_id")
-  nodeId    String   @map("node_id")
-  secret    String   @unique @default(uuid())
-  createdAt DateTime @default(now()) @map("created_at")
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String         @id @default(uuid())
+  nodeId    String         @unique @map("node_id")
+  name      String         @default("")
+  vertical  String         @default("")
+  owner     String         @default("")
+  secret    String         @unique @default(uuid())
+  createdAt DateTime       @default(now()) @map("created_at")
+  projects  TokenProject[]
 
-  @@unique([projectId, nodeId])
   @@map("tokens")
+}
+
+model TokenProject {
+  tokenId   String @map("token_id")
+  projectId String @map("project_id")
+  token     Token   @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([tokenId, projectId])
+  @@map("token_projects")
 }
