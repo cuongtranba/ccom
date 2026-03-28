@@ -7,7 +7,7 @@ import { slugify } from "@inv/shared";
 interface WizardInput {
   name: string;
   vertical: string;
-  project: string;
+  projects: string[];
   owner: string;
   serverUrl: string;
   token: string;
@@ -15,7 +15,7 @@ interface WizardInput {
 }
 
 interface InvConfig {
-  node: { name: string; vertical: string; project: string; owner: string };
+  node: { name: string; vertical: string; projects: string[]; owner: string };
   server: { url: string; token: string };
   database: { path: string };
 }
@@ -34,7 +34,7 @@ export function generateInvConfig(input: WizardInput): InvConfig {
     node: {
       name: input.name,
       vertical: input.vertical,
-      project: input.project,
+      projects: input.projects,
       owner: input.owner,
     },
     server: {
@@ -56,6 +56,31 @@ export function generateMcpConfig(configPath: string): McpConfig {
       },
     },
   };
+}
+
+// ── Fetch token info from server ────────────────────────────────────
+
+interface TokenInfoResponse {
+  nodeId: string;
+  name: string;
+  vertical: string;
+  owner: string;
+  projects: { name: string }[];
+}
+
+export async function fetchTokenInfo(
+  serverUrl: string,
+  token: string,
+): Promise<TokenInfoResponse> {
+  const httpUrl = serverUrl
+    .replace(/^ws/, "http")
+    .replace(/\/ws$/, "/api/token/info");
+  const res = await fetch(`${httpUrl}?token=${token}`);
+  if (!res.ok) {
+    const err = await res.json() as { error?: string };
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<TokenInfoResponse>;
 }
 
 // ── Interactive Wizard ───────────────────────────────────────────────
@@ -80,27 +105,40 @@ export async function runWizard(): Promise<void> {
   console.log("────────────────────");
   console.log("");
 
-  const rawName = await ask(rl, "Node name");
-  const name = slugify(rawName);
-  if (name !== rawName) console.log(`  → normalized to: ${name}`);
-  const vertical = await ask(rl, "Vertical", "dev");
-  const rawProject = await ask(rl, "Project");
-  const project = slugify(rawProject);
-  if (project !== rawProject) console.log(`  → normalized to: ${project}`);
-  const owner = await ask(rl, "Owner");
-
-  console.log("");
   const serverUrl = await ask(rl, "Server URL", "ws://localhost:8080/ws");
   const token = await ask(rl, "Auth token");
-  console.log("");
   const dbPath = await ask(rl, "Database path", "./inventory.db");
+
+  console.log("");
+  console.log("Fetching node info from server...");
+
+  let info: TokenInfoResponse;
+  try {
+    info = await fetchTokenInfo(serverUrl, token);
+  } catch (err) {
+    console.error(`Failed to fetch token info: ${err instanceof Error ? err.message : String(err)}`);
+    rl.close();
+    process.exit(1);
+  }
+
+  console.log(`  Node: ${info.name} (${info.nodeId})`);
+  console.log(`  Vertical: ${info.vertical}`);
+  console.log(`  Owner: ${info.owner}`);
+  console.log(`  Projects: ${info.projects.map((p) => p.name).join(", ") || "(none)"}`);
+  console.log("");
 
   rl.close();
 
-  const invConfig = generateInvConfig({ name, vertical, project, owner, serverUrl, token, dbPath });
+  const invConfig = generateInvConfig({
+    name: info.name,
+    vertical: info.vertical,
+    projects: info.projects.map((p) => p.name),
+    owner: info.owner,
+    serverUrl,
+    token,
+    dbPath,
+  });
   const mcpConfig = generateMcpConfig("./inv-config.json");
-
-  console.log("");
 
   const invConfigPath = "./inv-config.json";
   writeFileSync(invConfigPath, JSON.stringify(invConfig, null, 2) + "\n");
