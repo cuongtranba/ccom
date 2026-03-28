@@ -9,6 +9,11 @@ services:
       - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inv -d inv"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7
@@ -26,8 +31,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - ADMIN_KEY=${ADMIN_KEY:-}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:
