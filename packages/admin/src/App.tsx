@@ -18,9 +18,10 @@ export default function App() {
     loading,
     createResult,
     create,
-    revoke,
+    removeNode: removeNodeFn,
+    removeProject: removeProjectFn,
   } = useTokens(adminKey);
-  const { nodes } = useNodes(adminKey);
+  const { nodes, disconnect } = useNodes(adminKey);
   const { logs } = useLogs(adminKey);
 
   return (
@@ -55,10 +56,11 @@ export default function App() {
         disabled={!isAuthed}
         tokens={tokens}
         loading={loading}
-        onRevoke={revoke}
+        onRemoveNode={removeNodeFn}
+        onRemoveProject={removeProjectFn}
       />
 
-      <ConnectedNodes nodes={nodes} disabled={!isAuthed} />
+      <ConnectedNodes nodes={nodes} disabled={!isAuthed} onDisconnect={disconnect} />
 
       <ServerLogs logs={logs} disabled={!isAuthed} />
     </div>

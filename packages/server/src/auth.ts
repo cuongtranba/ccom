@@ -61,6 +61,50 @@ export class RedisAuth {
     return allTokens;
   }
 
+  /** Revokes all tokens for a specific node in a project. Returns the count revoked. */
+  async revokeByNode(projectId: string, nodeId: string): Promise<number> {
+    const tokens = await this.redis.smembers(`project_tokens:${projectId}`);
+    if (tokens.length === 0) return 0;
+
+    let revoked = 0;
+    for (const token of tokens) {
+      const data = await this.redis.hgetall(`token:${token}`);
+      if (data.nodeId === nodeId) {
+        const pipeline = this.redis.pipeline();
+        pipeline.del(`token:${token}`);
+        pipeline.srem(`project_tokens:${projectId}`, token);
+        await pipeline.exec();
+        revoked++;
+      }
+    }
+    return revoked;
+  }
+
+  /** Revokes all tokens for an entire project. Returns the count revoked. */
+  async revokeByProject(projectId: string): Promise<number> {
+    const tokens = await this.redis.smembers(`project_tokens:${projectId}`);
+    if (tokens.length === 0) return 0;
+
+    const pipeline = this.redis.pipeline();
+    for (const token of tokens) {
+      pipeline.del(`token:${token}`);
+    }
+    pipeline.del(`project_tokens:${projectId}`);
+    pipeline.srem("projects", projectId);
+    await pipeline.exec();
+    return tokens.length;
+  }
+
+  /** Checks if a node already has a token in the project. */
+  async nodeExists(projectId: string, nodeId: string): Promise<boolean> {
+    const tokens = await this.redis.smembers(`project_tokens:${projectId}`);
+    for (const token of tokens) {
+      const data = await this.redis.hgetall(`token:${token}`);
+      if (data.nodeId === nodeId) return true;
+    }
+    return false;
+  }
+
   /** Lists all tokens for a given project. */
   async listTokens(projectId: string): Promise<TokenInfo[]> {
     const tokens = await this.redis.smembers(`project_tokens:${projectId}`);

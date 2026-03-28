@@ -5,6 +5,7 @@ import type { RedisOutbox } from "./outbox";
 /** Minimal WebSocket interface for hub operations. */
 export interface HubWebSocket {
   send(data: string): void;
+  close(): void;
   readyState: number;
 }
 
@@ -68,6 +69,32 @@ export class RedisHub {
     this.localConns.delete(connKey);
     this.connMeta.delete(connKey);
     await this.redis.hdel(`presence:${projectId}`, nodeId);
+  }
+
+  /** Disconnects a node: closes WS and unregisters. Returns true if the node was connected locally. */
+  async disconnect(projectId: string, nodeId: string): Promise<boolean> {
+    const connKey = `${projectId}:${nodeId}`;
+    const ws = this.localConns.get(connKey);
+    if (ws) {
+      ws.close();
+      this.localConns.delete(connKey);
+      this.connMeta.delete(connKey);
+      await this.redis.hdel(`presence:${projectId}`, nodeId);
+      return true;
+    }
+    // Not local — just clean up presence in case it's stale
+    await this.redis.hdel(`presence:${projectId}`, nodeId);
+    return false;
+  }
+
+  /** Disconnects all nodes in a project. Returns the count disconnected locally. */
+  async disconnectProject(projectId: string): Promise<number> {
+    const nodes = await this.listOnline(projectId);
+    let count = 0;
+    for (const nodeId of nodes) {
+      if (await this.disconnect(projectId, nodeId)) count++;
+    }
+    return count;
   }
 
   /** Returns true if the node is registered as online (on any instance). */

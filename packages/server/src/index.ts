@@ -26,10 +26,13 @@ interface WsData {
 }
 
 /** Wraps a Bun ServerWebSocket to conform to the HubWebSocket interface. */
-function wrapBunWs(ws: { send(data: string | BufferSource): number; readyState: number }): HubWebSocket {
+function wrapBunWs(ws: { send(data: string | BufferSource): number; close(): void; readyState: number }): HubWebSocket {
   return {
     send(data: string) {
       ws.send(data);
+    },
+    close() {
+      ws.close();
     },
     get readyState() {
       return ws.readyState;
@@ -112,6 +115,9 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!body.project || !body.nodeId) {
           return Response.json({ error: "Missing project or nodeId" }, { status: 400 });
         }
+        if (await auth.nodeExists(body.project, body.nodeId)) {
+          return Response.json({ error: `Node "${body.nodeId}" already exists in project "${body.project}"` }, { status: 409 });
+        }
         const token = await auth.createToken(body.project, body.nodeId);
         return Response.json({ token, project: body.project, nodeId: body.nodeId });
       }
@@ -149,6 +155,48 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         const denied = requireAdmin(req);
         if (denied) return denied;
         return Response.json({ logs: log.entries() });
+      }
+
+      // ── Node & project removal (admin-key protected) ────────
+
+      if (url.pathname.startsWith("/api/project/") && req.method === "DELETE") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const projectId = decodeURIComponent(url.pathname.slice("/api/project/".length));
+        if (!projectId) {
+          return Response.json({ error: "Missing projectId" }, { status: 400 });
+        }
+        const disconnected = await hub.disconnectProject(projectId);
+        const revoked = await auth.revokeByProject(projectId);
+        log.info(`Project removed: ${projectId}`, { revoked: String(revoked), disconnected: String(disconnected) });
+        return Response.json({ revoked, disconnected });
+      }
+
+      if (url.pathname.startsWith("/api/node/") && req.method === "DELETE") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        // /api/node/:projectId/:nodeId
+        const parts = url.pathname.slice("/api/node/".length).split("/").map(decodeURIComponent);
+        if (parts.length < 2 || !parts[0] || !parts[1]) {
+          return Response.json({ error: "Missing projectId or nodeId" }, { status: 400 });
+        }
+        const [projectId, nodeId] = parts;
+        const disconnected = await hub.disconnect(projectId, nodeId);
+        const revoked = await auth.revokeByNode(projectId, nodeId);
+        log.info(`Node removed: ${nodeId} from ${projectId}`, { revoked: String(revoked), disconnected: String(disconnected) });
+        return Response.json({ revoked, disconnected });
+      }
+
+      if (url.pathname.startsWith("/api/disconnect/") && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const parts = url.pathname.slice("/api/disconnect/".length).split("/").map(decodeURIComponent);
+        if (parts.length < 2 || !parts[0] || !parts[1]) {
+          return Response.json({ error: "Missing projectId or nodeId" }, { status: 400 });
+        }
+        const [projectId, nodeId] = parts;
+        const disconnected = await hub.disconnect(projectId, nodeId);
+        return Response.json({ disconnected });
       }
 
       // ── WebSocket upgrade ────────────────────────────────────

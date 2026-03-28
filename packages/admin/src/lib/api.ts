@@ -88,6 +88,41 @@ export async function revokeToken(
   await handleResponse<{ revoked: boolean }>(res);
 }
 
+export async function removeNode(
+  adminKey: string,
+  projectId: string,
+  nodeId: string,
+): Promise<{ revoked: number; disconnected: boolean }> {
+  const res = await fetch(`/api/node/${encodeURIComponent(projectId)}/${encodeURIComponent(nodeId)}`, {
+    method: "DELETE",
+    headers: authHeaders(adminKey),
+  });
+  return handleResponse(res);
+}
+
+export async function removeProject(
+  adminKey: string,
+  projectId: string,
+): Promise<{ revoked: number; disconnected: number }> {
+  const res = await fetch(`/api/project/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+    headers: authHeaders(adminKey),
+  });
+  return handleResponse(res);
+}
+
+export async function disconnectNode(
+  adminKey: string,
+  projectId: string,
+  nodeId: string,
+): Promise<{ disconnected: boolean }> {
+  const res = await fetch(`/api/disconnect/${encodeURIComponent(projectId)}/${encodeURIComponent(nodeId)}`, {
+    method: "POST",
+    headers: authHeaders(adminKey),
+  });
+  return handleResponse(res);
+}
+
 export async function fetchNodes(
   adminKey: string,
 ): Promise<ConnectedNode[]> {

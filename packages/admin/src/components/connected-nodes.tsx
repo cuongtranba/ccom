@@ -6,11 +6,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import type { ConnectedNode } from "@/lib/api";
 
 interface ConnectedNodesProps {
   nodes: ConnectedNode[];
   disabled: boolean;
+  onDisconnect: (projectId: string, nodeId: string) => Promise<void>;
 }
 
 function formatRelativeTime(iso: string): string {
@@ -23,7 +25,12 @@ function formatRelativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export function ConnectedNodes({ nodes, disabled }: ConnectedNodesProps) {
+export function ConnectedNodes({ nodes, disabled, onDisconnect }: ConnectedNodesProps) {
+  async function handleDisconnect(projectId: string, nodeId: string) {
+    if (!confirm(`Disconnect node "${nodeId}" from project "${projectId}"?`)) return;
+    await onDisconnect(projectId, nodeId);
+  }
+
   return (
     <section className="mb-12">
       <div className="mb-5 border-b border-sand-dim pb-2 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent">
@@ -46,6 +53,7 @@ export function ConnectedNodes({ nodes, disabled }: ConnectedNodesProps) {
               <TableHead className="text-muted-foreground">Project</TableHead>
               <TableHead className="text-muted-foreground">Connected Since</TableHead>
               <TableHead className="text-muted-foreground">Last Message</TableHead>
+              <TableHead className="text-muted-foreground w-[100px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -62,6 +70,16 @@ export function ConnectedNodes({ nodes, disabled }: ConnectedNodesProps) {
                   {node.lastMessageAt
                     ? formatRelativeTime(node.lastMessageAt)
                     : "—"}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => handleDisconnect(node.project, node.nodeId)}
+                  >
+                    Disconnect
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

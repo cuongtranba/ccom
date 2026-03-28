@@ -1,9 +1,20 @@
-import { useState, useEffect } from "react";
-import { fetchNodes, type ConnectedNode } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { fetchNodes, disconnectNode, type ConnectedNode } from "@/lib/api";
 
 export function useNodes(adminKey: string) {
   const [nodes, setNodes] = useState<ConnectedNode[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!adminKey) return;
+    try {
+      const list = await fetchNodes(adminKey);
+      setNodes(list);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fetch failed");
+    }
+  }, [adminKey]);
 
   useEffect(() => {
     if (!adminKey) {
@@ -11,27 +22,19 @@ export function useNodes(adminKey: string) {
       return;
     }
 
-    let cancelled = false;
+    refresh();
+    const id = setInterval(refresh, 5000);
+    return () => clearInterval(id);
+  }, [adminKey, refresh]);
 
-    async function poll() {
-      try {
-        const list = await fetchNodes(adminKey);
-        if (!cancelled) {
-          setNodes(list);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Fetch failed");
-      }
-    }
+  const disconnect = useCallback(
+    async (projectId: string, nodeId: string) => {
+      if (!adminKey) return;
+      await disconnectNode(adminKey, projectId, nodeId);
+      await refresh();
+    },
+    [adminKey, refresh],
+  );
 
-    poll();
-    const id = setInterval(poll, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [adminKey]);
-
-  return { nodes, error };
+  return { nodes, error, disconnect };
 }

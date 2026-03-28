@@ -107,6 +107,47 @@ describe("RedisAuth", () => {
     const tokens = await auth.listTokens("nonexistent-project");
     expect(tokens).toHaveLength(0);
   });
+
+  test("revokeByNode removes all tokens for a node", async () => {
+    if (!redisAvailable) return;
+
+    await auth.createToken("proj-1", "node-a");
+    await auth.createToken("proj-1", "node-a"); // duplicate token for same node
+    await auth.createToken("proj-1", "node-b");
+
+    const revoked = await auth.revokeByNode("proj-1", "node-a");
+    expect(revoked).toBe(2);
+
+    const remaining = await auth.listTokens("proj-1");
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].nodeId).toBe("node-b");
+  });
+
+  test("revokeByProject removes all tokens and project entry", async () => {
+    if (!redisAvailable) return;
+
+    await auth.createToken("proj-1", "node-a");
+    await auth.createToken("proj-1", "node-b");
+    await auth.createToken("proj-2", "node-c");
+
+    const revoked = await auth.revokeByProject("proj-1");
+    expect(revoked).toBe(2);
+
+    const proj1Tokens = await auth.listTokens("proj-1");
+    expect(proj1Tokens).toHaveLength(0);
+
+    // proj-2 should be unaffected
+    const proj2Tokens = await auth.listTokens("proj-2");
+    expect(proj2Tokens).toHaveLength(1);
+  });
+
+  test("nodeExists returns true for existing node", async () => {
+    if (!redisAvailable) return;
+
+    await auth.createToken("proj-1", "node-a");
+    expect(await auth.nodeExists("proj-1", "node-a")).toBe(true);
+    expect(await auth.nodeExists("proj-1", "node-b")).toBe(false);
+  });
 });
 
 // ─── RedisOutbox ─────────────────────────────────────────────────────
@@ -433,6 +474,42 @@ describe("RedisHub", () => {
     expect(metrics.connections_active).toBe(1);
   });
 
+  test("disconnect closes WS and unregisters node", async () => {
+    if (!redisAvailable) return;
+
+    const fakeWs = createFakeWebSocket();
+    await hub.register("proj-1", "node-a", fakeWs);
+    expect(await hub.isOnline("proj-1", "node-a")).toBe(true);
+
+    const result = await hub.disconnect("proj-1", "node-a");
+    expect(result).toBe(true);
+    expect(fakeWs.closed).toBe(true);
+    expect(await hub.isOnline("proj-1", "node-a")).toBe(false);
+  });
+
+  test("disconnect returns false for non-local node", async () => {
+    if (!redisAvailable) return;
+
+    const result = await hub.disconnect("proj-1", "unknown");
+    expect(result).toBe(false);
+  });
+
+  test("disconnectProject closes all nodes in project", async () => {
+    if (!redisAvailable) return;
+
+    const ws1 = createFakeWebSocket();
+    const ws2 = createFakeWebSocket();
+    await hub.register("proj-1", "node-a", ws1);
+    await hub.register("proj-1", "node-b", ws2);
+
+    const count = await hub.disconnectProject("proj-1");
+    expect(count).toBe(2);
+    expect(ws1.closed).toBe(true);
+    expect(ws2.closed).toBe(true);
+    expect(await hub.isOnline("proj-1", "node-a")).toBe(false);
+    expect(await hub.isOnline("proj-1", "node-b")).toBe(false);
+  });
+
   test("getMetrics tracks drains_total and drain_messages_total", async () => {
     if (!redisAvailable) return;
 
@@ -452,15 +529,22 @@ describe("RedisHub", () => {
 
 interface FakeWebSocket {
   sentMessages: string[];
+  closed: boolean;
   send(data: string): void;
+  close(): void;
   readyState: number;
 }
 
 function createFakeWebSocket(): FakeWebSocket {
   return {
     sentMessages: [],
+    closed: false,
     send(data: string) {
       this.sentMessages.push(data);
+    },
+    close() {
+      this.closed = true;
+      this.readyState = 3; // WebSocket.CLOSED
     },
     readyState: 1, // WebSocket.OPEN
   };

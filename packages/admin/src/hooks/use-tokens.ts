@@ -3,6 +3,8 @@ import {
   createToken,
   listAllTokens,
   revokeToken,
+  removeNode,
+  removeProject,
   type TokenInfo,
 } from "@/lib/api";
 
@@ -74,12 +76,46 @@ export function useTokens(adminKey: string) {
     [adminKey, refresh],
   );
 
+  const removeNodeFn = useCallback(
+    async (projectId: string, nodeId: string) => {
+      if (!adminKey) return;
+      try {
+        await removeNode(adminKey, projectId, nodeId);
+        await refresh();
+      } catch (err) {
+        setCreateResult({
+          type: "error",
+          message: err instanceof Error ? err.message : "Remove node failed",
+        });
+      }
+    },
+    [adminKey, refresh],
+  );
+
+  const removeProjectFn = useCallback(
+    async (projectId: string) => {
+      if (!adminKey) return;
+      try {
+        await removeProject(adminKey, projectId);
+        await refresh();
+      } catch (err) {
+        setCreateResult({
+          type: "error",
+          message: err instanceof Error ? err.message : "Remove project failed",
+        });
+      }
+    },
+    [adminKey, refresh],
+  );
+
   return {
     tokens,
     loading,
     createResult,
     create,
     revoke,
+    removeNode: removeNodeFn,
+    removeProject: removeProjectFn,
     clearResult: () => setCreateResult(null),
   } as const;
 }

@@ -5,20 +5,25 @@ interface TokenListProps {
   disabled: boolean;
   tokens: TokenInfo[];
   loading: boolean;
-  onRevoke: (token: string) => Promise<void>;
+  onRemoveNode: (projectId: string, nodeId: string) => Promise<void>;
+  onRemoveProject: (projectId: string) => Promise<void>;
 }
 
 export function TokenList({
   disabled,
   tokens,
   loading,
-  onRevoke,
+  onRemoveNode,
+  onRemoveProject,
 }: TokenListProps) {
-  async function handleRevoke(nodeId: string) {
-    const token = prompt(`Enter the token for ${nodeId} to revoke it:`);
-    if (!token) return;
-    if (!confirm(`Revoke credential for ${nodeId}? This disconnects the node immediately.`)) return;
-    await onRevoke(token);
+  async function handleRemoveNode(projectId: string, nodeId: string) {
+    if (!confirm(`Remove node "${nodeId}" from project "${projectId}"? This revokes all its tokens and disconnects it.`)) return;
+    await onRemoveNode(projectId, nodeId);
+  }
+
+  async function handleRemoveProject(projectId: string) {
+    if (!confirm(`Remove entire project "${projectId}"? This revokes ALL tokens and disconnects ALL nodes in this project.`)) return;
+    await onRemoveProject(projectId);
   }
 
   // Group tokens by project
@@ -51,14 +56,25 @@ export function TokenList({
         <div className="flex flex-col gap-6">
           {Array.from(grouped.entries()).map(([project, projectTokens]) => (
             <div key={project}>
-              <div className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {project}
+              <div className="mb-2 flex items-center justify-between">
+                <div className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {project}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-[0.65rem]"
+                  onClick={() => handleRemoveProject(project)}
+                  disabled={disabled}
+                >
+                  Remove Project
+                </Button>
               </div>
               <div className="flex flex-col gap-px bg-sand-dim">
                 {projectTokens.map((t, i) => (
                   <div
                     key={`${t.nodeId}-${i}`}
-                    className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-4 bg-card px-4 py-3"
+                    className="grid grid-cols-[1fr_1fr_auto] items-center gap-4 bg-card px-4 py-3"
                   >
                     <div className="font-semibold">{t.nodeId}</div>
                     <div className="font-mono text-xs text-muted-foreground">
@@ -69,17 +85,14 @@ export function TokenList({
                         minute: "2-digit",
                       })}
                     </div>
-                    <div className="max-w-[160px] truncate font-mono text-xs text-border">
-                      token:hidden
-                    </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => handleRevoke(t.nodeId)}
+                      onClick={() => handleRemoveNode(project, t.nodeId)}
                       disabled={disabled}
                     >
-                      Revoke
+                      Remove
                     </Button>
                   </div>
                 ))}
