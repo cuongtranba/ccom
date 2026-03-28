@@ -27,7 +27,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: cd packages/server && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
+        run: cd packages/server && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
 
       - name: Run tests
         run: bun test
