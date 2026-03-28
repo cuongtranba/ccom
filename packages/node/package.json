@@ -8,7 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --target=bun --outdir=dist --entry-naming=cli.js --external=@modelcontextprotocol/sdk"
+    "build": "bun build src/index.ts --target=bun --outdir=dist --entry-naming=cli.js --external=@modelcontextprotocol/sdk && echo '#!/usr/bin/env bun' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && chmod +x dist/cli.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0"

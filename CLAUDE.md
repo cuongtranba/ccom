@@ -19,7 +19,8 @@ docker-compose up -d    # Redis + server
 
 # Build & Publish
 bun run build:node      # bundles packages/node + shared → dist/cli.js
-bun run publish:node    # publish @tini-works/inv-node to GitHub Packages
+bun run build:admin     # builds admin React SPA → packages/admin/dist/
+bun run publish:node    # publish @tini-works/inv-node to npm (prefer CI)
 ```
 
 ## Architecture
@@ -79,6 +80,27 @@ Central server (`packages/server`) routes envelopes:
 4. If it handles network messages, add handler in `ws-handlers.ts`
 5. Test in `channel.test.ts`
 
-## Package: @tini-works/inv-node
+## Deployment & Publishing
 
-Published to GitHub Packages. Build bundles `@inv/shared` inline, keeps `@modelcontextprotocol/sdk` external. CLI subcommands: `init` (wizard), `serve` (MCP server), `update` (clear cache). Auto-released on push to main via `.github/workflows/release-node.yml`.
+All deployments are triggered by **push to `main`** — never publish or deploy manually.
+
+### @tini-works/inv-node (packages/node)
+- **CI**: `.github/workflows/release-node.yml` — tests → builds → auto-bumps patch version → publishes to **npm** (public) → creates git tag `inv-node@X.Y.Z` + GitHub Release
+- **Build**: `bun run build:node` bundles `@inv/shared` inline, keeps `@modelcontextprotocol/sdk` external → `dist/cli.js` (with `#!/usr/bin/env bun` shebang)
+- **CLI subcommands**: `init` (wizard), `serve` (MCP server), `update` (clear cache)
+
+### Server + Admin (packages/server, packages/admin)
+- **Deploy**: Dokploy at `inv-server.apps.quickable.co` — multi-stage Docker build
+  - Stage 1: builds admin React SPA with pnpm (Node 22)
+  - Stage 2: runs server with Bun, serves admin at `/admin`
+- **Docker**: `packages/server/Dockerfile` + `docker-compose.yml` (Redis + server)
+- **Config**: `.dokploy.json` in `packages/server/`
+- **Port**: 4400, requires `ADMIN_KEY` env var and Redis
+
+### Dashboard (packages/dashboard)
+- **Framework**: Astro SSR with `@astrojs/node` adapter (standalone mode)
+- **Build**: `astro build` → deployable Node.js server
+
+### Web (web/)
+- **Framework**: Astro static site
+- **Docker**: `web/Dockerfile` — builds with Node, serves with Nginx on port 80
