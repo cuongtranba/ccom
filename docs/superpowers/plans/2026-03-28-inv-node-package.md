@@ -283,7 +283,7 @@ git commit -m "feat: add build:node and publish:node root scripts"
 
 ### Task 5: Create GitHub Actions workflow for test + publish
 
-Create the CI workflow that runs tests on every push/PR and publishes to GitHub Packages when a `node-v*` tag is pushed. Uses self-hosted runner.
+Create the CI workflow that runs tests on every push/PR and publishes to GitHub Packages when a `@inv/node@*` tag is pushed. Uses self-hosted runner.
 
 **Files:**
 - Create: `.github/workflows/release-node.yml`
@@ -302,7 +302,7 @@ name: Release @inv/node
 on:
   push:
     branches: [main]
-    tags: ["node-v*"]
+    tags: ["@inv/node@*"]
   pull_request:
     branches: [main]
 
@@ -332,7 +332,7 @@ jobs:
 
   publish:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/node-v')
+    if: startsWith(github.ref, 'refs/tags/@inv/node@')
     runs-on: self-hosted
     permissions:
       contents: write
@@ -352,7 +352,7 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#node-v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME#@inv/node@}" >> "$GITHUB_OUTPUT"
 
       - name: Set package version
         run: |
