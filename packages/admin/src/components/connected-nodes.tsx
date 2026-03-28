@@ -7,6 +7,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { ConnectedNode } from "@/lib/api";
 
 interface ConnectedNodesProps {
@@ -26,14 +37,9 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function ConnectedNodes({ nodes, isAuthed, onDisconnect }: ConnectedNodesProps) {
-  async function handleDisconnect(projectId: string, nodeId: string) {
-    if (!confirm(`Disconnect node "${nodeId}" from project "${projectId}"?`)) return;
-    await onDisconnect(projectId, nodeId);
-  }
-
   return (
-    <section className="mb-12">
-      <div className="mb-5 border-b border-sand-dim pb-2 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent">
+    <section className="mb-10">
+      <div className="mb-5 border-b border-sand-dim pb-2 text-[0.65rem] font-semibold uppercase tracking-widest text-accent">
         Connected Nodes
       </div>
 
@@ -50,10 +56,10 @@ export function ConnectedNodes({ nodes, isAuthed, onDisconnect }: ConnectedNodes
           <TableHeader>
             <TableRow className="border-sand-dim">
               <TableHead className="text-muted-foreground">Node ID</TableHead>
-              <TableHead className="text-muted-foreground">Project</TableHead>
+              <TableHead className="text-muted-foreground">Projects</TableHead>
               <TableHead className="text-muted-foreground">Connected Since</TableHead>
               <TableHead className="text-muted-foreground">Last Message</TableHead>
-              <TableHead className="text-muted-foreground w-[100px]" />
+              <TableHead className="text-muted-foreground w-[120px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -72,14 +78,34 @@ export function ConnectedNodes({ nodes, isAuthed, onDisconnect }: ConnectedNodes
                     : "—"}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => handleDisconnect(node.projects[0] ?? "", node.nodeId)}
-                  >
-                    Disconnect
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-[0.65rem]"
+                      >
+                        Disconnect
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect &quot;{node.nodeId}&quot;?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will close the WebSocket connection for this node. It can reconnect automatically.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => onDisconnect(node.projects[0] ?? "", node.nodeId)}
+                        >
+                          Disconnect
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </TableCell>
               </TableRow>
             ))}

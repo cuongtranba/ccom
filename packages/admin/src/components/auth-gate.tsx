@@ -15,7 +15,7 @@ export function AuthGate({ adminKey, onKeyChange, isAuthed }: AuthGateProps) {
       }`}
     >
       <div className="flex-1">
-        <label className="mb-1 block text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground">
+        <label className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
           Admin Key
         </label>
         <Input

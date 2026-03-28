@@ -2,6 +2,7 @@ import { useState, Fragment } from "react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export interface Column<T> {
   header: string;
@@ -33,17 +34,26 @@ export function DataTable<T>({
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>;
+    return (
+      <div className="bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+        Loading...
+      </div>
+    );
   }
 
   if (data.length === 0) {
-    return <div className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</div>;
+    return (
+      <div className="bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+        {emptyMessage}
+      </div>
+    );
   }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {expandable && <TableHead className="w-8" />}
           {columns.map((col) => (
             <TableHead key={col.header} className={col.className}>{col.header}</TableHead>
           ))}
@@ -59,6 +69,21 @@ export function DataTable<T>({
                 className={expandable ? "cursor-pointer hover:bg-muted/50" : undefined}
                 onClick={expandable ? () => toggleExpand(key) : undefined}
               >
+                {expandable && (
+                  <TableCell className="w-8 pr-0">
+                    <svg
+                      className={cn(
+                        "h-3.5 w-3.5 text-muted-foreground transition-transform duration-150",
+                        isExpanded && "rotate-90",
+                      )}
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 3l5 5-5 5V3z" />
+                    </svg>
+                  </TableCell>
+                )}
                 {columns.map((col) => (
                   <TableCell key={col.header} className={col.className}>
                     {typeof col.accessor === "function"
@@ -69,7 +94,7 @@ export function DataTable<T>({
               </TableRow>
               {expandable && isExpanded && (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="bg-muted/30 p-4">
+                  <TableCell colSpan={columns.length + 1} className="bg-muted/30 p-4">
                     {expandable(row)}
                   </TableCell>
                 </TableRow>

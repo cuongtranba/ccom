@@ -61,13 +61,14 @@ export function RegisterForm() {
             <div className="mb-1 text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
               Token Secret
             </div>
-            <div
-              className="cursor-pointer rounded border border-border bg-background px-3 py-2 font-mono text-xs text-foreground hover:bg-muted/50"
+            <button
+              type="button"
+              className="w-full cursor-pointer rounded border border-border bg-background px-3 py-2 text-left font-mono text-xs text-foreground hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary"
               onClick={handleCopy}
               title="Click to copy"
             >
               {result.token}
-            </div>
+            </button>
             <p className="mt-1 text-[0.65rem] text-muted-foreground">
               {copied ? "Copied!" : "Click to copy"}
             </p>
@@ -103,10 +104,11 @@ export function RegisterForm() {
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
+            <label htmlFor="reg-project" className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
               Project
             </label>
             <select
+              id="reg-project"
               value={project}
               onChange={(e) => setProject(e.target.value)}
               required

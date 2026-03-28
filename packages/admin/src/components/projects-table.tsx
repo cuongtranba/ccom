@@ -26,7 +26,7 @@ interface ProjectRow {
 }
 
 export function ProjectsTable({ adminKey }: ProjectsTableProps) {
-  const { projects, create, remove } = useProjects(adminKey);
+  const { projects, loading: projectsLoading, create, remove, createPending } = useProjects(adminKey);
   const { tokens, assignProject, unassignProject } = useTokens(adminKey);
   const [newProject, setNewProject] = useState("");
   const [creating, setCreating] = useState(false);
@@ -135,6 +135,7 @@ export function ProjectsTable({ adminKey }: ProjectsTableProps) {
         {unassignedTokens.length > 0 && (
           <div className="flex items-center gap-2">
             <select
+              aria-label={`Assign node to ${row.name}`}
               value={selectedTokenId}
               onChange={(e) =>
                 setAssignSelections((prev) => ({ ...prev, [row.name]: e.target.value }))
@@ -187,8 +188,8 @@ export function ProjectsTable({ adminKey }: ProjectsTableProps) {
                 className="border-border bg-background font-mono text-sm w-[220px]"
               />
             </div>
-            <Button type="submit" size="sm" className="text-[0.65rem] uppercase tracking-widest">
-              Create
+            <Button type="submit" size="sm" disabled={createPending} className="text-[0.65rem] uppercase tracking-widest">
+              {createPending ? "Creating..." : "Create"}
             </Button>
             <Button
               type="button"
@@ -217,6 +218,7 @@ export function ProjectsTable({ adminKey }: ProjectsTableProps) {
           data={rows}
           keyFn={(row) => row.name}
           expandable={expandRow}
+          loading={projectsLoading}
           emptyMessage="No projects yet. Create one above."
         />
       </div>

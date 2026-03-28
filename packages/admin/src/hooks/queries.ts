@@ -66,7 +66,7 @@ export function useMetrics(enabled: boolean) {
 export function useProjects(adminKey: string) {
   const qc = useQueryClient();
 
-  const { data: projects = [] } = useQuery<string[]>({
+  const { data: projects = [], isLoading: loading } = useQuery<string[]>({
     queryKey: keys.projects(adminKey),
     queryFn: async () => {
       const list = await listProjects(adminKey);
@@ -92,6 +92,7 @@ export function useProjects(adminKey: string) {
 
   return {
     projects,
+    loading,
     create: createMutation.mutateAsync,
     remove: removeMutation.mutateAsync,
     createPending: createMutation.isPending,

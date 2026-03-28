@@ -18,7 +18,7 @@ const METRIC_CONFIG: { key: keyof Metrics; label: string }[] = [
 
 export function MetricsStrip({ metrics, changedFields }: MetricsStripProps) {
   return (
-    <div className="mb-12 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px bg-sand-dim">
+    <div className="mb-10 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px bg-sand-dim">
       {METRIC_CONFIG.map(({ key, label }) => {
         const value = metrics ? metrics[key] : null;
         const isZero = value === 0;
