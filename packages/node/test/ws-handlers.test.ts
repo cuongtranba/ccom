@@ -183,10 +183,8 @@ describe("WSHandlers", () => {
     expect(emitted).toBe(true);
   });
 
-  it("handle query_ask auto-responds with local items via sendFn", () => {
+  it("handle query_ask stores query and delegates to Claude via eventBus (no auto-respond)", () => {
     const node = engine.registerNode("n", "dev", "proj-1", "o", false);
-    engine.addItem(node.id, "decision", "Item A", "", "");
-    engine.addItem(node.id, "api-spec", "Item B", "", "REF-1");
 
     const sent: Array<{ toNode: string; payload: unknown }> = [];
     handlers.setSendFn((toNode, payload) => {
@@ -205,13 +203,8 @@ describe("WSHandlers", () => {
 
     handlers.handle(envelope);
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0].toNode).toBe("pm-node-id");
-    const payload = sent[0].payload as { type: string; answer: string; responderId: string };
-    expect(payload.type).toBe("query_respond");
-    const answer = JSON.parse(payload.answer);
-    expect(answer.count).toBe(2);
-    expect(answer.items).toHaveLength(2);
+    // Should NOT auto-respond — Claude handles responses via inv_reply
+    expect(sent).toHaveLength(0);
   });
 
   it("handle trace_resolve_request sends response back via sendFn", () => {

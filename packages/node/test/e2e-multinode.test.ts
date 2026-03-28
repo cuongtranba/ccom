@@ -204,10 +204,7 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
   // ── Cross-Node Query/Response ─────────────────────────────────────────
 
   describe("Cross-node query and response", () => {
-    it("Dev asks PM a question, PM auto-responds with items", () => {
-      // PM has some items
-      pm.engine.addItem(pm.node.id, "prd", "Check-In PRD", "", "JIRA-101");
-
+    it("Dev asks PM a question, PM receives it and can reply", () => {
       // Dev asks PM
       dev.send(pm.node.id, {
         type: "query_ask",
@@ -215,51 +212,44 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
         askerId: dev.node.id,
       });
 
-      // PM receives the question
+      // PM receives the question via channel (no auto-respond)
       const pmQuestions = pm.events.filter((e) => e.type === "query_ask");
       expect(pmQuestions).toHaveLength(1);
 
-      // Dev receives auto-response from PM (items list)
+      // No auto-response — Claude handles replies via inv_reply
       const devAutoAnswers = dev.events.filter((e) => e.type === "query_respond");
-      expect(devAutoAnswers).toHaveLength(1);
-      const autoPayload = devAutoAnswers[0].data as { answer: string };
-      const autoAnswer = JSON.parse(autoPayload.answer);
-      expect(autoAnswer.count).toBe(1);
-      expect(autoAnswer.items[0].title).toBe("Check-In PRD");
+      expect(devAutoAnswers).toHaveLength(0);
 
-      // PM can also send a manual response
+      // PM sends a manual response
       pm.send(dev.node.id, {
         type: "query_respond",
         answer: "Base64-encoded appointment UUID",
         responderId: pm.node.id,
       });
 
-      // Dev now has 2 responses (auto + manual)
+      // Dev receives PM's manual response
       const devAllAnswers = dev.events.filter((e) => e.type === "query_respond");
-      expect(devAllAnswers).toHaveLength(2);
+      expect(devAllAnswers).toHaveLength(1);
     });
 
-    it("QA broadcasts question, all nodes auto-respond", () => {
-      // Each node has items
-      pm.engine.addItem(pm.node.id, "prd", "PRD", "", "");
-      dev.engine.addItem(dev.node.id, "api-spec", "API", "", "");
-
+    it("QA broadcasts question, all nodes receive it", () => {
       qa.broadcast({
         type: "query_ask",
         question: "Anyone seen intermittent 500s on /check-in?",
         askerId: qa.node.id,
       });
 
+      // All nodes receive the question via channel
       expect(pm.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
       expect(design.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
       expect(dev.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
       expect(devops.events.filter((e) => e.type === "query_ask")).toHaveLength(1);
 
-      // QA receives auto-responses from all 4 nodes
+      // No auto-responses — Claude on each node handles replies
       const qaAutoAnswers = qa.events.filter((e) => e.type === "query_respond");
-      expect(qaAutoAnswers).toHaveLength(4);
+      expect(qaAutoAnswers).toHaveLength(0);
 
-      // Dev and DevOps can also send manual responses
+      // Dev and DevOps send manual responses
       dev.send(qa.node.id, {
         type: "query_respond",
         answer: "Yes, it's a known race condition in the queue handler",
@@ -272,9 +262,9 @@ describe("E2E Multi-Node: 5 Claude Code sessions communicating", () => {
         responderId: devops.node.id,
       });
 
-      // QA now has 6 responses total (4 auto + 2 manual)
+      // QA receives 2 manual responses
       const qaAllAnswers = qa.events.filter((e) => e.type === "query_respond");
-      expect(qaAllAnswers).toHaveLength(6);
+      expect(qaAllAnswers).toHaveLength(2);
     });
   });
 

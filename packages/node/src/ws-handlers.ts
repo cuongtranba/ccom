@@ -132,24 +132,8 @@ export class WSHandlers {
         askerNode: envelope.fromNode,
         question: payload.question,
       });
-
-      // Auto-respond with local items summary
-      if (this.sendFn) {
-        const nodes = this.store.listNodes(envelope.projectId);
-        const allItems = nodes.flatMap((n) => this.store.listItems(n.id));
-        const summary = allItems.map((i) => ({
-          id: i.id,
-          kind: i.kind,
-          title: i.title,
-          state: i.state,
-          externalRef: i.externalRef || undefined,
-        }));
-        this.sendFn(envelope.fromNode, {
-          type: "query_respond",
-          answer: JSON.stringify({ items: summary, count: summary.length }),
-          responderId: payload.askerId,
-        });
-      }
+      // Question is forwarded to Claude via eventBus.emit at end of handle().
+      // Claude can respond using inv_reply.
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.eventBus.emit("error", {
