@@ -3,8 +3,14 @@ name: Release @tini-works/inv-node
 on:
   push:
     branches: [main]
+    paths:
+      - "packages/node/**"
+      - "packages/shared/**"
   pull_request:
     branches: [main]
+    paths:
+      - "packages/node/**"
+      - "packages/shared/**"
 
 jobs:
   test:
@@ -55,7 +61,7 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Get latest inv-node@ tag, default to 0.1.0 if none exists
+          # Get latest inv-node@ tag, default to 0.0.0 if none exists
           LATEST_TAG=$(git tag -l 'inv-node@*' --sort=-v:refname | head -1)
           if [ -z "$LATEST_TAG" ]; then
             NEXT_VERSION="0.1.0"
@@ -68,7 +74,7 @@ jobs:
           echo "tag=inv-node@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "Next version: $NEXT_VERSION"
 
-      - name: Set package version
+      - name: Update package.json version
         run: |
           cd packages/node
           jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' package.json > package.json.tmp
@@ -79,12 +85,14 @@ jobs:
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create tag
+      - name: Commit version bump, tag, and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/node/package.json
+          git commit -m "chore(node): release ${{ steps.version.outputs.tag }} [skip ci]"
           git tag "${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          git push origin main --tags
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
