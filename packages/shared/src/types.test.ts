@@ -15,12 +15,10 @@ import type {
   AuditReport,
   PendingAction,
 } from "./types";
-import { UPSTREAM_VERTICALS } from "./types";
-
 describe("domain types", () => {
-  test("Vertical accepts all valid values", () => {
-    const verticals: Vertical[] = ["pm", "design", "dev", "qa", "devops"];
-    expect(verticals).toHaveLength(5);
+  test("Vertical accepts any string value", () => {
+    const verticals: Vertical[] = ["pm", "design", "dev", "qa", "devops", "frontend", "backend"];
+    expect(verticals).toHaveLength(7);
   });
 
   test("ItemState accepts all valid values", () => {
@@ -202,24 +200,3 @@ describe("domain types", () => {
   });
 });
 
-describe("UPSTREAM_VERTICALS", () => {
-  test("pm has no upstream", () => {
-    expect(UPSTREAM_VERTICALS.pm).toEqual([]);
-  });
-
-  test("design depends on pm", () => {
-    expect(UPSTREAM_VERTICALS.design).toEqual(["pm"]);
-  });
-
-  test("dev depends on pm and design", () => {
-    expect(UPSTREAM_VERTICALS.dev).toEqual(["pm", "design"]);
-  });
-
-  test("qa depends on dev", () => {
-    expect(UPSTREAM_VERTICALS.qa).toEqual(["dev"]);
-  });
-
-  test("devops depends on dev and qa", () => {
-    expect(UPSTREAM_VERTICALS.devops).toEqual(["dev", "qa"]);
-  });
-});

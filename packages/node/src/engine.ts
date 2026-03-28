@@ -17,7 +17,6 @@ import type {
   ChecklistItem,
   KindMapping,
 } from "@inv/shared";
-import { UPSTREAM_VERTICALS } from "@inv/shared";
 import type { Store } from "./store";
 import type { StateMachine } from "./state";
 import { CRStateMachine } from "./state";
@@ -443,17 +442,7 @@ export class Engine {
     return cr;
   }
 
-  private tieBreak(cr: ChangeRequest): boolean {
-    const proposerNode = this.store.getNode(cr.proposerNode);
-    if (!proposerNode) return false;
-
-    const upstreams = UPSTREAM_VERTICALS[proposerNode.vertical];
-    const votes = this.store.listVotes(cr.id);
-    for (const vote of votes) {
-      if (upstreams.includes(vote.vertical) && vote.approve) {
-        return true;
-      }
-    }
+  private tieBreak(_cr: ChangeRequest): boolean {
     return false;
   }
 }

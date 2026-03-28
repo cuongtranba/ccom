@@ -23,7 +23,6 @@ import type {
   ChecklistItem,
   KindMapping,
 } from "@inv/shared";
-import { UPSTREAM_VERTICALS } from "@inv/shared";
 
 // ── Row types (snake_case DB representation) ────────────────────────────
 
@@ -1097,8 +1096,6 @@ export class Store {
     const orphans: string[] = [];
     const missingUpstreamRefs: string[] = [];
 
-    const upstreamVerticals = UPSTREAM_VERTICALS[node.vertical];
-
     for (const item of items) {
       // Categorize by state
       switch (item.state) {
@@ -1120,18 +1117,6 @@ export class Store {
       const traces = this.getItemTraces(item.id);
       if (traces.length === 0) {
         orphans.push(item.id);
-      }
-
-      // Check for missing upstream references
-      if (upstreamVerticals.length > 0) {
-        const incomingTraces = this.getDependentTraces(item.id);
-        const hasUpstreamTrace = incomingTraces.some((t) => {
-          const fromNode = this.getNode(t.fromNodeId);
-          return fromNode !== null && upstreamVerticals.includes(fromNode.vertical);
-        });
-        if (!hasUpstreamTrace) {
-          missingUpstreamRefs.push(item.id);
-        }
       }
     }
 

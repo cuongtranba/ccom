@@ -1,4 +1,4 @@
-export type Vertical = "pm" | "design" | "dev" | "qa" | "devops";
+export type Vertical = string;
 export type ItemState = "unverified" | "proven" | "suspect" | "broke";
 export type ItemKind =
   | "adr"
@@ -122,14 +122,6 @@ export interface PendingAction {
   status: "pending" | "approved" | "rejected" | "expired";
   createdAt: string;
 }
-
-export const UPSTREAM_VERTICALS: Record<Vertical, Vertical[]> = {
-  pm: [],
-  design: ["pm"],
-  dev: ["pm", "design"],
-  qa: ["dev"],
-  devops: ["dev", "qa"],
-};
 
 export type CRStatus =
   | "draft"

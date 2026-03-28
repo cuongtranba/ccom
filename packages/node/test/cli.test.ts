@@ -1,12 +1,11 @@
 import { describe, test, expect } from "bun:test";
 import { generateInvConfig, generateMcpConfig } from "../src/cli";
-import type { Vertical } from "@inv/shared";
 
 describe("CLI config generation", () => {
   test("generateInvConfig creates valid config", () => {
     const config = generateInvConfig({
       name: "dev-node",
-      vertical: "dev" as Vertical,
+      vertical: "dev",
       project: "clinic-checkin",
       owner: "cuong",
       serverUrl: "ws://localhost:8080/ws",
@@ -35,19 +34,16 @@ describe("CLI config generation", () => {
     });
   });
 
-  test("generateInvConfig handles all verticals", () => {
-    const verticals: Vertical[] = ["pm", "design", "dev", "qa", "devops"];
-    for (const v of verticals) {
-      const config = generateInvConfig({
-        name: `${v}-node`,
-        vertical: v,
-        project: "test",
-        owner: "tester",
-        serverUrl: "ws://localhost:8080/ws",
-        token: "tok",
-        dbPath: "./test.db",
-      });
-      expect(config.node.vertical).toBe(v);
-    }
+  test("generateInvConfig accepts any vertical string", () => {
+    const config = generateInvConfig({
+      name: "custom-node",
+      vertical: "frontend",
+      project: "my-project",
+      owner: "tester",
+      serverUrl: "ws://localhost:8080/ws",
+      token: "tok",
+      dbPath: "./test.db",
+    });
+    expect(config.node.vertical).toBe("frontend");
   });
 });

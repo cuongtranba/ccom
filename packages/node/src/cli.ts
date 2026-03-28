@@ -1,12 +1,12 @@
 import * as readline from "readline";
 import { writeFileSync } from "fs";
-import type { Vertical } from "@inv/shared";
+import { slugify } from "@inv/shared";
 
 // ── Config Generators (exported for testing) ────────────────────────
 
 interface WizardInput {
   name: string;
-  vertical: Vertical;
+  vertical: string;
   project: string;
   owner: string;
   serverUrl: string;
@@ -15,7 +15,7 @@ interface WizardInput {
 }
 
 interface InvConfig {
-  node: { name: string; vertical: Vertical; project: string; owner: string };
+  node: { name: string; vertical: string; project: string; owner: string };
   server: { url: string; token: string };
   database: { path: string };
 }
@@ -60,8 +60,6 @@ export function generateMcpConfig(configPath: string): McpConfig {
 
 // ── Interactive Wizard ───────────────────────────────────────────────
 
-const VERTICALS: Vertical[] = ["pm", "design", "dev", "qa", "devops"];
-
 function ask(rl: readline.Interface, question: string, defaultValue?: string): Promise<string> {
   const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
   return new Promise((resolve) => {
@@ -82,15 +80,13 @@ export async function runWizard(): Promise<void> {
   console.log("────────────────────");
   console.log("");
 
-  const name = await ask(rl, "Node name");
-  const verticalInput = await ask(rl, `Vertical (${VERTICALS.join("/")})`, "dev");
-  if (!VERTICALS.includes(verticalInput as Vertical)) {
-    console.error(`Invalid vertical: ${verticalInput}. Must be one of: ${VERTICALS.join(", ")}`);
-    rl.close();
-    process.exit(1);
-  }
-  const vertical = verticalInput as Vertical;
-  const project = await ask(rl, "Project");
+  const rawName = await ask(rl, "Node name");
+  const name = slugify(rawName);
+  if (name !== rawName) console.log(`  → normalized to: ${name}`);
+  const vertical = await ask(rl, "Vertical", "dev");
+  const rawProject = await ask(rl, "Project");
+  const project = slugify(rawProject);
+  if (project !== rawProject) console.log(`  → normalized to: ${project}`);
   const owner = await ask(rl, "Owner");
 
   console.log("");
