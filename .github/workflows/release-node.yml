@@ -75,9 +75,13 @@ jobs:
           mv package.json.tmp package.json
 
       - name: Publish to GitHub Packages
-        run: cd packages/node && bun publish --registry https://npm.pkg.github.com
+        run: |
+          cd packages/node
+          printf '[publish]\nregistry = { url = "https://npm.pkg.github.com", token = "$npm_token" }\n\n[install.scopes]\n"@inv" = { token = "$npm_token", url = "https://npm.pkg.github.com" }\n' > bunfig.toml
+          cat bunfig.toml
+          bun publish
         env:
-          BUN_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create tag
         run: |
