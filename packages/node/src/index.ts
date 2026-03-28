@@ -4,15 +4,24 @@ import { startChannelServer } from "./channel";
 async function main(): Promise<void> {
   const command = process.argv[2];
 
-  if (command === "init") {
-    await runWizard();
-    return;
+  switch (command) {
+    case "init":
+      await runWizard();
+      break;
+    case "serve":
+      await startChannelServer(process.argv[3] ?? "./inv-config.json");
+      break;
+    case undefined:
+      // Backwards compat: no subcommand starts serve
+      await startChannelServer(process.argv[3] ?? "./inv-config.json");
+      break;
+    default:
+      console.error(`Unknown command: ${command}`);
+      console.error("Usage:");
+      console.error("  @inv/node init              Set up a new node");
+      console.error("  @inv/node serve [config]    Start MCP server");
+      process.exit(1);
   }
-
-  // Default: start channel server
-  // Arg can be config path, defaults to ./inv-config.json
-  const configPath = command ?? "./inv-config.json";
-  await startChannelServer(configPath);
 }
 
 main().catch((err) => {
