@@ -1,5 +1,7 @@
 # inv — Inventory Network
 
+[![Release @tini-works/inv-node](https://github.com/tini-works/my-inventory/actions/workflows/release-node.yml/badge.svg?branch=main)](https://github.com/tini-works/my-inventory/actions/workflows/release-node.yml)
+
 A distributed inventory network for software teams and AI agents. Each team member (PM, design, dev, QA, devops) runs a local node that owns their slice of project artifacts — PRDs, ADRs, tickets, test plans — with automatic state propagation across the network when dependencies change.
 
 Built for the Constitution framework (`tini-works/const`).
@@ -76,8 +78,8 @@ bun run init
 ### 4. Connect Claude
 
 ```bash
-bun run node    # starts the MCP server on stdio
-claude          # Claude connects automatically via .mcp.json
+bun run node serve    # starts the MCP server on stdio
+claude                # Claude connects automatically via .mcp.json
 ```
 
 ### 5. Dashboard (optional)
