@@ -395,36 +395,13 @@ describe("Store", () => {
       expect(report.orphans).not.toContain(item2.id);
     });
 
-    it("reports missingUpstreamRefs for items in non-root verticals without upstream traces", () => {
-      // dev vertical has upstream: pm, design
+    it("missingUpstreamRefs is always empty (vertical hierarchy removed)", () => {
+      // Vertical is now a free-form string — no fixed upstream hierarchy.
+      // missingUpstreamRefs is always [] regardless of vertical or trace count.
       const devNode = store.createNode({ name: "Dev", vertical: "dev", project: "p1", owner: "a", isAI: false });
-      const pmNode = store.createNode({ name: "PM", vertical: "pm", project: "p1", owner: "b", isAI: false });
+      store.createItem({ nodeId: devNode.id, kind: "tech-design", title: "TD" });
 
-      const devItem = store.createItem({ nodeId: devNode.id, kind: "tech-design", title: "TD" });
-      const pmItem = store.createItem({ nodeId: pmNode.id, kind: "prd", title: "PRD" });
-
-      // devItem has no upstream trace from a pm or design node => missingUpstreamRef
-      const report1 = store.audit(devNode.id);
-      expect(report1.missingUpstreamRefs).toContain(devItem.id);
-
-      // Now add a trace from pmItem to devItem
-      store.createTrace({
-        fromItemId: pmItem.id,
-        fromNodeId: pmNode.id,
-        toItemId: devItem.id,
-        toNodeId: devNode.id,
-        relation: "traced_from",
-      });
-
-      const report2 = store.audit(devNode.id);
-      expect(report2.missingUpstreamRefs).not.toContain(devItem.id);
-    });
-
-    it("pm vertical has no missingUpstreamRefs (root vertical)", () => {
-      const pmNode = store.createNode({ name: "PM", vertical: "pm", project: "p1", owner: "a", isAI: false });
-      store.createItem({ nodeId: pmNode.id, kind: "prd", title: "PRD" });
-
-      const report = store.audit(pmNode.id);
+      const report = store.audit(devNode.id);
       expect(report.missingUpstreamRefs).toHaveLength(0);
     });
   });

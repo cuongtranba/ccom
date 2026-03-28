@@ -8,7 +8,7 @@ describe("defaultConfig", () => {
     expect(cfg.node.id).toBe("");
     expect(cfg.node.name).toBe("");
     expect(cfg.node.vertical).toBe("dev");
-    expect(cfg.node.project).toBe("");
+    expect(cfg.node.projects).toEqual([]);
     expect(cfg.node.owner).toBe("");
     expect(cfg.node.isAI).toBe(false);
 
@@ -57,7 +57,7 @@ describe("loadConfig", () => {
 
     // retained defaults
     expect(cfg.node.vertical).toBe("dev");
-    expect(cfg.node.project).toBe("");
+    expect(cfg.node.projects).toEqual([]);
     expect(cfg.node.owner).toBe("");
     expect(cfg.node.isAI).toBe(false);
 
