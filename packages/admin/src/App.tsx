@@ -1,10 +1,14 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useTokens } from "@/hooks/use-tokens";
+import { useNodes } from "@/hooks/use-nodes";
+import { useLogs } from "@/hooks/use-logs";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
 import { TokenCreateForm } from "@/components/token-create-form";
 import { TokenList } from "@/components/token-list";
+import { ConnectedNodes } from "@/components/connected-nodes";
+import { ServerLogs } from "@/components/server-logs";
 
 export default function App() {
   const { adminKey, setAdminKey, isAuthed } = useAuth();
@@ -18,6 +22,8 @@ export default function App() {
     create,
     revoke,
   } = useTokens(adminKey);
+  const { nodes } = useNodes(adminKey);
+  const { logs } = useLogs(adminKey);
 
   return (
     <div className="mx-auto max-w-[860px] px-[clamp(1rem,3vw,2rem)] py-[clamp(2rem,5vw,4rem)]">
@@ -55,6 +61,10 @@ export default function App() {
         onLoad={loadTokens}
         onRevoke={revoke}
       />
+
+      <ConnectedNodes nodes={nodes} disabled={!isAuthed} />
+
+      <ServerLogs logs={logs} disabled={!isAuthed} />
     </div>
   );
 }
