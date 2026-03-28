@@ -3,7 +3,7 @@ import { readFileSync, existsSync, statSync } from "fs";
 import { resolve, dirname, join, extname } from "path";
 import { fileURLToPath } from "url";
 import Redis from "ioredis";
-import { parseEnvelope } from "@inv/shared";
+import { parseEnvelope, slugify } from "@inv/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const adminDistDir = resolve(__dirname, "../../admin/dist");
@@ -22,7 +22,7 @@ export type { HubWebSocket } from "./hub";
 export type { ConnectedNode } from "./hub";
 
 interface WsData {
-  projectId: string;
+  projectIds: string[];
   nodeId: string;
 }
 
@@ -51,11 +51,6 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   const adminKey = process.env.ADMIN_KEY || "";
   const log = new LogBuffer(200);
   log.info("Server started", { instanceId, port: String(options.port) });
-
-  async function findProjectByName(name: string) {
-    const projects = await repos.projects.list();
-    return projects.find((p) => p.name === name) ?? null;
-  }
 
   function requireAdmin(req: Request): Response | null {
     if (!adminKey) {
@@ -113,6 +108,56 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json(hub.getMetrics());
       }
 
+      // ── Public endpoints (no auth) ─────────────────────────
+
+      if (url.pathname === "/api/project/public-list" && req.method === "GET") {
+        const projects = await repos.projects.list();
+        return Response.json({ projects: projects.map((p) => p.name) });
+      }
+
+      if (url.pathname === "/api/register" && req.method === "POST") {
+        const body = await req.json() as { project?: string; nodeId?: string; name?: string; vertical?: string; owner?: string };
+        if (!body.project || !body.nodeId || !body.name) {
+          return Response.json({ error: "Missing project, nodeId, or name" }, { status: 400 });
+        }
+        const nodeIdSlug = slugify(body.nodeId);
+        if (!nodeIdSlug) {
+          return Response.json({ error: "Node ID is empty after normalization" }, { status: 400 });
+        }
+        const project = await repos.projects.findByName(body.project);
+        if (!project) {
+          return Response.json({ error: `Project "${body.project}" does not exist` }, { status: 400 });
+        }
+        if (await repos.tokens.nodeExists(nodeIdSlug)) {
+          return Response.json({ error: `Node "${nodeIdSlug}" already exists` }, { status: 409 });
+        }
+        const nodeId = nodeIdSlug;
+        const name = body.name;
+        const vertical = body.vertical ?? "";
+        const owner = body.owner ?? "";
+        const token = await repos.tokens.create({ nodeId, name, vertical, owner });
+        await repos.tokens.assignProject(token.id, project.id);
+        return Response.json({ token: token.secret, nodeId, name, vertical, owner, project: body.project });
+      }
+
+      if (url.pathname === "/api/token/info" && req.method === "GET") {
+        const token = url.searchParams.get("token");
+        if (!token) {
+          return Response.json({ error: "Missing token" }, { status: 401 });
+        }
+        const info = await repos.tokens.validate(token);
+        if (!info) {
+          return Response.json({ error: "Invalid token" }, { status: 401 });
+        }
+        return Response.json({
+          nodeId: info.nodeId,
+          name: info.name,
+          vertical: info.vertical,
+          owner: info.owner,
+          projects: info.projects.map((p) => ({ name: p.name })),
+        });
+      }
+
       // ── Project management API (admin-key protected) ───────
 
       if (url.pathname === "/api/project/create" && req.method === "POST") {
@@ -122,12 +167,16 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!body.project) {
           return Response.json({ error: "Missing project" }, { status: 400 });
         }
-        const exists = await repos.projects.exists(body.project);
-        if (exists) {
-          return Response.json({ error: `Project "${body.project}" already exists` }, { status: 409 });
+        const projectName = slugify(body.project);
+        if (!projectName) {
+          return Response.json({ error: "Project name is empty after normalization" }, { status: 400 });
         }
-        await repos.projects.create(body.project);
-        return Response.json({ project: body.project, created: true });
+        const exists = await repos.projects.exists(projectName);
+        if (exists) {
+          return Response.json({ error: `Project "${projectName}" already exists` }, { status: 409 });
+        }
+        await repos.projects.create(projectName);
+        return Response.json({ project: projectName, created: true });
       }
 
       if (url.pathname === "/api/project/list" && req.method === "GET") {
@@ -142,19 +191,54 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       if (url.pathname === "/api/token/create" && req.method === "POST") {
         const denied = requireAdmin(req);
         if (denied) return denied;
-        const body = await req.json() as { project?: string; nodeId?: string };
-        if (!body.project || !body.nodeId) {
-          return Response.json({ error: "Missing project or nodeId" }, { status: 400 });
+        const body = await req.json() as { nodeId?: string; name?: string; vertical?: string; owner?: string };
+        if (!body.nodeId || !body.name) {
+          return Response.json({ error: "Missing nodeId or name" }, { status: 400 });
         }
-        const project = await findProjectByName(body.project);
+        const nodeIdSlug = slugify(body.nodeId);
+        if (!nodeIdSlug) {
+          return Response.json({ error: "Node ID is empty after normalization" }, { status: 400 });
+        }
+        if (await repos.tokens.nodeExists(nodeIdSlug)) {
+          return Response.json({ error: `Node "${nodeIdSlug}" already exists` }, { status: 409 });
+        }
+        const token = await repos.tokens.create({
+          nodeId: nodeIdSlug,
+          name: body.name,
+          vertical: body.vertical ?? "",
+          owner: body.owner ?? "",
+        });
+        return Response.json({ token: token.secret, nodeId: nodeIdSlug, id: token.id });
+      }
+
+      if (url.pathname === "/api/token/assign" && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const body = await req.json() as { tokenId?: string; project?: string };
+        if (!body.tokenId || !body.project) {
+          return Response.json({ error: "Missing tokenId or project" }, { status: 400 });
+        }
+        const project = await repos.projects.findByName(body.project);
         if (!project) {
-          return Response.json({ error: `Project "${body.project}" does not exist. Create it first.` }, { status: 400 });
+          return Response.json({ error: `Project "${body.project}" does not exist` }, { status: 404 });
         }
-        if (await repos.tokens.nodeExists(project.id, body.nodeId)) {
-          return Response.json({ error: `Node "${body.nodeId}" already exists in project "${body.project}"` }, { status: 409 });
+        await repos.tokens.assignProject(body.tokenId, project.id);
+        return Response.json({ assigned: true });
+      }
+
+      if (url.pathname === "/api/token/unassign" && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const body = await req.json() as { tokenId?: string; project?: string };
+        if (!body.tokenId || !body.project) {
+          return Response.json({ error: "Missing tokenId or project" }, { status: 400 });
         }
-        const token = await repos.tokens.create(project.id, body.nodeId);
-        return Response.json({ token: token.secret, project: body.project, nodeId: body.nodeId });
+        const project = await repos.projects.findByName(body.project);
+        if (!project) {
+          return Response.json({ error: `Project "${body.project}" does not exist` }, { status: 404 });
+        }
+        await repos.tokens.unassignProject(body.tokenId, project.id);
+        return Response.json({ unassigned: true });
       }
 
       if (url.pathname === "/api/token/list" && req.method === "GET") {
@@ -162,7 +246,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (denied) return denied;
         const project = url.searchParams.get("project");
         if (project) {
-          const projectRecord = await findProjectByName(project);
+          const projectRecord = await repos.projects.findByName(project);
           if (!projectRecord) return Response.json({ tokens: [] });
           const tokens = await repos.tokens.listByProject(projectRecord.id);
           return Response.json({ tokens });
@@ -203,7 +287,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!projectName) {
           return Response.json({ error: "Missing projectId" }, { status: 400 });
         }
-        const project = await findProjectByName(projectName);
+        const project = await repos.projects.findByName(projectName);
         if (!project) {
           return Response.json({ error: "Project not found" }, { status: 404 });
         }
@@ -223,12 +307,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           return Response.json({ error: "Missing projectId or nodeId" }, { status: 400 });
         }
         const [projectName, nodeId] = parts;
-        const project = await findProjectByName(projectName);
+        const project = await repos.projects.findByName(projectName);
         if (!project) {
           return Response.json({ error: "Project not found" }, { status: 404 });
         }
         const disconnected = await hub.disconnect(projectName, nodeId);
-        const revoked = await repos.tokens.revokeByNode(project.id, nodeId);
+        const revoked = await repos.tokens.revokeByNode(nodeId);
         log.info(`Node removed: ${nodeId} from ${projectName}`, { revoked: String(revoked), disconnected: String(disconnected) });
         return Response.json({ revoked, disconnected });
       }
@@ -256,10 +340,22 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         if (!info) {
           return Response.json({ error: "Invalid token" }, { status: 401 });
         }
-        const online = await hub.listOnline(info.projectId);
-        // Exclude the requesting node itself
-        const others = online.filter((id) => id !== info.nodeId);
-        return Response.json({ nodes: others, project: info.projectId });
+        const projectResults: { name: string; nodes: { nodeId: string; name: string; vertical: string }[] }[] = [];
+        for (const proj of info.projects) {
+          const onlineIds = await hub.listOnline(proj.name);
+          const others = onlineIds.filter((id) => id !== info.nodeId);
+          const allTokens = await repos.tokens.listByProject(proj.id);
+          const nodes = others.map((nid) => {
+            const meta = allTokens.find((t) => t.nodeId === nid);
+            return {
+              nodeId: nid,
+              name: meta?.name ?? "",
+              vertical: meta?.vertical ?? "",
+            };
+          });
+          projectResults.push({ name: proj.name, nodes });
+        }
+        return Response.json({ projects: projectResults });
       }
 
       // ── WebSocket upgrade ────────────────────────────────────
@@ -275,8 +371,10 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           return new Response("Invalid token", { status: 401 });
         }
 
+        const projectNames = info.projects.map((p) => p.name);
+
         const upgraded = server.upgrade(req, {
-          data: { projectId: info.projectId, nodeId: info.nodeId },
+          data: { projectIds: projectNames, nodeId: info.nodeId },
         });
 
         if (!upgraded) {
@@ -292,13 +390,17 @@ export function startServer(options: { port: number; redisUrl: string }): void {
 
     websocket: {
       async open(ws) {
-        const { projectId, nodeId } = ws.data;
+        const { projectIds, nodeId } = ws.data;
         const wrapped = wrapBunWs(ws);
-        const connKey = `${projectId}:${nodeId}`;
-        wsMap.set(connKey, wrapped);
-        await hub.register(projectId, nodeId, wrapped);
-        await hub.drainOutbox(projectId, nodeId, wrapped);
-        log.info(`Node connected: ${nodeId}`, { projectId, nodeId });
+        for (const pid of projectIds) {
+          const connKey = `${pid}:${nodeId}`;
+          wsMap.set(connKey, wrapped);
+        }
+        await hub.register(projectIds, nodeId, wrapped);
+        for (const pid of projectIds) {
+          await hub.drainOutbox(pid, nodeId, wrapped);
+        }
+        log.info(`Node connected: ${nodeId}`, { projects: projectIds.join(",") });
       },
 
       async message(ws, msg) {
@@ -307,12 +409,11 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           const envelope = parseEnvelope(raw);
           // Override with server-authenticated identity so routing is consistent
           envelope.fromNode = ws.data.nodeId;
-          envelope.projectId = ws.data.projectId;
           await hub.route(envelope);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Unknown error";
           log.error(`Parse error from ${ws.data.nodeId}: ${errorMsg}`, {
-            projectId: ws.data.projectId,
+            projectId: ws.data.projectIds[0] || "",
             nodeId: ws.data.nodeId,
           });
           ws.send(
@@ -320,7 +421,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
               messageId: randomUUID(),
               fromNode: "",
               toNode: ws.data.nodeId,
-              projectId: ws.data.projectId,
+              projectId: ws.data.projectIds[0] || "",
               timestamp: new Date().toISOString(),
               payload: { type: "error", code: "PARSE_ERROR", message: errorMsg },
             }),
@@ -329,11 +430,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       },
 
       async close(ws) {
-        const { projectId, nodeId } = ws.data;
-        const connKey = `${projectId}:${nodeId}`;
-        wsMap.delete(connKey);
-        await hub.unregister(projectId, nodeId);
-        log.info(`Node disconnected: ${nodeId}`, { projectId, nodeId });
+        const { projectIds, nodeId } = ws.data;
+        for (const pid of projectIds) {
+          wsMap.delete(`${pid}:${nodeId}`);
+        }
+        await hub.unregister(projectIds, nodeId);
+        log.info(`Node disconnected: ${nodeId}`, { projects: projectIds.join(",") });
       },
     },
   });
@@ -378,33 +480,39 @@ function parseArgs(args: string[]): { port: number; redisUrl: string } {
 }
 
 async function tokenCreate(args: string[]): Promise<void> {
-  let project = "";
   let nodeId = "";
+  let name = "";
+  let vertical = "";
+  let owner = "";
+  let project = "";
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--project" && args[i + 1]) {
-      project = args[i + 1];
-      i++;
-    } else if (args[i] === "--node" && args[i + 1]) {
-      nodeId = args[i + 1];
-      i++;
-    }
+    if (args[i] === "--node" && args[i + 1]) { nodeId = args[i + 1]; i++; }
+    else if (args[i] === "--name" && args[i + 1]) { name = args[i + 1]; i++; }
+    else if (args[i] === "--vertical" && args[i + 1]) { vertical = args[i + 1]; i++; }
+    else if (args[i] === "--owner" && args[i + 1]) { owner = args[i + 1]; i++; }
+    else if (args[i] === "--project" && args[i + 1]) { project = args[i + 1]; i++; }
   }
 
-  if (!project || !nodeId) {
-    console.error("Usage: token create --project <project> --node <nodeId>");
+  if (!nodeId || !name) {
+    console.error("Usage: token create --node <nodeId> --name <name> [--vertical <v>] [--owner <o>] [--project <p>]");
     process.exit(1);
   }
+
+  nodeId = slugify(nodeId);
 
   const prisma = getPrisma();
   const repos = createRepositories(prisma);
   try {
-    const projects = await repos.projects.list();
-    let projectRecord = projects.find((p) => p.name === project);
-    if (!projectRecord) {
-      projectRecord = await repos.projects.create(project);
+    const token = await repos.tokens.create({ nodeId, name, vertical, owner });
+    if (project) {
+      const projects = await repos.projects.list();
+      let projectRecord = projects.find((p) => p.name === project);
+      if (!projectRecord) {
+        projectRecord = await repos.projects.create(project);
+      }
+      await repos.tokens.assignProject(token.id, projectRecord.id);
     }
-    const token = await repos.tokens.create(projectRecord.id, nodeId);
     console.log(token.secret);
   } finally {
     await disconnectPrisma();
@@ -429,8 +537,7 @@ async function tokenList(args: string[]): Promise<void> {
   const prisma = getPrisma();
   const repos = createRepositories(prisma);
   try {
-    const projects = await repos.projects.list();
-    const projectRecord = projects.find((p) => p.name === project);
+    const projectRecord = await repos.projects.findByName(project);
     if (!projectRecord) {
       console.log("No tokens found.");
       return;
