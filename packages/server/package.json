@@ -4,6 +4,8 @@
   "private": true,
   "dependencies": {
     "@inv/shared": "workspace:*",
-    "ioredis": "^5.4.2"
+    "@prisma/client": "^7.6.0",
+    "ioredis": "^5.4.2",
+    "prisma": "^7.6.0"
   }
 }

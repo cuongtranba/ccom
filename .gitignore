@@ -17,6 +17,9 @@ web/dist/
 web/.astro/
 dist/
 
+# Generated Prisma client
+packages/server/generated/
+
 # Playwright MCP logs
 .playwright-mcp/
 

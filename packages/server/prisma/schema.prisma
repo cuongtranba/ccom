@@ -1,0 +1,29 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  tokens    Token[]
+
+  @@map("projects")
+}
+
+model Token {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  nodeId    String   @map("node_id")
+  secret    String   @unique @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, nodeId])
+  @@map("tokens")
+}
