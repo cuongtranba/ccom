@@ -15,10 +15,8 @@ export default function App() {
   const { metrics, changed } = useMetrics(true);
   const {
     tokens,
-    currentProject,
     loading,
     createResult,
-    loadTokens,
     create,
     revoke,
   } = useTokens(adminKey);
@@ -56,9 +54,7 @@ export default function App() {
       <TokenList
         disabled={!isAuthed}
         tokens={tokens}
-        currentProject={currentProject}
         loading={loading}
-        onLoad={loadTokens}
         onRevoke={revoke}
       />
 

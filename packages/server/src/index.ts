@@ -120,11 +120,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         const denied = requireAdmin(req);
         if (denied) return denied;
         const project = url.searchParams.get("project");
-        if (!project) {
-          return Response.json({ error: "Missing project query param" }, { status: 400 });
+        if (project) {
+          const tokens = await auth.listTokens(project);
+          return Response.json({ tokens });
         }
-        const tokens = await auth.listTokens(project);
-        return Response.json({ project, tokens });
+        const tokens = await auth.listAllTokens();
+        return Response.json({ tokens });
       }
 
       if (url.pathname === "/api/token/revoke" && req.method === "POST") {

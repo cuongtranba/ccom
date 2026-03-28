@@ -18,6 +18,7 @@ export class RedisAuth {
     const pipeline = this.redis.pipeline();
     pipeline.hset(`token:${token}`, { projectId, nodeId, createdAt });
     pipeline.sadd(`project_tokens:${projectId}`, token);
+    pipeline.sadd("projects", projectId);
     await pipeline.exec();
 
     return token;
@@ -45,6 +46,19 @@ export class RedisAuth {
     pipeline.del(`token:${token}`);
     pipeline.srem(`project_tokens:${info.projectId}`, token);
     await pipeline.exec();
+  }
+
+  /** Lists all tokens across all projects. */
+  async listAllTokens(): Promise<TokenInfo[]> {
+    const projects = await this.redis.smembers("projects");
+    if (projects.length === 0) return [];
+
+    const allTokens: TokenInfo[] = [];
+    for (const projectId of projects) {
+      const tokens = await this.listTokens(projectId);
+      allTokens.push(...tokens);
+    }
+    return allTokens;
   }
 
   /** Lists all tokens for a given project. */

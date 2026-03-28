@@ -8,6 +8,7 @@ export interface Metrics {
 }
 
 export interface TokenInfo {
+  projectId: string;
   nodeId: string;
   createdAt: string;
 }
@@ -65,15 +66,13 @@ export async function createToken(
   return handleResponse<CreateTokenResponse>(res);
 }
 
-export async function listTokens(
+export async function listAllTokens(
   adminKey: string,
-  project: string,
 ): Promise<TokenInfo[]> {
-  const res = await fetch(
-    `/api/token/list?project=${encodeURIComponent(project)}`,
-    { headers: authHeaders(adminKey) },
-  );
-  const data = await handleResponse<{ project: string; tokens: TokenInfo[] }>(res);
+  const res = await fetch("/api/token/list", {
+    headers: authHeaders(adminKey),
+  });
+  const data = await handleResponse<{ tokens: TokenInfo[] }>(res);
   return data.tokens;
 }
 

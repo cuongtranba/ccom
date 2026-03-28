@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   createToken,
-  listTokens,
+  listAllTokens,
   revokeToken,
   type TokenInfo,
 } from "@/lib/api";
@@ -15,26 +15,26 @@ interface CreateResult {
 
 export function useTokens(adminKey: string) {
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
-  const [currentProject, setCurrentProject] = useState("");
   const [loading, setLoading] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
 
-  const loadTokens = useCallback(
-    async (project: string) => {
-      if (!adminKey || !project) return;
-      setLoading(true);
-      try {
-        const list = await listTokens(adminKey, project);
-        setTokens(list);
-        setCurrentProject(project);
-      } catch {
-        setTokens([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [adminKey],
-  );
+  const refresh = useCallback(async () => {
+    if (!adminKey) return;
+    setLoading(true);
+    try {
+      const list = await listAllTokens(adminKey);
+      setTokens(list);
+    } catch {
+      setTokens([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [adminKey]);
+
+  // Auto-load all tokens when authenticated
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const create = useCallback(
     async (project: string, nodeId: string) => {
@@ -47,8 +47,7 @@ export function useTokens(adminKey: string) {
           token: res.token,
           nodeId: res.nodeId,
         });
-        // Auto-refresh: load the token list for this project immediately
-        await loadTokens(project);
+        await refresh();
       } catch (err) {
         setCreateResult({
           type: "error",
@@ -56,7 +55,7 @@ export function useTokens(adminKey: string) {
         });
       }
     },
-    [adminKey, loadTokens],
+    [adminKey, refresh],
   );
 
   const revoke = useCallback(
@@ -64,10 +63,7 @@ export function useTokens(adminKey: string) {
       if (!adminKey) return;
       try {
         await revokeToken(adminKey, token);
-        // Refresh list after revoke
-        if (currentProject) {
-          await loadTokens(currentProject);
-        }
+        await refresh();
       } catch (err) {
         setCreateResult({
           type: "error",
@@ -75,15 +71,13 @@ export function useTokens(adminKey: string) {
         });
       }
     },
-    [adminKey, currentProject, loadTokens],
+    [adminKey, refresh],
   );
 
   return {
     tokens,
-    currentProject,
     loading,
     createResult,
-    loadTokens,
     create,
     revoke,
     clearResult: () => setCreateResult(null),
