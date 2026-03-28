@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { TokenInfo } from "@/lib/api";
@@ -21,11 +21,15 @@ export function TokenList({
   onRevoke,
 }: TokenListProps) {
   const [project, setProject] = useState(currentProject);
+  const prevProjectRef = useRef(currentProject);
 
-  // Sync external project changes (from auto-refresh after create)
-  if (currentProject && currentProject !== project) {
-    setProject(currentProject);
-  }
+  // Sync only when the prop actually changes (e.g. auto-refresh after create)
+  useEffect(() => {
+    if (currentProject && currentProject !== prevProjectRef.current) {
+      setProject(currentProject);
+    }
+    prevProjectRef.current = currentProject;
+  }, [currentProject]);
 
   async function handleLoad(e: React.FormEvent) {
     e.preventDefault();
