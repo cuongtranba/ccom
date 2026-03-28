@@ -27,8 +27,8 @@ COPY --from=admin-build /app/packages/admin/dist/ packages/admin/dist/
 # Install dependencies
 RUN bun install
 
-# Generate Prisma client
-RUN cd packages/server && bunx prisma generate
+# Generate Prisma client (dummy URL — generate only needs the provider, not a real connection)
+RUN cd packages/server && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
 
 EXPOSE 4400
 
