@@ -4,7 +4,7 @@ import { TokenRepository } from "./token.repository";
 
 export { ProjectRepository } from "./project.repository";
 export { TokenRepository } from "./token.repository";
-export type { TokenInfo } from "./token.repository";
+export type { TokenInfo, TokenValidation } from "./token.repository";
 
 export interface Repositories {
   projects: ProjectRepository;

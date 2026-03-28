@@ -12,6 +12,10 @@ export class ProjectRepository {
     return count > 0;
   }
 
+  async findByName(name: string): Promise<Project | null> {
+    return this.prisma.project.findUnique({ where: { name } });
+  }
+
   async list(): Promise<Project[]> {
     return this.prisma.project.findMany({ orderBy: { name: "asc" } });
   }
