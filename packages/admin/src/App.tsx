@@ -1,79 +1,45 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useMetrics, useProjects, useTokens, useNodes, useLogs } from "@/hooks/queries";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
-import { ProjectCreateForm } from "@/components/project-create-form";
-import { TokenCreateForm } from "@/components/token-create-form";
-import { TokenList } from "@/components/token-list";
 import { ConnectedNodes } from "@/components/connected-nodes";
 import { ServerLogs } from "@/components/server-logs";
+import { RegisterForm } from "@/components/register-form";
+import { ProjectsTable } from "@/components/projects-table";
+import { NodesTable } from "@/components/nodes-table";
+import { useMetrics, useNodes, useLogs } from "@/hooks/queries";
 
 export default function App() {
   const { adminKey, setAdminKey, isAuthed } = useAuth();
-  const { metrics, changed } = useMetrics(true);
-  const {
-    projects,
-    createResult: projectCreateResult,
-    create: createProject,
-    refresh: refreshProjects,
-  } = useProjects(adminKey);
-  const {
-    tokens,
-    loading,
-    createResult,
-    create,
-    removeNode: removeNodeFn,
-    removeProject: removeProjectFn,
-  } = useTokens(adminKey, refreshProjects);
-  const { nodes, disconnect } = useNodes(adminKey);
-  const { logs } = useLogs(adminKey);
+  const metrics = useMetrics(isAuthed);
+  const nodes = useNodes(adminKey);
+  const logs = useLogs(adminKey);
 
   return (
-    <div className="mx-auto max-w-[860px] px-[clamp(1rem,3vw,2rem)] py-[clamp(2rem,5vw,4rem)]">
-      <header className="mb-12">
-        <div className="mb-2 text-[0.7rem] font-medium uppercase tracking-[0.25em] text-spice-dim">
+    <div className="mx-auto max-w-[960px] px-[clamp(1rem,3vw,2rem)] py-8 font-sans">
+      <header className="mb-8 text-center">
+        <h1 className="font-sans text-[clamp(1.2rem,3vw,1.6rem)] font-bold tracking-tight text-foreground">
           Spacing Guild Console
-        </div>
-        <h1 className="text-[clamp(1.6rem,4vw,2.2rem)] font-bold leading-tight tracking-tight">
-          inv-server <span className="text-primary">command post</span>
         </h1>
-        <div className="mt-1 text-sm text-muted-foreground">
-          Token management and signal monitoring
-        </div>
+        <p className="text-xs text-muted-foreground">inventory network control</p>
       </header>
 
-      <AuthGate
-        adminKey={adminKey}
-        onKeyChange={setAdminKey}
-        isAuthed={isAuthed}
-      />
+      <AuthGate adminKey={adminKey} onKeyChange={setAdminKey} isAuthed={isAuthed} />
 
-      <MetricsStrip metrics={metrics} changed={changed} />
-
-      <ProjectCreateForm
-        disabled={!isAuthed}
-        onSubmit={createProject}
-        result={projectCreateResult}
-      />
-
-      <TokenCreateForm
-        disabled={!isAuthed}
-        projects={projects}
-        onSubmit={create}
-        result={createResult}
-      />
-
-      <TokenList
-        disabled={!isAuthed}
-        tokens={tokens}
-        loading={loading}
-        onRemoveNode={removeNodeFn}
-        onRemoveProject={removeProjectFn}
-      />
-
-      <ConnectedNodes nodes={nodes} disabled={!isAuthed} onDisconnect={disconnect} />
-
-      <ServerLogs logs={logs} disabled={!isAuthed} />
+      {!isAuthed ? (
+        <RegisterForm />
+      ) : (
+        <>
+          <MetricsStrip metrics={metrics.data} changedFields={metrics.changedFields} />
+          <ProjectsTable adminKey={adminKey} />
+          <NodesTable adminKey={adminKey} />
+          <ConnectedNodes
+            nodes={nodes.data ?? []}
+            isAuthed={isAuthed}
+            onDisconnect={nodes.disconnect}
+          />
+          <ServerLogs logs={logs.data ?? []} isAuthed={isAuthed} />
+        </>
+      )}
     </div>
   );
 }

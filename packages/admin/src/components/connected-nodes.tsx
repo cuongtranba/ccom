@@ -11,7 +11,7 @@ import type { ConnectedNode } from "@/lib/api";
 
 interface ConnectedNodesProps {
   nodes: ConnectedNode[];
-  disabled: boolean;
+  isAuthed: boolean;
   onDisconnect: (projectId: string, nodeId: string) => Promise<void>;
 }
 
@@ -25,7 +25,7 @@ function formatRelativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export function ConnectedNodes({ nodes, disabled, onDisconnect }: ConnectedNodesProps) {
+export function ConnectedNodes({ nodes, isAuthed, onDisconnect }: ConnectedNodesProps) {
   async function handleDisconnect(projectId: string, nodeId: string) {
     if (!confirm(`Disconnect node "${nodeId}" from project "${projectId}"?`)) return;
     await onDisconnect(projectId, nodeId);
@@ -37,7 +37,7 @@ export function ConnectedNodes({ nodes, disabled, onDisconnect }: ConnectedNodes
         Connected Nodes
       </div>
 
-      {disabled ? (
+      {!isAuthed ? (
         <div className="bg-card p-8 text-sm text-muted-foreground">
           Authenticate to view connected nodes.
         </div>
@@ -58,10 +58,10 @@ export function ConnectedNodes({ nodes, disabled, onDisconnect }: ConnectedNodes
           </TableHeader>
           <TableBody>
             {nodes.map((node) => (
-              <TableRow key={`${node.project}:${node.nodeId}`} className="border-sand-dim">
+              <TableRow key={`${node.projects.join(",")}:${node.nodeId}`} className="border-sand-dim">
                 <TableCell className="font-semibold">{node.nodeId}</TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {node.project}
+                  {node.projects.join(", ")}
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   {formatRelativeTime(node.connectedAt)}
@@ -76,7 +76,7 @@ export function ConnectedNodes({ nodes, disabled, onDisconnect }: ConnectedNodes
                     variant="outline"
                     size="sm"
                     className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => handleDisconnect(node.project, node.nodeId)}
+                    onClick={() => handleDisconnect(node.projects[0] ?? "", node.nodeId)}
                   >
                     Disconnect
                   </Button>

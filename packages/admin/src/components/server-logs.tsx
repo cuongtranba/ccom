@@ -7,7 +7,7 @@ import type { LogEntry } from "@/lib/api";
 
 interface ServerLogsProps {
   logs: LogEntry[];
-  disabled: boolean;
+  isAuthed: boolean;
 }
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -16,7 +16,8 @@ const LEVEL_STYLES: Record<string, string> = {
   error: "bg-destructive/20 text-destructive",
 };
 
-export function ServerLogs({ logs, disabled }: ServerLogsProps) {
+export function ServerLogs({ logs, isAuthed }: ServerLogsProps) {
+  const disabled = !isAuthed;
   const [paused, setPaused] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 

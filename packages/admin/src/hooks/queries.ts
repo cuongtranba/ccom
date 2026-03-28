@@ -6,8 +6,11 @@ import {
   createProject,
   listAllTokens,
   createToken,
+  revokeToken,
   removeNode,
   removeProject,
+  assignToken,
+  unassignToken,
   fetchNodes,
   disconnectNode,
   fetchLogs,
@@ -15,6 +18,7 @@ import {
   type TokenInfo,
   type ConnectedNode,
   type LogEntry,
+  type CreateTokenResponse,
 } from "@/lib/api";
 
 // ─── Query Keys ──────────────────────────────────────────────────────────────
@@ -27,27 +31,13 @@ const keys = {
   logs: (adminKey: string) => ["logs", adminKey] as const,
 };
 
-// ─── Result Types ────────────────────────────────────────────────────────────
-
-interface CreateProjectResult {
-  type: "success" | "error";
-  message: string;
-}
-
-interface CreateTokenResult {
-  type: "success" | "error";
-  message: string;
-  token?: string;
-  nodeId?: string;
-}
-
 // ─── useMetrics ──────────────────────────────────────────────────────────────
 
 export function useMetrics(enabled: boolean) {
   const prevRef = useRef<Metrics | null>(null);
-  const [changed, setChanged] = useState<Set<keyof Metrics>>(new Set());
+  const [changedFields, setChangedFields] = useState<Set<keyof Metrics>>(new Set());
 
-  const { data: metrics = null } = useQuery<Metrics>({
+  const query = useQuery<Metrics>({
     queryKey: keys.metrics,
     queryFn: async () => {
       const m = await fetchMetrics();
@@ -58,7 +48,7 @@ export function useMetrics(enabled: boolean) {
         for (const key of Object.keys(m) as (keyof Metrics)[]) {
           if (m[key] !== prev[key]) diff.add(key);
         }
-        setChanged(diff);
+        setChangedFields(diff);
       }
 
       prevRef.current = m;
@@ -68,14 +58,13 @@ export function useMetrics(enabled: boolean) {
     refetchInterval: 3000,
   });
 
-  return { metrics, changed };
+  return { data: query.data ?? null, changedFields };
 }
 
 // ─── useProjects ─────────────────────────────────────────────────────────────
 
 export function useProjects(adminKey: string) {
   const qc = useQueryClient();
-  const [createResult, setCreateResult] = useState<CreateProjectResult | null>(null);
 
   const { data: projects = [] } = useQuery<string[]>({
     queryKey: keys.projects(adminKey),
@@ -88,32 +77,33 @@ export function useProjects(adminKey: string) {
 
   const createMutation = useMutation({
     mutationFn: (project: string) => createProject(adminKey, project),
-    onSuccess: (_data, project) => {
-      setCreateResult({ type: "success", message: `Project "${project}" created` });
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
-    },
-    onError: (err: Error) => {
-      setCreateResult({ type: "error", message: err.message });
     },
   });
 
-  const create = async (project: string) => {
-    if (!adminKey) return;
-    createMutation.mutate(project);
-  };
+  const removeMutation = useMutation({
+    mutationFn: (projectName: string) => removeProject(adminKey, projectName),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
+      qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
+    },
+  });
 
-  const refresh = async () => {
-    await qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
-  };
-
-  return { projects, createResult, create, refresh } as const;
+  return {
+    projects,
+    create: createMutation.mutateAsync,
+    remove: removeMutation.mutateAsync,
+    createPending: createMutation.isPending,
+    removePending: removeMutation.isPending,
+  } as const;
 }
 
 // ─── useTokens ───────────────────────────────────────────────────────────────
 
-export function useTokens(adminKey: string, onProjectChange?: () => Promise<void>) {
+export function useTokens(adminKey: string) {
   const qc = useQueryClient();
-  const [createResult, setCreateResult] = useState<CreateTokenResult | null>(null);
+  const [lastCreated, setLastCreated] = useState<CreateTokenResponse | null>(null);
 
   const { data: tokens = [], isLoading: loading } = useQuery<TokenInfo[]>({
     queryKey: keys.tokens(adminKey),
@@ -122,66 +112,61 @@ export function useTokens(adminKey: string, onProjectChange?: () => Promise<void
   });
 
   const createMutation = useMutation({
-    mutationFn: ({ project, nodeId }: { project: string; nodeId: string }) =>
-      createToken(adminKey, project, nodeId),
+    mutationFn: (input: { nodeId: string; name: string; vertical: string; owner: string }) =>
+      createToken(adminKey, input),
     onSuccess: (res) => {
-      setCreateResult({
-        type: "success",
-        message: `Token created for ${res.nodeId}`,
-        token: res.token,
-        nodeId: res.nodeId,
-      });
+      setLastCreated(res);
       qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
     },
-    onError: (err: Error) => {
-      setCreateResult({ type: "error", message: err.message });
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (secret: string) => revokeToken(adminKey, secret),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
     },
   });
 
   const removeNodeMutation = useMutation({
-    mutationFn: ({ projectId, nodeId }: { projectId: string; nodeId: string }) =>
-      removeNode(adminKey, projectId, nodeId),
+    mutationFn: ({ projectName, nodeId }: { projectName: string; nodeId: string }) =>
+      removeNode(adminKey, projectName, nodeId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
-    },
-    onError: (err: Error) => {
-      setCreateResult({ type: "error", message: err.message });
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
     },
   });
 
-  const removeProjectMutation = useMutation({
-    mutationFn: (projectId: string) => removeProject(adminKey, projectId),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
-      await onProjectChange?.();
-    },
-    onError: (err: Error) => {
-      setCreateResult({ type: "error", message: err.message });
+  const assignProjectMutation = useMutation({
+    mutationFn: ({ tokenId, project }: { tokenId: string; project: string }) =>
+      assignToken(adminKey, tokenId, project),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
     },
   });
 
-  const create = async (project: string, nodeId: string) => {
-    if (!adminKey) return;
-    createMutation.mutate({ project, nodeId });
-  };
-
-  const removeNodeFn = async (projectId: string, nodeId: string) => {
-    if (!adminKey) return;
-    removeNodeMutation.mutate({ projectId, nodeId });
-  };
-
-  const removeProjectFn = async (projectId: string) => {
-    if (!adminKey) return;
-    removeProjectMutation.mutate(projectId);
-  };
+  const unassignProjectMutation = useMutation({
+    mutationFn: ({ tokenId, project }: { tokenId: string; project: string }) =>
+      unassignToken(adminKey, tokenId, project),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
+      qc.invalidateQueries({ queryKey: keys.projects(adminKey) });
+    },
+  });
 
   return {
     tokens,
     loading,
-    createResult,
-    create,
-    removeNode: removeNodeFn,
-    removeProject: removeProjectFn,
+    lastCreated,
+    clearLastCreated: () => setLastCreated(null),
+    create: createMutation.mutateAsync,
+    revokeToken: revokeMutation.mutateAsync,
+    removeNode: removeNodeMutation.mutateAsync,
+    assignProject: assignProjectMutation.mutateAsync,
+    unassignProject: unassignProjectMutation.mutateAsync,
+    createPending: createMutation.isPending,
   } as const;
 }
 
@@ -205,12 +190,12 @@ export function useNodes(adminKey: string) {
     },
   });
 
-  const disconnect = async (projectId: string, nodeId: string) => {
-    if (!adminKey) return;
-    disconnectMutation.mutate({ projectId, nodeId });
+  const disconnect = (projectId: string, nodeId: string) => {
+    if (!adminKey) return Promise.resolve();
+    return disconnectMutation.mutateAsync({ projectId, nodeId });
   };
 
-  return { nodes, disconnect };
+  return { data: nodes, disconnect };
 }
 
 // ─── useLogs ─────────────────────────────────────────────────────────────────
@@ -223,5 +208,5 @@ export function useLogs(adminKey: string) {
     refetchInterval: 3000,
   });
 
-  return { logs };
+  return { data: logs };
 }
