@@ -367,13 +367,13 @@ export function buildToolHandlers(
 
           if (wsClient?.connected) {
             if (args.targetNode) {
-              wsClient.sendMessage(args.targetNode, {
+              wsClient.sendMessage(args.targetNode, config.node.projects[0] ?? "", {
                 type: "query_ask",
                 question,
                 askerId: config.node.id,
               });
             } else {
-              wsClient.broadcast({
+              wsClient.broadcast(config.node.projects[0] ?? "", {
                 type: "query_ask",
                 question,
                 askerId: config.node.id,
@@ -392,7 +392,7 @@ export function buildToolHandlers(
           if (!wsClient?.connected) {
             return text(JSON.stringify({ error: "Not connected to server" }));
           }
-          wsClient.sendMessage(args.targetNode ?? "", {
+          wsClient.sendMessage(args.targetNode ?? "", config.node.projects[0] ?? "", {
             type: "query_respond",
             answer: args.message ?? "",
             responderId: config.node.id,
@@ -408,7 +408,7 @@ export function buildToolHandlers(
           engine.submitProposal(cr.id);
           engine.openVoting(cr.id);
           if (wsClient?.connected) {
-            wsClient.broadcast({
+            wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "proposal_create",
               crId: cr.id,
               targetItemId: args.targetItemId ?? "",
@@ -423,7 +423,7 @@ export function buildToolHandlers(
           const nodeInfo = engine.getNode(config.node.id);
           const vote = engine.castVote(args.crId ?? "", config.node.id, nodeInfo.vertical, args.approve === "true" || args.approve === true, args.reason ?? "");
           if (wsClient?.connected) {
-            wsClient.broadcast({
+            wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "proposal_vote",
               crId: args.crId ?? "",
               approve: vote.approve,
@@ -438,7 +438,7 @@ export function buildToolHandlers(
           engine.submitProposal(cr.id);
           engine.openVoting(cr.id);
           if (wsClient?.connected) {
-            wsClient.broadcast({
+            wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "challenge_create",
               challengeId: cr.id,
               targetItemId: args.targetItemId ?? "",
@@ -453,7 +453,7 @@ export function buildToolHandlers(
           const nodeInfo = engine.getNode(config.node.id);
           const vote = engine.castVote(args.challengeId ?? "", config.node.id, nodeInfo.vertical, args.approve === "true" || args.approve === true, args.reason ?? "");
           if (wsClient?.connected) {
-            wsClient.broadcast({
+            wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "proposal_vote",
               crId: args.challengeId ?? "",
               approve: vote.approve,
@@ -464,9 +464,9 @@ export function buildToolHandlers(
         }
 
         case "inv_pair_invite": {
-          const session = engine.invitePair(config.node.id, args.targetNode ?? "", config.node.project);
+          const session = engine.invitePair(config.node.id, args.targetNode ?? "", config.node.projects[0] ?? "");
           if (wsClient?.connected) {
-            wsClient.sendMessage(args.targetNode ?? "", {
+            wsClient.sendMessage(args.targetNode ?? "", config.node.projects[0] ?? "", {
               type: "pair_invite",
               sessionId: session.id,
               initiatorNode: config.node.id,
@@ -478,7 +478,7 @@ export function buildToolHandlers(
         case "inv_pair_join": {
           const session = engine.joinPair(args.sessionId ?? "");
           if (wsClient?.connected) {
-            wsClient.sendMessage(session.initiatorNode, {
+            wsClient.sendMessage(session.initiatorNode, config.node.projects[0] ?? "", {
               type: "pair_respond",
               sessionId: session.id,
               accepted: true,
@@ -491,7 +491,7 @@ export function buildToolHandlers(
           const session = engine.endPair(args.sessionId ?? "");
           if (wsClient?.connected) {
             const partner = session.initiatorNode === config.node.id ? session.partnerNode : session.initiatorNode;
-            wsClient.sendMessage(partner, {
+            wsClient.sendMessage(partner, config.node.projects[0] ?? "", {
               type: "pair_end",
               sessionId: session.id,
             });
@@ -528,7 +528,6 @@ export function buildToolHandlers(
           if (!config.server.url || !config.server.token) {
             return text(JSON.stringify({ error: "Not configured for network" }));
           }
-          // Convert ws(s)://host/ws to http(s)://host/api/online
           const httpUrl = config.server.url
             .replace(/^ws/, "http")
             .replace(/\/ws$/, "/api/online");
@@ -537,12 +536,26 @@ export function buildToolHandlers(
             const err = await res.json() as { error?: string };
             return text(JSON.stringify({ error: err.error ?? `HTTP ${res.status}` }));
           }
-          const data = await res.json() as { nodes: string[]; project: string };
-          return text(JSON.stringify({
-            project: data.project,
-            onlineNodes: data.nodes,
-            count: data.nodes.length,
-          }, null, 2));
+          const data = await res.json() as {
+            projects: { name: string; nodes: { nodeId: string; name: string; vertical: string }[] }[];
+          };
+          const lines: string[] = ["Online Nodes", ""];
+          let totalNodes = 0;
+          for (const proj of data.projects) {
+            lines.push(`── ${proj.name} ──`);
+            if (proj.nodes.length === 0) {
+              lines.push("  (no other nodes online)");
+            } else {
+              for (const node of proj.nodes) {
+                const vLabel = node.vertical ? ` (${node.vertical})` : "";
+                lines.push(`  ${node.nodeId}${vLabel} — online`);
+                totalNodes++;
+              }
+            }
+            lines.push("");
+          }
+          lines.push(`Total: ${totalNodes} node${totalNodes !== 1 ? "s" : ""} online across ${data.projects.length} project${data.projects.length !== 1 ? "s" : ""}`);
+          return text(lines.join("\n"));
         }
 
         default:
@@ -577,7 +590,7 @@ export async function startChannelServer(configPath: string): Promise<void> {
     const node = engine.registerNode(
       config.node.name || "unnamed-node",
       config.node.vertical,
-      config.node.project || "default",
+      config.node.projects[0] || "default",
       config.node.owner || "local",
       config.node.isAI,
     );
@@ -601,7 +614,7 @@ export async function startChannelServer(configPath: string): Promise<void> {
       serverUrl: config.server.url,
       token: config.server.token,
       nodeId: config.node.id,
-      projectId: config.node.project,
+      projectIds: config.node.projects,
     });
 
     wsClient.onMessage((envelope) => {
@@ -610,7 +623,7 @@ export async function startChannelServer(configPath: string): Promise<void> {
 
     wsHandlers.setSendFn((toNode, payload) => {
       if (wsClient?.connected) {
-        wsClient.sendMessage(toNode, payload);
+        wsClient.sendMessage(toNode, config.node.projects[0] ?? "", payload);
       }
     });
 
@@ -632,7 +645,7 @@ export async function startChannelServer(configPath: string): Promise<void> {
         },
         tools: {},
       },
-      instructions: `You are connected to the inventory network as node "${config.node.name}" (${config.node.vertical}, project: ${config.node.project}, owner: ${config.node.owner}).
+      instructions: `You are connected to the inventory network as node "${config.node.name}" (${config.node.vertical}, projects: ${config.node.projects.join(", ")}, owner: ${config.node.owner}).
 
 Events from the inventory network arrive as <channel source="inventory"> tags. These include:
 - signal_change: an item changed state
