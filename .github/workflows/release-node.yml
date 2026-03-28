@@ -3,7 +3,6 @@ name: Release @inv/node
 on:
   push:
     branches: [main]
-    tags: ["@inv/node@*"]
   pull_request:
     branches: [main]
 
@@ -31,15 +30,17 @@ jobs:
           test -f packages/node/dist/cli.js || (echo "Build output missing" && exit 1)
           bun packages/node/dist/cli.js bogus 2>&1 | grep -q "Unknown command" || (echo "CLI routing broken" && exit 1)
 
-  publish:
+  release:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/@inv/node@')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: self-hosted
     permissions:
       contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -51,9 +52,21 @@ jobs:
       - name: Build @inv/node
         run: bun run build:node
 
-      - name: Extract version from tag
+      - name: Determine next version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#@inv/node@}" >> "$GITHUB_OUTPUT"
+        run: |
+          # Get latest @inv/node@ tag, default to 0.1.0 if none exists
+          LATEST_TAG=$(git tag -l '@inv/node@*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_VERSION="0.1.0"
+          else
+            CURRENT_VERSION="${LATEST_TAG#@inv/node@}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=@inv/node@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT_VERSION"
 
       - name: Set package version
         run: |
@@ -70,17 +83,16 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
           name: "@inv/node ${{ steps.version.outputs.version }}"
-          body: |
-            ## Install
-
-            ```bash
-            bunx @inv/node init
-            ```
-
-            See [README](https://github.com/tini-works/my-inventory#install) for setup instructions.
           generate_release_notes: true
