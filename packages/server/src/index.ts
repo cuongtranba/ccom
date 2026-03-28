@@ -106,6 +106,29 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json(hub.getMetrics());
       }
 
+      // ── Project management API (admin-key protected) ───────
+
+      if (url.pathname === "/api/project/create" && req.method === "POST") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const body = await req.json() as { project?: string };
+        if (!body.project) {
+          return Response.json({ error: "Missing project" }, { status: 400 });
+        }
+        const created = await auth.createProject(body.project);
+        if (!created) {
+          return Response.json({ error: `Project "${body.project}" already exists` }, { status: 409 });
+        }
+        return Response.json({ project: body.project, created: true });
+      }
+
+      if (url.pathname === "/api/project/list" && req.method === "GET") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const projects = await auth.listProjects();
+        return Response.json({ projects });
+      }
+
       // ── Token management API (admin-key protected) ───────────
 
       if (url.pathname === "/api/token/create" && req.method === "POST") {
@@ -114,6 +137,9 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         const body = await req.json() as { project?: string; nodeId?: string };
         if (!body.project || !body.nodeId) {
           return Response.json({ error: "Missing project or nodeId" }, { status: 400 });
+        }
+        if (!(await auth.projectExists(body.project))) {
+          return Response.json({ error: `Project "${body.project}" does not exist. Create it first.` }, { status: 400 });
         }
         if (await auth.nodeExists(body.project, body.nodeId)) {
           return Response.json({ error: `Node "${body.nodeId}" already exists in project "${body.project}"` }, { status: 409 });

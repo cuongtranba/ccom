@@ -53,6 +53,28 @@ export async function fetchMetrics(): Promise<Metrics> {
   return handleResponse<Metrics>(res);
 }
 
+export async function createProject(
+  adminKey: string,
+  project: string,
+): Promise<{ project: string; created: boolean }> {
+  const res = await fetch("/api/project/create", {
+    method: "POST",
+    headers: authHeaders(adminKey),
+    body: JSON.stringify({ project }),
+  });
+  return handleResponse(res);
+}
+
+export async function listProjects(
+  adminKey: string,
+): Promise<string[]> {
+  const res = await fetch("/api/project/list", {
+    headers: authHeaders(adminKey),
+  });
+  const data = await handleResponse<{ projects: string[] }>(res);
+  return data.projects;
+}
+
 export async function createToken(
   adminKey: string,
   project: string,

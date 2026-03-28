@@ -1,10 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useProjects } from "@/hooks/use-projects";
 import { useTokens } from "@/hooks/use-tokens";
 import { useNodes } from "@/hooks/use-nodes";
 import { useLogs } from "@/hooks/use-logs";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
+import { ProjectCreateForm } from "@/components/project-create-form";
 import { TokenCreateForm } from "@/components/token-create-form";
 import { TokenList } from "@/components/token-list";
 import { ConnectedNodes } from "@/components/connected-nodes";
@@ -14,13 +16,19 @@ export default function App() {
   const { adminKey, setAdminKey, isAuthed } = useAuth();
   const { metrics, changed } = useMetrics(true);
   const {
+    projects,
+    createResult: projectCreateResult,
+    create: createProject,
+    refresh: refreshProjects,
+  } = useProjects(adminKey);
+  const {
     tokens,
     loading,
     createResult,
     create,
     removeNode: removeNodeFn,
     removeProject: removeProjectFn,
-  } = useTokens(adminKey);
+  } = useTokens(adminKey, refreshProjects);
   const { nodes, disconnect } = useNodes(adminKey);
   const { logs } = useLogs(adminKey);
 
@@ -46,8 +54,15 @@ export default function App() {
 
       <MetricsStrip metrics={metrics} changed={changed} />
 
+      <ProjectCreateForm
+        disabled={!isAuthed}
+        onSubmit={createProject}
+        result={projectCreateResult}
+      />
+
       <TokenCreateForm
         disabled={!isAuthed}
+        projects={projects}
         onSubmit={create}
         result={createResult}
       />

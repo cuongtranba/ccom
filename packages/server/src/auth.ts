@@ -10,6 +10,22 @@ export interface TokenInfo {
 export class RedisAuth {
   constructor(private redis: Redis) {}
 
+  /** Creates a project. Returns false if it already exists. */
+  async createProject(projectId: string): Promise<boolean> {
+    const added = await this.redis.sadd("projects", projectId);
+    return added === 1;
+  }
+
+  /** Returns true if the project exists. */
+  async projectExists(projectId: string): Promise<boolean> {
+    return (await this.redis.sismember("projects", projectId)) === 1;
+  }
+
+  /** Lists all project names. */
+  async listProjects(): Promise<string[]> {
+    return this.redis.smembers("projects");
+  }
+
   /** Generates a UUID token, stores it in a Redis hash, and indexes it under the project. */
   async createToken(projectId: string, nodeId: string): Promise<string> {
     const token = randomUUID();
@@ -18,7 +34,6 @@ export class RedisAuth {
     const pipeline = this.redis.pipeline();
     pipeline.hset(`token:${token}`, { projectId, nodeId, createdAt });
     pipeline.sadd(`project_tokens:${projectId}`, token);
-    pipeline.sadd("projects", projectId);
     await pipeline.exec();
 
     return token;

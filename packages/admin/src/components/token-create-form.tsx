@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface TokenCreateFormProps {
   disabled: boolean;
+  projects: string[];
   onSubmit: (project: string, nodeId: string) => Promise<void>;
   result: {
     type: "success" | "error";
@@ -16,6 +17,7 @@ interface TokenCreateFormProps {
 
 export function TokenCreateForm({
   disabled,
+  projects,
   onSubmit,
   result,
 }: TokenCreateFormProps) {
@@ -26,11 +28,10 @@ export function TokenCreateForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!project.trim() || !nodeId.trim()) return;
+    if (!project || !nodeId.trim()) return;
     setSubmitting(true);
     setCopied(false);
-    await onSubmit(project.trim(), nodeId.trim());
-    setProject("");
+    await onSubmit(project, nodeId.trim());
     setNodeId("");
     setSubmitting(false);
   }
@@ -50,20 +51,26 @@ export function TokenCreateForm({
           <label className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
             Project
           </label>
-          <Input
-            placeholder="e.g. clinic-checkin"
+          <select
             value={project}
             onChange={(e) => setProject(e.target.value)}
-            disabled={disabled}
-            className="border-border bg-background"
-          />
+            disabled={disabled || projects.length === 0}
+            className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">Select a project</option>
+            {projects.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex-1">
           <label className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
             Node ID
           </label>
           <Input
-            placeholder="e.g. dev-node"
+            placeholder="e.g. dev"
             value={nodeId}
             onChange={(e) => setNodeId(e.target.value)}
             disabled={disabled}
@@ -72,7 +79,7 @@ export function TokenCreateForm({
         </div>
         <Button
           type="submit"
-          disabled={disabled || submitting}
+          disabled={disabled || submitting || !project}
           className="bg-primary text-primary-foreground hover:bg-spice-bright"
         >
           Create

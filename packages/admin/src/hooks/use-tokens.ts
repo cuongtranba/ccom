@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import {
   createToken,
   listAllTokens,
-  revokeToken,
   removeNode,
   removeProject,
   type TokenInfo,
@@ -15,7 +14,7 @@ interface CreateResult {
   nodeId?: string;
 }
 
-export function useTokens(adminKey: string) {
+export function useTokens(adminKey: string, onProjectChange?: () => Promise<void>) {
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
@@ -33,7 +32,6 @@ export function useTokens(adminKey: string) {
     }
   }, [adminKey]);
 
-  // Auto-load all tokens when authenticated
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -54,22 +52,6 @@ export function useTokens(adminKey: string) {
         setCreateResult({
           type: "error",
           message: err instanceof Error ? err.message : "Failed",
-        });
-      }
-    },
-    [adminKey, refresh],
-  );
-
-  const revoke = useCallback(
-    async (token: string) => {
-      if (!adminKey) return;
-      try {
-        await revokeToken(adminKey, token);
-        await refresh();
-      } catch (err) {
-        setCreateResult({
-          type: "error",
-          message: err instanceof Error ? err.message : "Revoke failed",
         });
       }
     },
@@ -98,6 +80,7 @@ export function useTokens(adminKey: string) {
       try {
         await removeProject(adminKey, projectId);
         await refresh();
+        await onProjectChange?.();
       } catch (err) {
         setCreateResult({
           type: "error",
@@ -105,7 +88,7 @@ export function useTokens(adminKey: string) {
         });
       }
     },
-    [adminKey, refresh],
+    [adminKey, refresh, onProjectChange],
   );
 
   return {
@@ -113,7 +96,6 @@ export function useTokens(adminKey: string) {
     loading,
     createResult,
     create,
-    revoke,
     removeNode: removeNodeFn,
     removeProject: removeProjectFn,
     clearResult: () => setCreateResult(null),
