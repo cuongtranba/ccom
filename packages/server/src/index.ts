@@ -258,12 +258,16 @@ export function startServer(options: { port: number; redisUrl: string }): void {
       if (url.pathname === "/api/token/revoke" && req.method === "POST") {
         const denied = requireAdmin(req);
         if (denied) return denied;
-        const body = await req.json() as { token?: string };
-        if (!body.token) {
-          return Response.json({ error: "Missing token" }, { status: 400 });
+        const body = await req.json() as { token?: string; nodeId?: string };
+        if (body.nodeId) {
+          await repos.tokens.revokeByNode(body.nodeId);
+          return Response.json({ revoked: true });
         }
-        await repos.tokens.revoke(body.token);
-        return Response.json({ revoked: true });
+        if (body.token) {
+          await repos.tokens.revoke(body.token);
+          return Response.json({ revoked: true });
+        }
+        return Response.json({ error: "Missing token or nodeId" }, { status: 400 });
       }
 
       if (url.pathname === "/api/nodes" && req.method === "GET") {

@@ -136,11 +136,11 @@ export async function listAllTokens(adminKey: string): Promise<TokenInfo[]> {
   return data.tokens;
 }
 
-export async function revokeToken(adminKey: string, secret: string): Promise<void> {
+export async function revokeTokenByNodeId(adminKey: string, nodeId: string): Promise<void> {
   const res = await fetch(`${BASE}/api/token/revoke`, {
     method: "POST",
     headers: authHeaders(adminKey),
-    body: JSON.stringify({ token: secret }),
+    body: JSON.stringify({ nodeId }),
   });
   await handleResponse(res);
 }

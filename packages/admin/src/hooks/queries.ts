@@ -6,7 +6,7 @@ import {
   createProject,
   listAllTokens,
   createToken,
-  revokeToken,
+  revokeTokenByNodeId,
   removeNode,
   removeProject,
   assignToken,
@@ -123,7 +123,7 @@ export function useTokens(adminKey: string) {
   });
 
   const revokeMutation = useMutation({
-    mutationFn: (secret: string) => revokeToken(adminKey, secret),
+    mutationFn: (nodeId: string) => revokeTokenByNodeId(adminKey, nodeId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.tokens(adminKey) });
       qc.invalidateQueries({ queryKey: keys.projects(adminKey) });

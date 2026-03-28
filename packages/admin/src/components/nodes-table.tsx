@@ -135,7 +135,7 @@ export function NodesTable({ adminKey }: NodesTableProps) {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => revokeToken(row.id)}
+                onClick={() => revokeToken(row.nodeId)}
               >
                 Delete
               </AlertDialogAction>
