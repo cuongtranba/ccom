@@ -1,11 +1,23 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useTokens } from "@/hooks/use-tokens";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
+import { TokenCreateForm } from "@/components/token-create-form";
+import { TokenList } from "@/components/token-list";
 
 export default function App() {
   const { adminKey, setAdminKey, isAuthed } = useAuth();
   const { metrics, changed } = useMetrics(true);
+  const {
+    tokens,
+    currentProject,
+    loading,
+    createResult,
+    loadTokens,
+    create,
+    revoke,
+  } = useTokens(adminKey);
 
   return (
     <div className="mx-auto max-w-[860px] px-[clamp(1rem,3vw,2rem)] py-[clamp(2rem,5vw,4rem)]">
@@ -28,6 +40,21 @@ export default function App() {
       />
 
       <MetricsStrip metrics={metrics} changed={changed} />
+
+      <TokenCreateForm
+        disabled={!isAuthed}
+        onSubmit={create}
+        result={createResult}
+      />
+
+      <TokenList
+        disabled={!isAuthed}
+        tokens={tokens}
+        currentProject={currentProject}
+        loading={loading}
+        onLoad={loadTokens}
+        onRevoke={revoke}
+      />
     </div>
   );
 }
