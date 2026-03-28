@@ -194,6 +194,9 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         try {
           const raw = typeof msg === "string" ? msg : new TextDecoder().decode(msg);
           const envelope = parseEnvelope(raw);
+          // Override with server-authenticated identity so routing is consistent
+          envelope.fromNode = ws.data.nodeId;
+          envelope.projectId = ws.data.projectId;
           await hub.route(envelope);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Unknown error";
