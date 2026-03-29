@@ -38,6 +38,8 @@
     broke: ['arrow-fix', 'proven', 'label-fix'],
   };
 
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function fireTransition(node: HTMLElement): void {
     const state = node.dataset.state!;
     const allNodes = document.querySelectorAll<HTMLElement>('.state-node');
@@ -53,6 +55,19 @@
     const [arrowId, targetState, labelId] = transitions[state];
     const arrow = document.getElementById(arrowId) as SVGPathElement | null;
     const label = document.getElementById(labelId) as SVGTextElement | null;
+
+    if (reducedMotion) {
+      // Apply all states immediately without animation
+      if (arrow) { arrow.classList.add('active'); arrow.style.markerEnd = 'url(#arrowhead-active)'; }
+      if (label) { label.classList.add('active'); }
+      document.querySelector<HTMLElement>(`[data-state="${targetState}"]`)?.classList.add('active');
+      setTimeout(() => {
+        allNodes.forEach(n => n.classList.remove('active'));
+        allArrows.forEach(a => { a.classList.remove('active'); a.style.markerEnd = 'url(#arrowhead)'; });
+        allLabels.forEach(l => l.classList.remove('active'));
+      }, 800);
+      return;
+    }
 
     setTimeout(() => {
       if (arrow) {
@@ -173,5 +188,49 @@
     border: 1.5px solid var(--broke);
     color: var(--broke);
     left: 42%; top: 80%;
+  }
+
+  @media (max-width: 640px) {
+    .state-machine {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      aspect-ratio: auto;
+      min-height: auto;
+      padding: 1rem 0;
+    }
+
+    #state-arrows {
+      display: none;
+    }
+
+    .state-node {
+      position: relative;
+      width: 100%;
+      max-width: 200px;
+      text-align: center;
+      padding: 0.85rem 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    [data-state="unverified"],
+    [data-state="proven"],
+    [data-state="suspect"],
+    [data-state="broke"] {
+      left: auto;
+      top: auto;
+      box-shadow: none;
+    }
+
+    .state-node:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -2rem;
+      width: 1px;
+      height: 2rem;
+      background: var(--trace-line);
+    }
   }
 </style>

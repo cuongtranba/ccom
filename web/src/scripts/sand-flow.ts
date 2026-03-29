@@ -123,7 +123,9 @@ function createGrain(w: number, h: number, cfg: LayerConfig): SandGrain {
 }
 
 function createLayers(w: number, h: number): SandLayer[] {
-  const totalCount = Math.min(Math.floor((w * h) / 4500), 600);
+  const isMobile = w < 768;
+  const maxParticles = isMobile ? 200 : 600;
+  const totalCount = Math.min(Math.floor((w * h) / 4500), maxParticles);
   return LAYER_CONFIGS.map(cfg => ({
     grains: Array.from({ length: Math.floor(totalCount * cfg.fraction) }, () => createGrain(w, h, cfg)),
     config: cfg,
