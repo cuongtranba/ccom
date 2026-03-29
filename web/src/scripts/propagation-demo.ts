@@ -31,21 +31,21 @@ if (propCanvas) {
   const cssVar = createCssVarReader();
 
   const demoNodes: DemoNode[] = [
-    { id: 'pm-us001', label: 'US-001', vertical: 'PM', x: 275, y: 60, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
-    { id: 'des-s001', label: 'S-001', vertical: 'Design', x: 120, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
-    { id: 'des-s002', label: 'S-002', vertical: 'Design', x: 430, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
-    { id: 'dev-api', label: 'API-001', vertical: 'Dev', x: 160, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
-    { id: 'dev-adr', label: 'ADR-001', vertical: 'Dev', x: 390, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
-    { id: 'qa-tc', label: 'TC-101', vertical: 'QA', x: 275, y: 510, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'cuong-us001', label: 'US-001', vertical: 'cuong-node', x: 275, y: 60, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'duke-s001', label: 'S-001', vertical: 'duke-node', x: 120, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'duke-s002', label: 'S-002', vertical: 'duke-node', x: 430, y: 220, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'phong-api', label: 'API-001', vertical: 'phong-node', x: 160, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'phong-adr', label: 'ADR-001', vertical: 'phong-node', x: 390, y: 400, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
+    { id: 'blue-tc', label: 'TC-101', vertical: 'blue-node', x: 275, y: 510, status: 'unverified', prevStatus: 'unverified', pulse: 0 },
   ];
 
   const demoTraces: DemoTrace[] = [
-    { from: 'des-s001', to: 'pm-us001' },
-    { from: 'des-s002', to: 'pm-us001' },
-    { from: 'dev-api', to: 'des-s001' },
-    { from: 'dev-api', to: 'pm-us001' },
-    { from: 'dev-adr', to: 'des-s002' },
-    { from: 'qa-tc', to: 'dev-api' },
+    { from: 'duke-s001', to: 'cuong-us001' },
+    { from: 'duke-s002', to: 'cuong-us001' },
+    { from: 'phong-api', to: 'duke-s001' },
+    { from: 'phong-api', to: 'cuong-us001' },
+    { from: 'phong-adr', to: 'duke-s002' },
+    { from: 'blue-tc', to: 'phong-api' },
   ];
 
   let activeSignals: ActiveSignal[] = [];
@@ -163,52 +163,52 @@ if (propCanvas) {
     if (action === 'reset') {
       demoNodes.forEach(n => { n.status = 'unverified'; n.prevStatus = 'unverified'; n.pulse = 0; });
       activeSignals = [];
-      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>\n<span class="out">ID        NAME              VERTICAL  OWNER\n0fb8353f  Dev Inventory     dev       cuong\nde061a81  PM Inventory      pm        duke\n5447c4b6  Design Inventory  design    may</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>\n<span class="out">ID        NAME              OWNER\n0fb8353f  cuong-node        cuong\nde061a81  phong-node        phong\n5447c4b6  duke-node         duke\na3b2c1d0  blue-node         blue</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
       return;
     }
 
     if (action === 'verify') {
       demoNodes.forEach(n => n.status = 'proven');
-      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 1 interview" --actor duke</span>\n<span class="out">Item 38ae34fd verified -> </span><span class="s-proven">proven</span>\n\n<span class="prompt">$</span> <span class="cmd">inv verify S-001 --evidence "Figma reviewed" --actor may</span>\n<span class="out">Item f5a14352 verified -> </span><span class="s-proven">proven</span>\n\n<span class="prompt">$</span> <span class="cmd">inv verify API-001 --evidence "Tests passing" --actor cuong</span>\n<span class="out">Item e8def515 verified -> </span><span class="s-proven">proven</span>\n\n<span class="out">All items </span><span class="s-proven">proven</span><span class="out"> across the network.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 1 interview" --actor cuong</span>\n<span class="out">Item 38ae34fd verified -> </span><span class="s-proven">proven</span>\n\n<span class="prompt">$</span> <span class="cmd">inv verify S-001 --evidence "Figma reviewed" --actor duke</span>\n<span class="out">Item f5a14352 verified -> </span><span class="s-proven">proven</span>\n\n<span class="prompt">$</span> <span class="cmd">inv verify API-001 --evidence "Tests passing" --actor phong</span>\n<span class="out">Item e8def515 verified -> </span><span class="s-proven">proven</span>\n\n<span class="out">All items </span><span class="s-proven">proven</span><span class="out"> across the network.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
       return;
     }
 
     if (action === 'change') {
-      getNode('pm-us001').status = 'proven';
-      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor duke</span>\n<span class="out">Item 38ae34fd verified -> </span><span class="s-proven">proven</span>\n<span class="out">Propagated signals through the network:</span>`;
+      getNode('cuong-us001').status = 'proven';
+      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor cuong</span>\n<span class="out">Item 38ae34fd verified -> </span><span class="s-proven">proven</span>\n<span class="out">Propagated signals through the network:</span>`;
 
       setTimeout(() => {
-        activeSignals.push(createSandSignal('pm-us001', 'des-s001', () => { getNode('des-s001').status = 'suspect'; }));
-        activeSignals.push(createSandSignal('pm-us001', 'des-s002', () => { getNode('des-s002').status = 'suspect'; }));
+        activeSignals.push(createSandSignal('cuong-us001', 'duke-s001', () => { getNode('duke-s001').status = 'suspect'; }));
+        activeSignals.push(createSandSignal('cuong-us001', 'duke-s002', () => { getNode('duke-s002').status = 'suspect'; }));
       }, 300);
 
       setTimeout(() => {
-        output.innerHTML += `\n<span class="out">  -> S-001 in Design is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> S-002 in Design is now </span><span class="s-suspect">suspect</span>`;
-        activeSignals.push(createSandSignal('des-s001', 'dev-api', () => { getNode('dev-api').status = 'suspect'; }));
-        activeSignals.push(createSandSignal('des-s002', 'dev-adr', () => { getNode('dev-adr').status = 'suspect'; }));
+        output.innerHTML += `\n<span class="out">  -> S-001 in duke-node is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> S-002 in duke-node is now </span><span class="s-suspect">suspect</span>`;
+        activeSignals.push(createSandSignal('duke-s001', 'phong-api', () => { getNode('phong-api').status = 'suspect'; }));
+        activeSignals.push(createSandSignal('duke-s002', 'phong-adr', () => { getNode('phong-adr').status = 'suspect'; }));
       }, 1500);
 
       setTimeout(() => {
-        output.innerHTML += `\n<span class="out">  -> API-001 in Dev is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> ADR-001 in Dev is now </span><span class="s-suspect">suspect</span>`;
-        activeSignals.push(createSandSignal('dev-api', 'qa-tc', () => { getNode('qa-tc').status = 'suspect'; }));
+        output.innerHTML += `\n<span class="out">  -> API-001 in phong-node is now </span><span class="s-suspect">suspect</span>\n<span class="out">  -> ADR-001 in phong-node is now </span><span class="s-suspect">suspect</span>`;
+        activeSignals.push(createSandSignal('phong-api', 'blue-tc', () => { getNode('blue-tc').status = 'suspect'; }));
       }, 2800);
 
       setTimeout(() => {
-        output.innerHTML += `\n<span class="out">  -> TC-101 in QA is now </span><span class="s-suspect">suspect</span>\n\n<span class="out">5 items across 3 nodes became </span><span class="s-suspect">suspect</span><span class="out"> from 1 change.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+        output.innerHTML += `\n<span class="out">  -> TC-101 in blue-node is now </span><span class="s-suspect">suspect</span>\n\n<span class="out">5 items across 3 nodes became </span><span class="s-suspect">suspect</span><span class="out"> from 1 change.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
       }, 4000);
       return;
     }
 
     if (action === 'reverify') {
-      getNode('des-s001').status = 'proven';
-      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify S-001 --evidence "Updated Figma for mobile" --actor may</span>\n<span class="out">Item re-verified -> </span><span class="s-proven">proven</span>`;
+      getNode('duke-s001').status = 'proven';
+      output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify S-001 --evidence "Updated Figma for mobile" --actor duke</span>\n<span class="out">Item re-verified -> </span><span class="s-proven">proven</span>`;
 
-      setTimeout(() => { getNode('des-s002').status = 'proven'; output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify S-002 --evidence "Mobile screen added" --actor may</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>`; }, 800);
-      setTimeout(() => { getNode('dev-api').status = 'proven'; output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify API-001 --evidence "Async endpoints tested" --actor cuong</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>`; }, 1600);
+      setTimeout(() => { getNode('duke-s002').status = 'proven'; output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify S-002 --evidence "Mobile screen added" --actor duke</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>`; }, 800);
+      setTimeout(() => { getNode('phong-api').status = 'proven'; output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify API-001 --evidence "Async endpoints tested" --actor phong</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>`; }, 1600);
       setTimeout(() => {
-        getNode('dev-adr').status = 'proven';
-        getNode('qa-tc').status = 'proven';
-        output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify ADR-001 --evidence "Updated for async" --actor cuong</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>\n<span class="prompt">$</span> <span class="cmd">inv verify TC-101 --evidence "New test suite passing" --actor qa-bot</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>\n\n<span class="out">All items re-verified. Network is fully </span><span class="s-proven">proven</span><span class="out">.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+        getNode('phong-adr').status = 'proven';
+        getNode('blue-tc').status = 'proven';
+        output.innerHTML += `\n<span class="prompt">$</span> <span class="cmd">inv verify ADR-001 --evidence "Updated for async" --actor phong</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>\n<span class="prompt">$</span> <span class="cmd">inv verify TC-101 --evidence "New test suite passing" --actor blue</span>\n<span class="out">Item verified -> </span><span class="s-proven">proven</span>\n\n<span class="out">All items re-verified. Network is fully </span><span class="s-proven">proven</span><span class="out">.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
       }, 2400);
     }
   }
