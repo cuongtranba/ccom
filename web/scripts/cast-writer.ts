@@ -3,7 +3,7 @@ import { RESET, BOLD, FG, NODE_COLOR } from './cast-colors';
 
 // ── Terminal dimensions ──
 export const TERM_COLS = 120;
-export const TERM_ROWS = 40;
+export const TERM_ROWS = 30;
 
 // ── Pane position in a grid ──
 export interface PaneConfig {

@@ -51,7 +51,7 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
   </section>
 
   <!-- AI ACCOUNTABILITY -->
-  <section class="section">
+  <section class="section section-wide">
     <SectionHeader
       label="03 — AI Accountability"
       title="Same protocol. Same proof. No shortcuts."
@@ -129,9 +129,9 @@ Writing ./.mcp.json... ✓</code></pre>
 
     <div class="thumper-seismic">
       <div class="seismic-line"></div>
-      <span class="thumper-button">
+      <button class="thumper-button" type="button">
         Join the waitlist
-      </span>
+      </button>
       <div class="seismic-line"></div>
     </div>
 
@@ -299,6 +299,7 @@ Writing ./.mcp.json... ✓</code></pre>
     color: var(--text-primary);
     text-decoration: none;
     background: transparent;
+    cursor: pointer;
     border: 1px solid oklch(0.40 0.08 65 / 0.6);
     position: relative;
     z-index: 1;
