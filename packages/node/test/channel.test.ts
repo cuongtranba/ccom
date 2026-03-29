@@ -130,6 +130,129 @@ describe("buildToolHandlers V2 tools", () => {
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.error).toBe("Not configured for network");
   });
+
+  test("inv_reply returns error when not connected to server", async () => {
+    const result = await handleTool("inv_reply", { answer: "My answer", targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBe("Not connected to server");
+  });
+
+  test("inv_reply returns error for empty answer", async () => {
+    const result = await handleTool("inv_reply", { answer: "", targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBeTruthy();
+  });
+
+  test("inv_reply returns error when answer param is missing", async () => {
+    const result = await handleTool("inv_reply", { targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBeTruthy();
+  });
+
+  test("inv_reply ignores old 'message' param (regression guard)", async () => {
+    const result = await handleTool("inv_reply", { message: "Should be ignored", targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    // Should error because 'answer' is empty/missing, not use 'message'
+    expect(parsed.error).toBeTruthy();
+  });
+
+  test("inv_reply schema uses 'answer' not 'message'", () => {
+    const replyTool = TOOL_DEFINITIONS.find((t) => t.name === "inv_reply")!;
+    const props = replyTool.inputSchema.properties as Record<string, unknown>;
+    expect(props.answer).toBeTruthy();
+    expect(props.message).toBeUndefined();
+    expect((replyTool.inputSchema.required as string[])).toContain("answer");
+  });
+
+  test("inv_reply handles very long answer", async () => {
+    const longAnswer = "x".repeat(10000);
+    const result = await handleTool("inv_reply", { answer: longAnswer, targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBe("Not connected to server");
+  });
+
+  test("inv_reply handles special characters in answer", async () => {
+    const specialAnswer = 'Items:\n1. **prd** — "Test PRD"\n2. <api-spec> & more';
+    const result = await handleTool("inv_reply", { answer: specialAnswer, targetNode: "some-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBe("Not connected to server");
+  });
+});
+
+describe("inv_reply with connected wsClient", () => {
+  let store: Store;
+  let engine: Engine;
+  let handleTool: ReturnType<typeof buildToolHandlers>;
+  let nodeId: string;
+  let sentMessages: Array<{ toNode: string; projectId: string; payload: unknown }>;
+
+  beforeEach(() => {
+    store = new Store(":memory:");
+    const sm = new StateMachine();
+    const propagator = new SignalPropagator(store, sm);
+    engine = new Engine(store, sm, propagator);
+
+    const node = engine.registerNode("test-node", "dev", "proj", "tester", false);
+    nodeId = node.id;
+
+    sentMessages = [];
+    const mockWsClient = {
+      connected: true,
+      sendMessage(toNode: string, projectId: string, payload: unknown) {
+        sentMessages.push({ toNode, projectId, payload });
+      },
+    };
+
+    const config: NodeConfig = {
+      node: { id: nodeId, name: "test-node", vertical: "dev", projects: ["proj"], owner: "tester", isAI: false },
+      server: { url: "", token: "" },
+      database: { path: ":memory:" },
+    };
+
+    handleTool = buildToolHandlers(engine, config, mockWsClient as any);
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  test("inv_reply sends answer via wsClient", async () => {
+    const result = await handleTool("inv_reply", { answer: "Here are my items", targetNode: "pm-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.sent).toBe(true);
+    expect(parsed.targetNode).toBe("pm-node");
+
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages[0].toNode).toBe("pm-node");
+    expect(sentMessages[0].projectId).toBe("proj");
+    const payload = sentMessages[0].payload as { type: string; answer: string; responderId: string };
+    expect(payload.type).toBe("query_respond");
+    expect(payload.answer).toBe("Here are my items");
+    expect(payload.responderId).toBe(nodeId);
+  });
+
+  test("inv_reply preserves markdown formatting in answer", async () => {
+    const markdownAnswer = "## Items\n1. **prd** — Test\n2. **epic** — Auth\n\nTotal: 2 items";
+    await handleTool("inv_reply", { answer: markdownAnswer, targetNode: "pm-node" });
+
+    const payload = sentMessages[0].payload as { answer: string };
+    expect(payload.answer).toBe(markdownAnswer);
+  });
+
+  test("inv_reply preserves unicode in answer", async () => {
+    const unicodeAnswer = "Items: café ☕ résumé 日本語";
+    await handleTool("inv_reply", { answer: unicodeAnswer, targetNode: "pm-node" });
+
+    const payload = sentMessages[0].payload as { answer: string };
+    expect(payload.answer).toBe(unicodeAnswer);
+  });
+
+  test("inv_reply rejects empty answer even when connected", async () => {
+    const result = await handleTool("inv_reply", { answer: "", targetNode: "pm-node" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.error).toBe("Answer cannot be empty");
+    expect(sentMessages).toHaveLength(0);
+  });
 });
 
 describe("auto-registration", () => {

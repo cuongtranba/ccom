@@ -125,14 +125,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "inv_reply",
     description:
-      "Send a reply message to a specific node through the inventory network.",
+      "Reply to a question from another node. Use this when you receive a query_ask event and want to send your answer back.",
     inputSchema: {
       type: "object",
       properties: {
-        message: { type: "string", description: "The reply message" },
-        targetNode: { type: "string", description: "Target node UUID" },
+        answer: { type: "string", description: "The answer to the question" },
+        targetNode: { type: "string", description: "Target node name or UUID" },
       },
-      required: ["message", "targetNode"],
+      required: ["answer", "targetNode"],
     },
   },
   {
@@ -392,9 +392,13 @@ export function buildToolHandlers(
           if (!wsClient?.connected) {
             return text(JSON.stringify({ error: "Not connected to server" }));
           }
+          const answer = args.answer ?? "";
+          if (!answer) {
+            return text(JSON.stringify({ error: "Answer cannot be empty" }));
+          }
           wsClient.sendMessage(args.targetNode ?? "", config.node.projects[0] ?? "", {
             type: "query_respond",
-            answer: args.message ?? "",
+            answer,
             responderId: config.node.id,
           });
           return text(JSON.stringify({

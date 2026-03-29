@@ -1,5 +1,8 @@
-import { describe, test, expect } from "bun:test";
-import { generateInvConfig, generateMcpConfig } from "../src/cli";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { writeFileSync, unlinkSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { generateInvConfig, generateMcpConfig, generateStatusLine, detectExistingFiles } from "../src/cli";
 
 describe("CLI config generation", () => {
   test("generateInvConfig creates valid config", () => {
@@ -47,6 +50,16 @@ describe("CLI config generation", () => {
     });
   });
 
+  test("generateStatusLine creates initial status text", () => {
+    const line = generateStatusLine("dev-node", "dev", "clinic-checkin");
+    expect(line).toBe("inv: dev-node (dev) · clinic-checkin · 0 online");
+  });
+
+  test("generateStatusLine handles missing project", () => {
+    const line = generateStatusLine("dev-node", "dev", "");
+    expect(line).toBe("inv: dev-node (dev) · no project · 0 online");
+  });
+
   test("generateInvConfig accepts any vertical string", () => {
     const config = generateInvConfig({
       name: "custom-node",
@@ -58,5 +71,58 @@ describe("CLI config generation", () => {
       dbPath: "./test.db",
     });
     expect(config.node.vertical).toBe("frontend");
+  });
+});
+
+describe("detectExistingFiles", () => {
+  const testDir = join(tmpdir(), `inv-cli-test-${Date.now()}`);
+  let origCwd: string;
+
+  beforeEach(() => {
+    const { mkdirSync } = require("fs");
+    mkdirSync(testDir, { recursive: true });
+    origCwd = process.cwd();
+    process.chdir(testDir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    const { rmSync } = require("fs");
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("returns empty array when no files exist", () => {
+    expect(detectExistingFiles()).toEqual([]);
+  });
+
+  test("detects inv-config.json", () => {
+    writeFileSync("./inv-config.json", "{}");
+    expect(detectExistingFiles()).toContain("./inv-config.json");
+  });
+
+  test("detects .mcp.json", () => {
+    writeFileSync("./.mcp.json", "{}");
+    expect(detectExistingFiles()).toContain("./.mcp.json");
+  });
+
+  test("detects database file with default path", () => {
+    writeFileSync("./inventory.db", "");
+    expect(detectExistingFiles()).toContain("./inventory.db");
+  });
+
+  test("detects database file with custom path", () => {
+    writeFileSync("./custom.db", "");
+    expect(detectExistingFiles("./custom.db")).toContain("./custom.db");
+  });
+
+  test("detects all files when all exist", () => {
+    writeFileSync("./inv-config.json", "{}");
+    writeFileSync("./.mcp.json", "{}");
+    writeFileSync("./inventory.db", "");
+    const found = detectExistingFiles();
+    expect(found).toHaveLength(3);
+    expect(found).toContain("./inv-config.json");
+    expect(found).toContain("./.mcp.json");
+    expect(found).toContain("./inventory.db");
   });
 });
