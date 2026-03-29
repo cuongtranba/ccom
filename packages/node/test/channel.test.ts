@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { writeFileSync, readFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -252,6 +252,209 @@ describe("inv_reply with connected wsClient", () => {
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.error).toBe("Answer cannot be empty");
     expect(sentMessages).toHaveLength(0);
+  });
+});
+
+describe("proposal voting flow with pending voters", () => {
+  let store: Store;
+  let engine: Engine;
+  let handleTool: ReturnType<typeof buildToolHandlers>;
+  let nodeId: string;
+  let broadcastMessages: Array<{ projectId: string; payload: unknown }>;
+  let originalFetch: typeof globalThis.fetch;
+
+  const onlineNodesResponse = {
+    projects: [{
+      name: "proj",
+      nodes: [
+        { nodeId: "pm-id", name: "pm", vertical: "pm" },
+        { nodeId: "qa-id", name: "qa", vertical: "qa" },
+        { nodeId: "ds-id", name: "ds", vertical: "ds" },
+      ],
+    }],
+  };
+
+  beforeEach(() => {
+    store = new Store(":memory:");
+    const sm = new StateMachine();
+    const propagator = new SignalPropagator(store, sm);
+    engine = new Engine(store, sm, propagator);
+
+    const node = engine.registerNode("dev-node", "dev", "proj", "dev-owner", false);
+    nodeId = node.id;
+
+    broadcastMessages = [];
+    const mockWsClient = {
+      connected: true,
+      sendMessage(_toNode: string, _projectId: string, _payload: unknown) {},
+      broadcast(projectId: string, payload: unknown) {
+        broadcastMessages.push({ projectId, payload });
+      },
+    };
+
+    const config: NodeConfig = {
+      node: { id: nodeId, name: "dev-node", vertical: "dev", projects: ["proj"], owner: "dev-owner", isAI: false },
+      server: { url: "ws://localhost:8080/ws", token: "test-token" },
+      database: { path: ":memory:" },
+    };
+
+    handleTool = buildToolHandlers(engine, config, mockWsClient as any);
+
+    // Mock fetch for /api/online
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((url: string) => {
+      if (url.includes("/api/online")) {
+        return Promise.resolve(new Response(JSON.stringify(onlineNodesResponse), { status: 200 }));
+      }
+      return Promise.resolve(new Response("Not Found", { status: 404 }));
+    }) as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    store.close();
+    globalThis.fetch = originalFetch;
+  });
+
+  test("proposal_create returns pendingVoters list", async () => {
+    const item = engine.addItem(nodeId, "epic", "User onboarding flow");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Remove epic" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.crId).toBeTruthy();
+    expect(parsed.status).toBe("voting");
+    expect(parsed.targetItemTitle).toBe("User onboarding flow");
+    expect(parsed.pendingVoters).toHaveLength(3);
+    expect(parsed.pendingVoters).toContainEqual({ name: "pm", vertical: "pm" });
+    expect(parsed.pendingVoters).toContainEqual({ name: "qa", vertical: "qa" });
+    expect(parsed.pendingVoters).toContainEqual({ name: "ds", vertical: "ds" });
+  });
+
+  test("proposal_create returns waitingMessage with all node names", async () => {
+    const item = engine.addItem(nodeId, "epic", "User onboarding flow");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Remove epic" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.waitingMessage).toContain("Waiting for 3 node(s) to vote:");
+    expect(parsed.waitingMessage).toContain("waiting for pm (pm)...");
+    expect(parsed.waitingMessage).toContain("waiting for qa (qa)...");
+    expect(parsed.waitingMessage).toContain("waiting for ds (ds)...");
+  });
+
+  test("proposal_create broadcast includes pendingVoters names", async () => {
+    const item = engine.addItem(nodeId, "epic", "User onboarding flow");
+    await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Remove epic" });
+
+    expect(broadcastMessages).toHaveLength(1);
+    const payload = broadcastMessages[0].payload as {
+      type: string; pendingVoters: string[]; targetItemTitle: string; proposerNodeName: string;
+    };
+    expect(payload.type).toBe("proposal_create");
+    expect(payload.pendingVoters).toEqual(["pm", "qa", "ds"]);
+    expect(payload.targetItemTitle).toBe("User onboarding flow");
+    expect(payload.proposerNodeName).toBe("dev-node");
+  });
+
+  test("proposal_create excludes the proposer node from pendingVoters", async () => {
+    // The mock returns pm, qa, ds — none have dev-node's id, so all 3 should be pending
+    const item = engine.addItem(nodeId, "prd", "Test PRD");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change scope" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    // dev-node (the proposer) should not be in pendingVoters
+    const voterNames = parsed.pendingVoters.map((v: { name: string }) => v.name);
+    expect(voterNames).not.toContain("dev-node");
+  });
+
+  test("proposal_vote broadcast includes voterNodeName", async () => {
+    const item = engine.addItem(nodeId, "epic", "User onboarding flow");
+    const createResult = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Remove epic" });
+    const crId = JSON.parse(createResult.content[0].text).crId;
+
+    broadcastMessages = [];
+    const voteResult = await handleTool("inv_proposal_vote", { crId, approve: true, reason: "Agreed" });
+    const voteParsed = JSON.parse(voteResult.content[0].text);
+
+    expect(voteParsed.voted).toBe(true);
+    expect(voteParsed.approve).toBe(true);
+    expect(broadcastMessages).toHaveLength(1);
+    const payload = broadcastMessages[0].payload as { type: string; voterNodeName: string };
+    expect(payload.type).toBe("proposal_vote");
+    expect(payload.voterNodeName).toBe("dev-node");
+  });
+
+  test("challenge_create returns pendingVoters list", async () => {
+    const item = engine.addItem(nodeId, "decision", "Architecture choice");
+    const result = await handleTool("inv_challenge_create", { targetItemId: item.id, reason: "Outdated decision" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.challengeId).toBeTruthy();
+    expect(parsed.status).toBe("voting");
+    expect(parsed.targetItemTitle).toBe("Architecture choice");
+    expect(parsed.pendingVoters).toHaveLength(3);
+    expect(parsed.waitingMessage).toContain("Waiting for 3 node(s) to vote:");
+  });
+
+  test("challenge_create broadcast includes pendingVoters and names", async () => {
+    const item = engine.addItem(nodeId, "decision", "Architecture choice");
+    await handleTool("inv_challenge_create", { targetItemId: item.id, reason: "Outdated" });
+
+    expect(broadcastMessages).toHaveLength(1);
+    const payload = broadcastMessages[0].payload as {
+      type: string; pendingVoters: string[]; targetItemTitle: string; challengerNodeName: string;
+    };
+    expect(payload.type).toBe("challenge_create");
+    expect(payload.pendingVoters).toEqual(["pm", "qa", "ds"]);
+    expect(payload.targetItemTitle).toBe("Architecture choice");
+    expect(payload.challengerNodeName).toBe("dev-node");
+  });
+
+  test("proposal with no other online nodes shows empty voter message", async () => {
+    // Override fetch to return only the proposer node (which gets excluded)
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(JSON.stringify({
+        projects: [{ name: "proj", nodes: [{ nodeId: nodeId, name: "dev-node", vertical: "dev" }] }],
+      }), { status: 200 })),
+    ) as typeof globalThis.fetch;
+
+    const item = engine.addItem(nodeId, "prd", "Solo PRD");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.pendingVoters).toHaveLength(0);
+    expect(parsed.waitingMessage).toBe("No other nodes online to vote.");
+  });
+
+  test("proposal with fetch failure still creates proposal with empty voters", async () => {
+    globalThis.fetch = mock(() => Promise.reject(new Error("Network error"))) as typeof globalThis.fetch;
+
+    const item = engine.addItem(nodeId, "prd", "Offline PRD");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.crId).toBeTruthy();
+    expect(parsed.status).toBe("voting");
+    expect(parsed.pendingVoters).toHaveLength(0);
+    expect(parsed.waitingMessage).toBe("No other nodes online to vote.");
+  });
+
+  test("pendingVoters deduplicates nodes across multiple projects", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(JSON.stringify({
+        projects: [
+          { name: "proj-a", nodes: [{ nodeId: "pm-id", name: "pm", vertical: "pm" }] },
+          { name: "proj-b", nodes: [{ nodeId: "pm-id", name: "pm", vertical: "pm" }, { nodeId: "qa-id", name: "qa", vertical: "qa" }] },
+        ],
+      }), { status: 200 })),
+    ) as typeof globalThis.fetch;
+
+    const item = engine.addItem(nodeId, "prd", "Multi-project PRD");
+    const result = await handleTool("inv_proposal_create", { targetItemId: item.id, description: "Change" });
+    const parsed = JSON.parse(result.content[0].text);
+
+    // pm appears in both projects but should only be listed once
+    expect(parsed.pendingVoters).toHaveLength(2);
+    expect(parsed.pendingVoters).toContainEqual({ name: "pm", vertical: "pm" });
+    expect(parsed.pendingVoters).toContainEqual({ name: "qa", vertical: "qa" });
   });
 });
 
