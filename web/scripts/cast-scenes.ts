@@ -65,7 +65,7 @@ export function networkSetupScene(): { panes: Pane[]; actions: SceneAction[] } {
     { kind: 'pause', duration: 1.0 },
 
     // Each node creates their signature item
-    { kind: 'type', pane: dev, text: 'inv_add_item kind:tech-design title:"Auth Flow with OAuth2 + JWT"', charDelay: 35 },
+    { kind: 'type', pane: dev, text: 'inv_add_item tech-design "Auth Flow OAuth2+JWT"', charDelay: 35 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: dev, lines: [
       toolCall('inv_add_item'),
@@ -74,7 +74,7 @@ export function networkSetupScene(): { panes: Pane[]; actions: SceneAction[] } {
     ]},
 
     { kind: 'pause', duration: 0.3 },
-    { kind: 'type', pane: pm, text: 'inv_add_item kind:prd title:"PVS Core v2.0 Requirements"', charDelay: 35 },
+    { kind: 'type', pane: pm, text: 'inv_add_item prd "PVS Core v2.0 Requirements"', charDelay: 35 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: pm, lines: [
       toolCall('inv_add_item'),
@@ -83,7 +83,7 @@ export function networkSetupScene(): { panes: Pane[]; actions: SceneAction[] } {
     ]},
 
     { kind: 'pause', duration: 0.3 },
-    { kind: 'type', pane: qa, text: 'inv_add_item kind:test-plan title:"Auth Integration Test Plan"', charDelay: 35 },
+    { kind: 'type', pane: qa, text: 'inv_add_item test-plan "Auth Test Plan"', charDelay: 35 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: qa, lines: [
       toolCall('inv_add_item'),
@@ -92,7 +92,7 @@ export function networkSetupScene(): { panes: Pane[]; actions: SceneAction[] } {
     ]},
 
     { kind: 'pause', duration: 0.3 },
-    { kind: 'type', pane: designer, text: 'inv_add_item kind:tech-design title:"UI Authentication Module"', charDelay: 35 },
+    { kind: 'type', pane: designer, text: 'inv_add_item tech-design "UI Auth Module"', charDelay: 35 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: designer, lines: [
       toolCall('inv_add_item'),
@@ -210,7 +210,7 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
 
   const actions: SceneAction[] = [
     // PM creates proposal
-    { kind: 'type', pane: pm, text: 'inv_proposal_create item:034e51df description:"Redesign UI Auth: JWT + OAuth2 + MFA + RBAC"', charDelay: 30 },
+    { kind: 'type', pane: pm, text: 'inv_proposal_create 034e51df "UI Auth: JWT+OAuth2+MFA"', charDelay: 30 },
     { kind: 'pause', duration: 0.6 },
     { kind: 'output', pane: pm, lines: [
       toolCall('inv_proposal_create'),
@@ -244,7 +244,7 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
 
     // Dev votes
     { kind: 'pause', duration: 1.0 },
-    { kind: 'type', pane: dev, text: `inv_proposal_vote proposal:${crId} vote:approve reason:"Aligns with our OAuth2 design"`, charDelay: 30 },
+    { kind: 'type', pane: dev, text: `inv_proposal_vote ${crId} approve`, charDelay: 30 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: dev, lines: [
       toolCall('inv_proposal_vote'),
@@ -253,7 +253,7 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
 
     // QA votes
     { kind: 'pause', duration: 0.8 },
-    { kind: 'type', pane: qa, text: `inv_proposal_vote proposal:${crId} vote:approve reason:"Improves auth testability"`, charDelay: 30 },
+    { kind: 'type', pane: qa, text: `inv_proposal_vote ${crId} approve`, charDelay: 30 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: qa, lines: [
       toolCall('inv_proposal_vote'),
@@ -262,7 +262,7 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
 
     // Designer votes
     { kind: 'pause', duration: 0.8 },
-    { kind: 'type', pane: designer, text: `inv_proposal_vote proposal:${crId} vote:approve reason:"Unified auth simplifies UI"`, charDelay: 30 },
+    { kind: 'type', pane: designer, text: `inv_proposal_vote ${crId} approve`, charDelay: 30 },
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: designer, lines: [
       toolCall('inv_proposal_vote'),
