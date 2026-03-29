@@ -4,38 +4,38 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
 
 <div class="claude-demo">
   <div class="cast-tabs">
-    <button class="cast-tab active" data-cast="session">MCP session</button>
+    <button class="cast-tab active" data-cast="setup">network setup</button>
+    <button class="cast-tab" data-cast="query">cross-node query</button>
     <button class="cast-tab" data-cast="vote">proposal & vote</button>
-    <button class="cast-tab" data-cast="challenge">challenge</button>
   </div>
 
   <div class="cast-panels">
-    <div class="cast-panel active" data-panel="session">
+    <div class="cast-panel active" data-panel="setup">
       <AsciinemaPlayer
-        src="/casts/mcp-session.cast"
-        title="dev node — register, list items, add trace, audit"
-        rows={20}
-        cols={92}
+        src="/casts/network-setup.cast"
+        title="dev, pm, qa, designer — 4 nodes come online, create items"
+        rows={40}
+        cols={120}
+        speed={1}
+        idleTimeLimit={3}
+      />
+    </div>
+    <div class="cast-panel" data-panel="query">
+      <AsciinemaPlayer
+        src="/casts/cross-node-query.cast"
+        title="pm queries dev's inventory — qa asks about epic status"
+        rows={40}
+        cols={120}
         speed={1}
         idleTimeLimit={3}
       />
     </div>
     <div class="cast-panel" data-panel="vote">
       <AsciinemaPlayer
-        src="/casts/governance-vote.cast"
-        title="dev proposes change — PM approves, QA rejects, tally shown"
-        rows={22}
-        cols={92}
-        speed={1}
-        idleTimeLimit={3}
-      />
-    </div>
-    <div class="cast-panel" data-panel="challenge">
-      <AsciinemaPlayer
-        src="/casts/challenge.cast"
-        title="QA challenges Dev's API spec — Dev resolves with evidence"
-        rows={20}
-        cols={92}
+        src="/casts/proposal-vote.cast"
+        title="pm proposes UI auth redesign — dev, qa, designer vote to approve"
+        rows={40}
+        cols={120}
         speed={1}
         idleTimeLimit={3}
       />
@@ -120,12 +120,30 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
 
   @media (max-width: 640px) {
     .cast-tabs {
-      flex-wrap: wrap;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
     }
 
     .cast-tab {
       font-size: 0.7rem;
       padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+    }
+
+    .cast-tab.active {
+      border-color: var(--signal-pulse);
+    }
+
+    .cast-panels {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .cast-panel.active {
+      min-width: 580px;
     }
   }
 </style>
