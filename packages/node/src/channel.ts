@@ -411,6 +411,8 @@ export function buildToolHandlers(
           const cr = engine.createProposal(config.node.id, config.node.owner, args.targetItemId ?? "", args.description ?? "");
           engine.submitProposal(cr.id);
           engine.openVoting(cr.id);
+          let targetItemTitle = "";
+          try { targetItemTitle = engine.getItem(args.targetItemId ?? "").title; } catch { /* remote item */ }
           if (wsClient?.connected) {
             wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "proposal_create",
@@ -418,9 +420,11 @@ export function buildToolHandlers(
               targetItemId: args.targetItemId ?? "",
               description: args.description ?? "",
               proposerNode: config.node.id,
+              targetItemTitle,
+              proposerNodeName: config.node.name,
             });
           }
-          return text(JSON.stringify({ crId: cr.id, status: "voting" }, null, 2));
+          return text(JSON.stringify({ crId: cr.id, status: "voting", targetItemTitle }, null, 2));
         }
 
         case "inv_proposal_vote": {
@@ -432,6 +436,7 @@ export function buildToolHandlers(
               crId: args.crId ?? "",
               approve: vote.approve,
               reason: args.reason ?? "",
+              voterNodeName: config.node.name,
             });
           }
           return text(JSON.stringify({ voted: true, crId: args.crId, approve: vote.approve }, null, 2));
@@ -441,6 +446,8 @@ export function buildToolHandlers(
           const cr = engine.createChallenge(config.node.id, config.node.owner, args.targetItemId ?? "", args.reason ?? "");
           engine.submitProposal(cr.id);
           engine.openVoting(cr.id);
+          let challengeItemTitle = "";
+          try { challengeItemTitle = engine.getItem(args.targetItemId ?? "").title; } catch { /* remote item */ }
           if (wsClient?.connected) {
             wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "challenge_create",
@@ -448,9 +455,11 @@ export function buildToolHandlers(
               targetItemId: args.targetItemId ?? "",
               reason: args.reason ?? "",
               challengerNode: config.node.id,
+              targetItemTitle: challengeItemTitle,
+              challengerNodeName: config.node.name,
             });
           }
-          return text(JSON.stringify({ challengeId: cr.id, status: "voting" }, null, 2));
+          return text(JSON.stringify({ challengeId: cr.id, status: "voting", targetItemTitle: challengeItemTitle }, null, 2));
         }
 
         case "inv_challenge_respond": {
@@ -462,6 +471,7 @@ export function buildToolHandlers(
               crId: args.challengeId ?? "",
               approve: vote.approve,
               reason: args.reason ?? "",
+              voterNodeName: config.node.name,
             });
           }
           return text(JSON.stringify({ voted: true, challengeId: args.challengeId, approve: vote.approve }, null, 2));
@@ -728,13 +738,43 @@ Use the inv_* tools to manage inventory, propose changes, vote, challenge items,
     "error",
   ] as const;
 
+  // Enrich event data with human-readable names for UUIDs where possible
+  function enrichEvent(eventType: string, data: Record<string, unknown>): Record<string, unknown> {
+    const enriched = { ...data };
+    // Resolve item titles
+    if (enriched.itemId && !enriched.itemTitle) {
+      try { enriched.itemTitle = engine.getItem(enriched.itemId as string).title; } catch { /* remote item */ }
+    }
+    if (enriched.targetItemId && !enriched.targetItemTitle) {
+      try { enriched.targetItemTitle = engine.getItem(enriched.targetItemId as string).title; } catch { /* remote item */ }
+    }
+    // Resolve node names
+    if (enriched.fromNode && !enriched.fromNodeName) {
+      try { enriched.fromNodeName = engine.getNode(enriched.fromNode as string).name; } catch { /* unknown node */ }
+    }
+    if (enriched.proposerNode && !enriched.proposerNodeName) {
+      try { enriched.proposerNodeName = engine.getNode(enriched.proposerNode as string).name; } catch { /* unknown node */ }
+    }
+    if (enriched.challengerNode && !enriched.challengerNodeName) {
+      try { enriched.challengerNodeName = engine.getNode(enriched.challengerNode as string).name; } catch { /* unknown node */ }
+    }
+    if (enriched.responderId && !enriched.responderName) {
+      try { enriched.responderName = engine.getNode(enriched.responderId as string).name; } catch { /* unknown node */ }
+    }
+    if (enriched.askerId && !enriched.askerName) {
+      try { enriched.askerName = engine.getNode(enriched.askerId as string).name; } catch { /* unknown node */ }
+    }
+    return enriched;
+  }
+
   const log = new Logger("channel-bridge");
   for (const eventType of channelEvents) {
     eventBus.on(eventType, (data) => {
+      const enriched = enrichEvent(eventType, data as Record<string, unknown>);
       mcp.notification({
         method: "notifications/claude/channel",
         params: {
-          content: JSON.stringify(data),
+          content: JSON.stringify(enriched),
           meta: { source: "inventory", eventType },
         },
       } as Parameters<typeof mcp.notification>[0]).catch((err) => {

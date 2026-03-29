@@ -11,7 +11,7 @@ export interface Envelope {
 }
 
 export type MessagePayload =
-  | { type: "signal_change"; itemId: string; oldState: string; newState: string }
+  | { type: "signal_change"; itemId: string; oldState: string; newState: string; itemTitle?: string }
   | { type: "sweep"; externalRef: string; newValue: string }
   | { type: "trace_resolve_request"; itemId: string }
   | { type: "trace_resolve_response"; itemId: string; title: string; kind: string; state: string }
@@ -20,10 +20,10 @@ export type MessagePayload =
   | { type: "ack"; originalMessageId: string }
   | ({ type: "permission_request"; requestId: string } & ToolArgs)
   | { type: "permission_verdict"; requestId: string; allowed: boolean; reason?: string }
-  | { type: "proposal_create"; crId: string; targetItemId: string; description: string; proposerNode: string }
-  | { type: "proposal_vote"; crId: string; approve: boolean; reason: string }
+  | { type: "proposal_create"; crId: string; targetItemId: string; description: string; proposerNode: string; targetItemTitle?: string; proposerNodeName?: string }
+  | { type: "proposal_vote"; crId: string; approve: boolean; reason: string; voterNodeName?: string }
   | { type: "proposal_result"; crId: string; approved: boolean; tally: { approved: number; rejected: number; total: number } }
-  | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string }
+  | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string; targetItemTitle?: string; challengerNodeName?: string }
   | { type: "pair_invite"; sessionId: string; initiatorNode: string }
   | { type: "pair_respond"; sessionId: string; accepted: boolean }
   | { type: "pair_end"; sessionId: string }
