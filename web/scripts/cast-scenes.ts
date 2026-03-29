@@ -7,11 +7,11 @@ const PROJECT = 'pvs-core';
 
 // ── Helper to build common output patterns ──
 function toolCall(tool: string): string {
-  return `${FG.secondary}⏵ Calling${RESET} ${FG.pulse}${tool}${RESET}`;
+  return `${FG.secondary}> Calling${RESET} ${FG.pulse}${tool}${RESET}`;
 }
 
 function success(msg: string): string {
-  return `${FG.proven}✓${RESET} ${msg}`;
+  return `${FG.proven}ok${RESET} ${msg}`;
 }
 
 function notification(icon: string, msg: string): string {
@@ -125,7 +125,7 @@ export function crossNodeQueryScene(): { panes: Pane[]; actions: SceneAction[] }
     // Dev receives notification
     { kind: 'pause', duration: 0.6 },
     { kind: 'output', pane: dev, lines: [
-      notification('📨', 'Query from pm@pvs-core:'),
+      notification('<<', 'Query from pm@pvs-core:'),
       `  ${FG.secondary}"List your inventory items"${RESET}`,
     ]},
 
@@ -141,7 +141,7 @@ export function crossNodeQueryScene(): { panes: Pane[]; actions: SceneAction[] }
     // PM receives reply
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: pm, lines: [
-      notification('📩', 'Reply from dev@pvs-core:'),
+      notification('>>', 'Reply from dev@pvs-core:'),
       '',
       tableHeader('  KIND          TITLE'),
       `  tech-design   Auth Flow OAuth2 + JWT`,
@@ -164,7 +164,7 @@ export function crossNodeQueryScene(): { panes: Pane[]; actions: SceneAction[] }
     { kind: 'pause', duration: 0.6 },
     { kind: 'output', pane: dev, lines: [
       '',
-      notification('📨', 'Query from qa@pvs-core:'),
+      notification('<<', 'Query from qa@pvs-core:'),
       `  ${FG.secondary}"Status of User Onboarding epic?"${RESET}`,
     ]},
 
@@ -180,7 +180,7 @@ export function crossNodeQueryScene(): { panes: Pane[]; actions: SceneAction[] }
     // QA receives
     { kind: 'pause', duration: 0.5 },
     { kind: 'output', pane: qa, lines: [
-      notification('📩', 'Reply from dev@pvs-core:'),
+      notification('>>', 'Reply from dev@pvs-core:'),
       `  ${FG.muted}state:${RESET} unverified`,
       `  ${FG.muted}tests:${RESET} none linked`,
     ]},
@@ -189,8 +189,8 @@ export function crossNodeQueryScene(): { panes: Pane[]; actions: SceneAction[] }
     { kind: 'output', pane: designer, lines: [
       `${FG.muted}listening to network events...${RESET}`,
       '',
-      notification('📡', 'pm queried dev'),
-      notification('📡', 'qa queried dev'),
+      notification('--', 'pm queried dev'),
+      notification('--', 'qa queried dev'),
     ]},
 
     { kind: 'pause', duration: 1.5 },
@@ -222,21 +222,21 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
     // All other nodes receive notification
     { kind: 'pause', duration: 0.8 },
     { kind: 'output', pane: dev, lines: [
-      notification('📋', 'New proposal from pm@pvs-core'),
+      notification('!!', 'New proposal from pm@pvs-core'),
       `  ${FG.secondary}"Redesign UI Auth: JWT +${RESET}`,
       `  ${FG.secondary} OAuth2 + MFA + RBAC"${RESET}`,
       `  ${FG.muted}CR: ${crId}${RESET}`,
     ]},
     { kind: 'pause', duration: 0.3 },
     { kind: 'output', pane: qa, lines: [
-      notification('📋', 'New proposal from pm@pvs-core'),
+      notification('!!', 'New proposal from pm@pvs-core'),
       `  ${FG.secondary}"Redesign UI Auth: JWT +${RESET}`,
       `  ${FG.secondary} OAuth2 + MFA + RBAC"${RESET}`,
       `  ${FG.muted}CR: ${crId}${RESET}`,
     ]},
     { kind: 'pause', duration: 0.3 },
     { kind: 'output', pane: designer, lines: [
-      notification('📋', 'New proposal from pm@pvs-core'),
+      notification('!!', 'New proposal from pm@pvs-core'),
       `  ${FG.secondary}"Redesign UI Auth: JWT +${RESET}`,
       `  ${FG.secondary} OAuth2 + MFA + RBAC"${RESET}`,
       `  ${FG.muted}CR: ${crId}${RESET}`,
@@ -273,7 +273,7 @@ export function proposalVoteScene(): { panes: Pane[]; actions: SceneAction[] } {
     { kind: 'pause', duration: 1.0 },
     { kind: 'output', pane: pm, lines: [
       '',
-      notification('\u{1F5F3}\uFE0F', `Vote tally for ${crId}:`),
+      notification('>>', `Vote tally for ${crId}:`),
       `  ${FG.green}dev${RESET}      ${FG.proven}approve${RESET}`,
       `  ${FG.red}qa${RESET}       ${FG.proven}approve${RESET}`,
       `  ${FG.blue}designer${RESET} ${FG.proven}approve${RESET}`,

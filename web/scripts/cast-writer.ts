@@ -137,6 +137,10 @@ function renderPaneFrame(pane: Pane): string {
 function charWidth(ch: string): number {
   const cp = ch.codePointAt(0) ?? 0;
   if (cp >= 0x1F000) return 2;               // Emoji & symbols
+  if (cp >= 0x231A && cp <= 0x231B) return 2; // ⌚⌛ watch/hourglass
+  if (cp >= 0x23E9 && cp <= 0x23FA) return 2; // ⏩-⏺ media controls (includes ⏵)
+  if (cp >= 0x2614 && cp <= 0x2615) return 2; // ☔☕
+  if (cp >= 0x2648 && cp <= 0x2653) return 2; // Zodiac signs
   if (cp >= 0x2E80 && cp <= 0x9FFF) return 2; // CJK
   if (cp >= 0xF900 && cp <= 0xFAFF) return 2; // CJK compat
   if (cp >= 0xFE30 && cp <= 0xFE6F) return 2; // CJK compat forms
