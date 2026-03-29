@@ -53,8 +53,8 @@ export function createSandSignal(
   particleCount: number = 10,
 ): ActiveSignal {
   const particles: SandParticle[] = Array.from({ length: particleCount }, () => ({
-    progress: -(Math.random() * 0.15),
-    speed: 0.012 + (Math.random() - 0.5) * 0.004,
+    progress: -(Math.random() * 0.2),
+    speed: 0.006 + (Math.random() - 0.5) * 0.002,
     offsetX: (Math.random() - 0.5) * 6,
     offsetY: (Math.random() - 0.5) * 6,
     size: 1.5 + Math.random() * 1.5,
@@ -125,16 +125,17 @@ export function setupCanvasHover<T extends Positioned & { id: string }>(
   items: T[],
   hitWidth: number,
   hitHeight: number,
+  drawingSize?: { w: number; h: number },
 ): { getHoveredId: () => string | null; hoverScales: Map<string, number> } {
   let hoveredId: string | null = null;
   const hoverScales = new Map<string, number>();
 
-  canvas.addEventListener('mousemove', (e: MouseEvent) => {
+  canvas.addEventListener('pointermove', (e: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+    const coordW = drawingSize?.w ?? canvas.width;
+    const coordH = drawingSize?.h ?? canvas.height;
+    const mx = (e.clientX - rect.left) / rect.width * coordW;
+    const my = (e.clientY - rect.top) / rect.height * coordH;
 
     hoveredId = null;
     for (const item of items) {
@@ -147,7 +148,7 @@ export function setupCanvasHover<T extends Positioned & { id: string }>(
     canvas.style.cursor = hoveredId ? 'pointer' : 'default';
   });
 
-  canvas.addEventListener('mouseleave', () => {
+  canvas.addEventListener('pointerleave', () => {
     hoveredId = null;
     canvas.style.cursor = 'default';
   });

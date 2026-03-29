@@ -47,9 +47,26 @@ if (cascadeCanvas) {
   const ctx = cascadeCanvas.getContext('2d')!;
   const cssVar = createCssVarReader();
 
+  const BASE_W = 900;
+  const BASE_H = 500;
   const ISLAND_W = 140;
   const ISLAND_H = 90;
   const ISLAND_R = 6;
+
+  // DPR-aware canvas sizing
+  let fontScale = 1;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function resizeCanvas(): void {
+    const dpr = window.devicePixelRatio || 1;
+    cascadeCanvas!.width = BASE_W * dpr;
+    cascadeCanvas!.height = BASE_H * dpr;
+    const rect = cascadeCanvas!.getBoundingClientRect();
+    const displayRatio = rect.width / BASE_W;
+    fontScale = displayRatio < 0.7 ? Math.min(0.7 / displayRatio, 2) : 1;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', () => { resizeCanvas(); markDirty(); });
 
   const islands: Island[] = [
     {
@@ -93,7 +110,7 @@ if (cascadeCanvas) {
     return islands.find(i => i.id === id)!;
   }
 
-  const { getHoveredId, hoverScales } = setupCanvasHover(cascadeCanvas, islands, ISLAND_W, ISLAND_H);
+  const { getHoveredId, hoverScales } = setupCanvasHover(cascadeCanvas, islands, ISLAND_W, ISLAND_H, { w: BASE_W, h: BASE_H });
 
   function drawIsland(island: Island): void {
     if (island.status !== island.prevStatus) {
@@ -146,24 +163,27 @@ if (cascadeCanvas) {
     }
 
     // Inner node dots
+    const dotR = 4 * Math.max(1, fontScale * 0.7);
+    const nodeFontPx = Math.round(11 * fontScale);
+    const teamFontPx = Math.round(12 * fontScale);
     for (const node of island.nodes) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(island.x + node.ox, island.y + node.oy, 4, 0, Math.PI * 2);
+      ctx.arc(island.x + node.ox, island.y + node.oy, dotR, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = color;
-      ctx.font = '500 11px "JetBrains Mono", monospace';
+      ctx.font = `500 ${nodeFontPx}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'center';
-      ctx.fillText(node.label, island.x + node.ox, island.y + node.oy - 8);
+      ctx.fillText(node.label, island.x + node.ox, island.y + node.oy - 8 * fontScale);
     }
 
     // Team label below island
     ctx.fillStyle = cssVar('--text-muted');
     ctx.globalAlpha = dimAlpha;
-    ctx.font = '500 12px "JetBrains Mono", monospace';
+    ctx.font = `500 ${teamFontPx}px "JetBrains Mono", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(island.team, island.x, island.y + ISLAND_H / 2 + 18);
+    ctx.fillText(island.team, island.x, island.y + ISLAND_H / 2 + 18 * fontScale);
 
     ctx.globalAlpha = 1.0;
 
@@ -214,7 +234,7 @@ if (cascadeCanvas) {
 
   // ---- Link draw animation ----
   let linkAnimations: Array<{ link: P2PLink; startTime: number }> = [];
-  const LINK_DRAW_DURATION = 400;
+  const LINK_DRAW_DURATION = 700;
 
   function updateLinkAnimations(now: number): void {
     for (const anim of linkAnimations) {
@@ -236,11 +256,21 @@ if (cascadeCanvas) {
     }
   }
 
+  // ---- Idle detection ----
+  let needsRedraw = true;
+
+  function markDirty(): void {
+    if (!needsRedraw) {
+      needsRedraw = true;
+      requestAnimationFrame(drawLoop);
+    }
+  }
+
   // ---- Main draw loop ----
   function drawLoop(timestamp: number): void {
-    const w = cascadeCanvas!.width;
-    const h = cascadeCanvas!.height;
-    ctx.clearRect(0, 0, w, h);
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, BASE_W, BASE_H);
 
     updateDiscoveryPulses();
     updateLinkAnimations(timestamp);
@@ -259,7 +289,17 @@ if (cascadeCanvas) {
       drawIsland(island);
     }
 
-    requestAnimationFrame(drawLoop);
+    // Continue loop only if animations are active
+    const hasAnimations = discoveryActive
+      || linkAnimations.length > 0
+      || activeSignals.length > 0
+      || islands.some(i => i.pulse > 0.001);
+
+    if (hasAnimations && !prefersReducedMotion.matches) {
+      requestAnimationFrame(drawLoop);
+    } else {
+      needsRedraw = false;
+    }
   }
 
   requestAnimationFrame(drawLoop);
@@ -305,6 +345,7 @@ Last sweep           --</span>
         island.status = 'connected';
         island.discoveryPulse = 0;
         discoveryActive = true;
+        markDirty();
 
         output.innerHTML += `\n<span class="out">  [ws] </span><span class="s-proven">${island.team}</span><span class="out"> node connected (${island.nodes.length} items)</span>`;
 
@@ -313,7 +354,7 @@ Last sweep           --</span>
 Nodes connected      </span><span class="s-proven">5 / 5</span><span class="out">
 Server               </span><span class="s-proven">active</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
         }
-      }, 500 * (i + 1));
+      }, 900 * (i + 1));
     });
 
     links.forEach((link, i) => {
@@ -321,12 +362,14 @@ Server               </span><span class="s-proven">active</span>\n\n<span class=
         link.active = true;
         link.drawProgress = 0;
         linkAnimations.push({ link, startTime: performance.now() });
-      }, 2500 + 300 * i);
+        markDirty();
+      }, 4500 + 500 * i);
     });
   }
 
   function runChange(): void {
     getIsland('pm').status = 'proven';
+    markDirty();
 
     output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor duke</span>
 <span class="out">Item US-001 verified -> </span><span class="s-proven">proven</span>
@@ -339,10 +382,11 @@ Server               </span><span class="s-proven">active</span>\n\n<span class=
       activeSignals.push(createSandSignal('pm', 'dev', () => {
         getIsland('dev').status = 'suspect';
       }, 12));
+      markDirty();
 
       output.innerHTML += `\n<span class="out">  -> Design island now </span><span class="s-suspect">suspect</span><span class="out"> (S-001, S-002)</span>`;
       output.innerHTML += `\n<span class="out">  -> Dev island now </span><span class="s-suspect">suspect</span><span class="out"> (API-001, ADR-001)</span>`;
-    }, 400);
+    }, 800);
 
     setTimeout(() => {
       activeSignals.push(createSandSignal('design', 'dev', null, 12));
@@ -352,14 +396,15 @@ Server               </span><span class="s-proven">active</span>\n\n<span class=
       activeSignals.push(createSandSignal('dev', 'devops', () => {
         getIsland('devops').status = 'suspect';
       }, 12));
+      markDirty();
 
       output.innerHTML += `\n<span class="out">  -> QA island now </span><span class="s-suspect">suspect</span><span class="out"> (TC-101)</span>`;
       output.innerHTML += `\n<span class="out">  -> DevOps island now </span><span class="s-suspect">suspect</span><span class="out"> (MON-01)</span>`;
-    }, 2000);
+    }, 3500);
 
     setTimeout(() => {
       output.innerHTML += `\n\n<span class="out">Sweep complete: </span><span class="s-suspect">4 islands</span><span class="out"> affected by 1 PM change.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
-    }, 3500);
+    }, 6000);
   }
 
   function runResolve(): void {
@@ -372,17 +417,19 @@ Server               </span><span class="s-proven">active</span>\n\n<span class=
       setTimeout(() => {
         const island = getIsland(id);
         island.status = 'proven';
+        markDirty();
 
         output.innerHTML += `\n<span class="out">  [${island.team}] Reconciled -> </span><span class="s-proven">proven</span>`;
 
         if (i === order.length - 1) {
           output.innerHTML += `\n\n<span class="out">All islands </span><span class="s-proven">proven</span><span class="out">. Network consistent.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
         }
-      }, 600 * (i + 1));
+      }, 1000 * (i + 1));
     });
   }
 
   function runDemo(action: string): void {
+    markDirty();
     switch (action) {
       case 'connect': runConnect(); break;
       case 'change': runChange(); break;
