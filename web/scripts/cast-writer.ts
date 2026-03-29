@@ -133,23 +133,42 @@ function renderPaneFrame(pane: Pane): string {
   return out;
 }
 
-/** Truncate a visible string to max chars (ignoring ANSI codes in length calc) */
+/** Terminal column width of a single character (emoji = 2, ZWJ/VS = 0, rest = 1) */
+function charWidth(ch: string): number {
+  const cp = ch.codePointAt(0) ?? 0;
+  if (cp >= 0x1F000) return 2;               // Emoji & symbols
+  if (cp >= 0x2E80 && cp <= 0x9FFF) return 2; // CJK
+  if (cp >= 0xF900 && cp <= 0xFAFF) return 2; // CJK compat
+  if (cp >= 0xFE30 && cp <= 0xFE6F) return 2; // CJK compat forms
+  if (cp >= 0xFF01 && cp <= 0xFF60) return 2; // Fullwidth forms
+  if (cp >= 0xFE00 && cp <= 0xFE0F) return 0; // Variation selectors
+  if (cp === 0x200D) return 0;                 // Zero-width joiner
+  return 1;
+}
+
+/** Visible column width of a string (ignoring ANSI codes, counting wide chars as 2) */
 function visibleLength(s: string): number {
-  return s.replace(/\x1b\[[0-9;]*m/g, '').length;
+  const stripped = s.replace(/\x1b\[[0-9;]*m/g, '');
+  let len = 0;
+  for (const ch of stripped) {
+    len += charWidth(ch);
+  }
+  return len;
 }
 
 function truncateVisible(s: string, max: number): string {
   let vis = 0;
   let result = '';
-  const re = /(\x1b\[[0-9;]*m)|(.)/g;
+  const re = /(\x1b\[[0-9;]*m)|([\s\S])/gu;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s)) !== null) {
     if (m[1]) {
       result += m[1]; // ANSI escape — doesn't count
     } else {
-      if (vis >= max) break;
+      const w = charWidth(m[2]);
+      if (vis + w > max) break;
       result += m[2];
-      vis++;
+      vis += w;
     }
   }
   return result + RESET;
