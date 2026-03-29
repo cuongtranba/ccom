@@ -70,38 +70,32 @@ if (cascadeCanvas) {
 
   const islands: Island[] = [
     {
-      id: 'pm', team: 'PM', x: 450, y: 60,
+      id: 'cuong', team: 'cuong-node', x: 450, y: 60,
       nodes: [{ label: 'US-001', ox: -35, oy: 0 }, { label: 'US-002', ox: 35, oy: 0 }],
       status: 'disconnected', discoveryPulse: 0, prevStatus: 'disconnected', pulse: 0,
     },
     {
-      id: 'design', team: 'Design', x: 150, y: 220,
+      id: 'duke', team: 'duke-node', x: 150, y: 220,
       nodes: [{ label: 'S-001', ox: -30, oy: -18 }, { label: 'S-002', ox: 30, oy: 18 }],
       status: 'disconnected', discoveryPulse: 0, prevStatus: 'disconnected', pulse: 0,
     },
     {
-      id: 'dev', team: 'Dev', x: 750, y: 220,
+      id: 'phong', team: 'phong-node', x: 750, y: 220,
       nodes: [{ label: 'API-001', ox: -35, oy: -12 }, { label: 'ADR-001', ox: 30, oy: 18 }],
       status: 'disconnected', discoveryPulse: 0, prevStatus: 'disconnected', pulse: 0,
     },
     {
-      id: 'qa', team: 'QA', x: 250, y: 400,
+      id: 'blue', team: 'blue-node', x: 350, y: 400,
       nodes: [{ label: 'TC-101', ox: 0, oy: 0 }],
-      status: 'disconnected', discoveryPulse: 0, prevStatus: 'disconnected', pulse: 0,
-    },
-    {
-      id: 'devops', team: 'DevOps', x: 650, y: 400,
-      nodes: [{ label: 'MON-01', ox: 0, oy: 0 }],
       status: 'disconnected', discoveryPulse: 0, prevStatus: 'disconnected', pulse: 0,
     },
   ];
 
   const links: P2PLink[] = [
-    { from: 'pm', to: 'design', active: false, drawProgress: 0 },
-    { from: 'pm', to: 'dev', active: false, drawProgress: 0 },
-    { from: 'design', to: 'dev', active: false, drawProgress: 0 },
-    { from: 'dev', to: 'qa', active: false, drawProgress: 0 },
-    { from: 'dev', to: 'devops', active: false, drawProgress: 0 },
+    { from: 'cuong', to: 'duke', active: false, drawProgress: 0 },
+    { from: 'cuong', to: 'phong', active: false, drawProgress: 0 },
+    { from: 'duke', to: 'phong', active: false, drawProgress: 0 },
+    { from: 'phong', to: 'blue', active: false, drawProgress: 0 },
   ];
 
   let activeSignals: ActiveSignal[] = [];
@@ -309,7 +303,7 @@ if (cascadeCanvas) {
 
   const INITIAL_TERMINAL = `<span class="prompt">$</span> <span class="cmd">inv network status</span>
 <span class="out">NETWORK              STATUS
-Nodes connected      0 / 5
+Nodes connected      0 / 4
 Server               idle
 Last sweep           --</span>
 
@@ -334,7 +328,7 @@ Last sweep           --</span>
   }
 
   function runConnect(): void {
-    const order = ['pm', 'design', 'dev', 'qa', 'devops'];
+    const order = ['cuong', 'duke', 'phong', 'blue'];
 
     output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv network connect</span>
 <span class="out">Connecting to WebSocket server...</span>`;
@@ -351,7 +345,7 @@ Last sweep           --</span>
 
         if (i === order.length - 1) {
           output.innerHTML += `\n\n<span class="out">NETWORK              STATUS
-Nodes connected      </span><span class="s-proven">5 / 5</span><span class="out">
+Nodes connected      </span><span class="s-proven">4 / 4</span><span class="out">
 Server               </span><span class="s-proven">active</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
         }
       }, 900 * (i + 1));
@@ -368,47 +362,43 @@ Server               </span><span class="s-proven">active</span>\n\n<span class=
   }
 
   function runChange(): void {
-    getIsland('pm').status = 'proven';
+    getIsland('cuong').status = 'proven';
     markDirty();
 
-    output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor duke</span>
+    output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv verify US-001 --evidence "Round 3: added mobile check-in" --actor cuong</span>
 <span class="out">Item US-001 verified -> </span><span class="s-proven">proven</span>
-<span class="out">Initiating cross-team sweep...</span>`;
+<span class="out">Initiating cross-node sweep...</span>`;
 
     setTimeout(() => {
-      activeSignals.push(createSandSignal('pm', 'design', () => {
-        getIsland('design').status = 'suspect';
+      activeSignals.push(createSandSignal('cuong', 'duke', () => {
+        getIsland('duke').status = 'suspect';
       }, 12));
-      activeSignals.push(createSandSignal('pm', 'dev', () => {
-        getIsland('dev').status = 'suspect';
+      activeSignals.push(createSandSignal('cuong', 'phong', () => {
+        getIsland('phong').status = 'suspect';
       }, 12));
       markDirty();
 
-      output.innerHTML += `\n<span class="out">  -> Design island now </span><span class="s-suspect">suspect</span><span class="out"> (S-001, S-002)</span>`;
-      output.innerHTML += `\n<span class="out">  -> Dev island now </span><span class="s-suspect">suspect</span><span class="out"> (API-001, ADR-001)</span>`;
+      output.innerHTML += `\n<span class="out">  -> duke-node now </span><span class="s-suspect">suspect</span><span class="out"> (S-001, S-002)</span>`;
+      output.innerHTML += `\n<span class="out">  -> phong-node now </span><span class="s-suspect">suspect</span><span class="out"> (API-001, ADR-001)</span>`;
     }, 800);
 
     setTimeout(() => {
-      activeSignals.push(createSandSignal('design', 'dev', null, 12));
-      activeSignals.push(createSandSignal('dev', 'qa', () => {
-        getIsland('qa').status = 'suspect';
-      }, 12));
-      activeSignals.push(createSandSignal('dev', 'devops', () => {
-        getIsland('devops').status = 'suspect';
+      activeSignals.push(createSandSignal('duke', 'phong', null, 12));
+      activeSignals.push(createSandSignal('phong', 'blue', () => {
+        getIsland('blue').status = 'suspect';
       }, 12));
       markDirty();
 
-      output.innerHTML += `\n<span class="out">  -> QA island now </span><span class="s-suspect">suspect</span><span class="out"> (TC-101)</span>`;
-      output.innerHTML += `\n<span class="out">  -> DevOps island now </span><span class="s-suspect">suspect</span><span class="out"> (MON-01)</span>`;
+      output.innerHTML += `\n<span class="out">  -> blue-node now </span><span class="s-suspect">suspect</span><span class="out"> (TC-101)</span>`;
     }, 3500);
 
     setTimeout(() => {
-      output.innerHTML += `\n\n<span class="out">Sweep complete: </span><span class="s-suspect">4 islands</span><span class="out"> affected by 1 PM change.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
+      output.innerHTML += `\n\n<span class="out">Sweep complete: </span><span class="s-suspect">3 nodes</span><span class="out"> affected by 1 cuong-node change.</span>\n\n<span class="prompt">$</span> <span class="cmd">_</span>`;
     }, 6000);
   }
 
   function runResolve(): void {
-    const order = ['design', 'dev', 'qa', 'devops'];
+    const order = ['duke', 'phong', 'blue'];
 
     output.innerHTML = `<span class="prompt">$</span> <span class="cmd">inv reconcile --all --network</span>
 <span class="out">Starting cross-team reconciliation...</span>`;

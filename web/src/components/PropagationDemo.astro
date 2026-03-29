@@ -8,15 +8,16 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
   <div class="demo-panel">
     <div class="demo-buttons">
       <button class="demo-btn" data-action="verify">verify all</button>
-      <button class="demo-btn" data-action="change">PM changes story</button>
+      <button class="demo-btn" data-action="change">cuong-node changes story</button>
       <button class="demo-btn" data-action="reverify">re-verify chain</button>
       <button class="demo-btn" data-action="reset">reset</button>
     </div>
     <pre class="demo-terminal" id="demo-output" aria-live="polite"><span class="prompt">$</span> <span class="cmd">inv node list --project clinic-checkin</span>
-<span class="out">ID        NAME              VERTICAL  OWNER
-0fb8353f  Dev Inventory     dev       cuong
-de061a81  PM Inventory      pm        duke
-5447c4b6  Design Inventory  design    may</span>
+<span class="out">ID        NAME              OWNER
+0fb8353f  cuong-node        cuong
+de061a81  phong-node        phong
+5447c4b6  duke-node         duke
+a3b2c1d0  blue-node         blue</span>
 
 <span class="prompt">$</span> <span class="cmd">inv item list --node 0fb8353f</span>
 <span class="out">ID        KIND      TITLE                    STATUS</span>
@@ -29,7 +30,7 @@ de061a81  PM Inventory      pm        duke
   <div class="cast-companion">
     <AsciinemaPlayer
       src="/casts/cross-node-signal.cast"
-      title="PM marks PRD suspect — signals cascade to Dev, Design, QA"
+      title="cuong-node marks PRD suspect — signals cascade to phong-node, duke-node, blue-node"
       rows={20}
       cols={92}
       speed={1}

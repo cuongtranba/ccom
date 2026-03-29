@@ -3,23 +3,23 @@
 
 <div class="pipeline-demo">
   <div class="pipeline-columns" id="pipeline-viz">
-    <div class="pipeline-col" data-vertical="pm">
-      <div class="pipeline-vertical-label">PM</div>
-      <div class="pipeline-card" id="pm-card"></div>
+    <div class="pipeline-col" data-vertical="cuong">
+      <div class="pipeline-vertical-label">cuong-node</div>
+      <div class="pipeline-card" id="cuong-card"></div>
     </div>
-    <div class="pipeline-arrow" id="arrow-pm-design">
+    <div class="pipeline-arrow" id="arrow-cuong-duke">
       <div class="arrow-line"></div>
     </div>
-    <div class="pipeline-col" data-vertical="design">
-      <div class="pipeline-vertical-label">Designer</div>
-      <div class="pipeline-card" id="design-card"></div>
+    <div class="pipeline-col" data-vertical="duke">
+      <div class="pipeline-vertical-label">duke-node</div>
+      <div class="pipeline-card" id="duke-card"></div>
     </div>
-    <div class="pipeline-arrow" id="arrow-design-dev">
+    <div class="pipeline-arrow" id="arrow-duke-phong">
       <div class="arrow-line"></div>
     </div>
-    <div class="pipeline-col" data-vertical="dev">
-      <div class="pipeline-vertical-label">Dev</div>
-      <div class="pipeline-card" id="dev-card"></div>
+    <div class="pipeline-col" data-vertical="phong">
+      <div class="pipeline-vertical-label">phong-node</div>
+      <div class="pipeline-card" id="phong-card"></div>
     </div>
   </div>
 
@@ -27,17 +27,17 @@
 
   <div class="pipeline-controls">
     <div class="demo-buttons">
-      <button class="demo-btn" data-pipeline="pm">PM checklist</button>
-      <button class="demo-btn" data-pipeline="design">Design handoff</button>
-      <button class="demo-btn" data-pipeline="dev">Dev pickup</button>
+      <button class="demo-btn" data-pipeline="cuong">cuong-node checklist</button>
+      <button class="demo-btn" data-pipeline="duke">duke-node handoff</button>
+      <button class="demo-btn" data-pipeline="phong">phong-node pickup</button>
       <button class="demo-btn" data-pipeline="audit">audit trail</button>
       <button class="demo-btn" data-pipeline="reset">reset</button>
     </div>
     <pre class="demo-terminal" id="pipeline-output" aria-live="polite"><span class="prompt">$</span> <span class="cmd">inv pipeline status --project clinic-checkin</span>
-<span class="out">VERTICAL  STATUS      ITEMS  TRACES
-pm        pending     0/3    —
-design    pending     0/3    —
-dev       pending     0/3    —</span>
+<span class="out">NODE         STATUS      ITEMS  TRACES
+cuong-node   pending     0/3    —
+duke-node    pending     0/3    —
+phong-node   pending     0/3    —</span>
 
 <span class="prompt">$</span> <span class="cmd">_</span></pre>
   </div>

@@ -10,13 +10,13 @@ interface VerticalState {
   items: CheckItem[];
 }
 
-const pmCard = document.getElementById('pm-card');
-const designCard = document.getElementById('design-card');
-const devCard = document.getElementById('dev-card');
+const cuongCard = document.getElementById('cuong-card');
+const dukeCard = document.getElementById('duke-card');
+const phongCard = document.getElementById('phong-card');
 const auditBar = document.getElementById('audit-bar');
 const pipelineOutput = document.getElementById('pipeline-output');
 
-if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
+if (cuongCard && dukeCard && phongCard && auditBar && pipelineOutput) {
 
   function renderCard(el: HTMLElement, state: VerticalState, active: boolean): void {
     el.innerHTML = '';
@@ -80,8 +80,8 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
   }
 
   function runPipeline(action: string): void {
-    if (action === 'pm') {
-      renderCard(pmCard!, {
+    if (action === 'cuong') {
+      renderCard(cuongCard!, {
         traces: [],
         items: [
           { label: 'User story written', checked: true },
@@ -91,7 +91,7 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
       }, true);
 
       pipelineOutput!.innerHTML =
-        `<span class="prompt">$</span> <span class="cmd">inv checklist complete --node pm --item US-001</span>\n` +
+        `<span class="prompt">$</span> <span class="cmd">inv checklist complete --node cuong-node --item US-001</span>\n` +
         `<span class="out">Checklist items:</span>\n` +
         `<span class="out">  [x] User story written</span>\n` +
         `<span class="out">  [x] Acceptance criteria defined</span>\n` +
@@ -101,11 +101,11 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
       return;
     }
 
-    if (action === 'design') {
-      activateArrow('arrow-pm-design');
+    if (action === 'duke') {
+      activateArrow('arrow-cuong-duke');
 
-      renderCard(designCard!, {
-        traces: ['US-001 (PM)'],
+      renderCard(dukeCard!, {
+        traces: ['US-001 (cuong-node)'],
         items: [
           { label: 'Screen spec', checked: true },
           { label: 'Mobile variant', checked: true },
@@ -114,9 +114,9 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
       }, true);
 
       pipelineOutput!.innerHTML =
-        `<span class="prompt">$</span> <span class="cmd">inv trace add S-001 --refs US-001 --vertical design</span>\n` +
-        `<span class="out">Trace S-001 -> US-001 (PM) created.</span>\n\n` +
-        `<span class="prompt">$</span> <span class="cmd">inv checklist status --node design --item S-001</span>\n` +
+        `<span class="prompt">$</span> <span class="cmd">inv trace add S-001 --refs US-001 --node duke-node</span>\n` +
+        `<span class="out">Trace S-001 -> US-001 (cuong-node) created.</span>\n\n` +
+        `<span class="prompt">$</span> <span class="cmd">inv checklist status --node duke-node --item S-001</span>\n` +
         `<span class="out">  [x] Screen spec</span>\n` +
         `<span class="out">  [x] Mobile variant</span>\n` +
         `<span class="out">  [ ] Accessibility reviewed</span>\n` +
@@ -125,12 +125,12 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
       return;
     }
 
-    if (action === 'dev') {
-      activateArrow('arrow-pm-design');
-      activateArrow('arrow-design-dev');
+    if (action === 'phong') {
+      activateArrow('arrow-cuong-duke');
+      activateArrow('arrow-duke-phong');
 
-      renderCard(devCard!, {
-        traces: ['US-001 (PM)', 'S-001 (Design)'],
+      renderCard(phongCard!, {
+        traces: ['US-001 (cuong-node)', 'S-001 (duke-node)'],
         items: [
           { label: 'API endpoint', checked: true },
           { label: 'Tests passing', checked: true },
@@ -139,14 +139,14 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
       }, true);
 
       pipelineOutput!.innerHTML =
-        `<span class="prompt">$</span> <span class="cmd">inv trace add API-001 --refs US-001,S-001 --vertical dev</span>\n` +
-        `<span class="out">Trace API-001 -> US-001 (PM), S-001 (Design) created.</span>\n\n` +
-        `<span class="prompt">$</span> <span class="cmd">inv checklist status --node dev --item API-001</span>\n` +
+        `<span class="prompt">$</span> <span class="cmd">inv trace add API-001 --refs US-001,S-001 --node phong-node</span>\n` +
+        `<span class="out">Trace API-001 -> US-001 (cuong-node), S-001 (duke-node) created.</span>\n\n` +
+        `<span class="prompt">$</span> <span class="cmd">inv checklist status --node phong-node --item API-001</span>\n` +
         `<span class="out">  [x] API endpoint</span>\n` +
         `<span class="out">  [x] Tests passing</span>\n` +
         `<span class="out">  [ ] ADR documented</span>\n\n` +
         `<span class="prompt">$</span> <span class="cmd">inv audit check --pipeline clinic-checkin</span>\n` +
-        `<span class="out">Checking trace integrity across verticals...</span>\n` +
+        `<span class="out">Checking trace integrity across nodes...</span>\n` +
         `<span class="out">All traces valid. 2 items have incomplete checklists.</span>\n\n` +
         `<span class="prompt">$</span> <span class="cmd">_</span>`;
       return;
@@ -184,21 +184,21 @@ if (pmCard && designCard && devCard && auditBar && pipelineOutput) {
     }
 
     if (action === 'reset') {
-      pmCard!.innerHTML = '';
-      pmCard!.classList.remove('active');
-      designCard!.innerHTML = '';
-      designCard!.classList.remove('active');
-      devCard!.innerHTML = '';
-      devCard!.classList.remove('active');
+      cuongCard!.innerHTML = '';
+      cuongCard!.classList.remove('active');
+      dukeCard!.innerHTML = '';
+      dukeCard!.classList.remove('active');
+      phongCard!.innerHTML = '';
+      phongCard!.classList.remove('active');
 
-      resetArrow('arrow-pm-design');
-      resetArrow('arrow-design-dev');
+      resetArrow('arrow-cuong-duke');
+      resetArrow('arrow-duke-phong');
 
       auditBar!.classList.remove('scanning');
 
       pipelineOutput!.innerHTML =
         `<span class="prompt">$</span> <span class="cmd">inv pipeline status --project clinic-checkin</span>\n` +
-        `<span class="out">VERTICAL  STATUS      ITEMS  TRACES\npm        pending     0/3    —\ndesign    pending     0/3    —\ndev       pending     0/3    —</span>\n\n` +
+        `<span class="out">NODE         STATUS      ITEMS  TRACES\ncuong-node   pending     0/3    —\nduke-node    pending     0/3    —\nphong-node   pending     0/3    —</span>\n\n` +
         `<span class="prompt">$</span> <span class="cmd">_</span>`;
       return;
     }

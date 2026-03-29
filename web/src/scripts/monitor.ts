@@ -77,10 +77,10 @@ let activityEvents: ActivityEvent[] = [];
 
 function getDemoConfig(): NodeConfig {
   return {
-    name: 'dev-inventory',
+    name: 'phong-node',
     vertical: 'dev',
     project: 'my-inventory',
-    owner: 'cuong',
+    owner: 'phong',
     id: '439d8306-4931-4533-bf40-92bbf618a23e',
     mode: 'normal',
   };
@@ -88,8 +88,9 @@ function getDemoConfig(): NodeConfig {
 
 function getDemoPeers(): PeerInfo[] {
   return [
-    { peer_id: '12D3KooWKMo2', name: 'pm-inventory', vertical: 'pm', status: 'approved', owner: 'cuong', reputation: 3 },
-    { peer_id: '12D3KooWAAhu', name: 'qa-inventory', vertical: 'qa', status: 'approved', owner: 'duke', reputation: 1 },
+    { peer_id: '12D3KooWKMo2', name: 'cuong-node', vertical: 'pm', status: 'approved', owner: 'cuong', reputation: 3 },
+    { peer_id: '12D3KooWAAhu', name: 'blue-node', vertical: 'qa', status: 'approved', owner: 'blue', reputation: 1 },
+    { peer_id: '12D3KooWBBcd', name: 'duke-node', vertical: 'design', status: 'approved', owner: 'duke', reputation: 2 },
   ];
 }
 
@@ -98,14 +99,14 @@ function getDemoAudit(): AuditReport {
 }
 
 function getDemoNetworkStatus(): NetworkStatus {
-  return { peers: 2, outbox_depth: 0, active_proposals: 1, active_challenges: 0 };
+  return { peers: 3, outbox_depth: 0, active_proposals: 1, active_challenges: 0 };
 }
 
 function getDemoActivity(): ActivityEvent[] {
   return [
-    { id: '1', type: 'verify', summary: 'P2P Handshake Protocol verified by cuong', timestamp: new Date().toISOString() },
+    { id: '1', type: 'verify', summary: 'P2P Handshake Protocol verified by phong', timestamp: new Date().toISOString() },
     { id: '2', type: 'signal', summary: 'Signal propagated: API Spec → Test Plan', timestamp: new Date(Date.now() - 60000).toISOString() },
-    { id: '3', type: 'peer_join', summary: 'pm-inventory joined the network', timestamp: new Date(Date.now() - 120000).toISOString() },
+    { id: '3', type: 'peer_join', summary: 'cuong-node joined the network', timestamp: new Date(Date.now() - 120000).toISOString() },
     { id: '4', type: 'proposal', summary: 'CR: Switch to WebSocket hub', timestamp: new Date(Date.now() - 300000).toISOString() },
     { id: '5', type: 'challenge', summary: 'Stale data challenge on US-003', timestamp: new Date(Date.now() - 600000).toISOString() },
   ];
@@ -389,7 +390,7 @@ async function poll(): Promise<void> {
 
     const audit = getDemoAudit();
     renderAudit(audit);
-    renderVitals(2, audit.total, 8, 0);
+    renderVitals(3, audit.total, 8, 0);
     renderGovernance(1, 0, 3);
     renderActivity(getDemoActivity());
   }

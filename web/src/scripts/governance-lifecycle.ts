@@ -15,10 +15,10 @@ interface Vote {
 }
 
 const VOTES: Vote[] = [
-  { node: 'PM Node', icon: '✓', iconClass: 'approve', reason: 'Aligns with mobile check-in epic', isAI: false },
-  { node: 'Design Node', icon: '↻', iconClass: 'revise', reason: 'Need loading state for async', isAI: true },
-  { node: 'QA Node', icon: '✓', iconClass: 'approve', reason: 'Can update test suites', isAI: true },
-  { node: 'DevOps Node', icon: '✓', iconClass: 'approve', reason: 'Monitoring covers async patterns', isAI: false },
+  { node: 'cuong-node', icon: '✓', iconClass: 'approve', reason: 'Aligns with mobile check-in epic', isAI: false },
+  { node: 'duke-node', icon: '↻', iconClass: 'revise', reason: 'Need loading state for async', isAI: true },
+  { node: 'blue-node', icon: '✓', iconClass: 'approve', reason: 'Can update test suites', isAI: true },
+  { node: 'phong-node', icon: '✓', iconClass: 'approve', reason: 'Async endpoints already tested', isAI: false },
   { node: 'Arch Lead', icon: '✓', iconClass: 'approve', reason: 'Consistent with async-first strategy', isAI: false },
 ];
 
