@@ -282,6 +282,44 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 ];
 
+// ── Online Nodes Helper ───────────────────────────────────────────────
+
+interface OnlineNode {
+  nodeId: string;
+  name: string;
+  vertical: string;
+}
+
+async function fetchOnlineNodes(
+  serverUrl: string,
+  token: string,
+  excludeNodeId?: string,
+): Promise<OnlineNode[]> {
+  try {
+    const httpUrl = serverUrl
+      .replace(/^ws/, "http")
+      .replace(/\/ws$/, "/api/online");
+    const res = await fetch(`${httpUrl}?token=${token}`);
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      projects: { nodes: { nodeId: string; name: string; vertical: string }[] }[];
+    };
+    const seen = new Set<string>();
+    const nodes: OnlineNode[] = [];
+    for (const proj of data.projects) {
+      for (const n of proj.nodes) {
+        if (!seen.has(n.nodeId) && n.nodeId !== excludeNodeId) {
+          seen.add(n.nodeId);
+          nodes.push({ nodeId: n.nodeId, name: n.name, vertical: n.vertical });
+        }
+      }
+    }
+    return nodes;
+  } catch {
+    return [];
+  }
+}
+
 // ── Tool Handler Builder ──────────────────────────────────────────────
 
 interface ToolCallArgs {
@@ -413,6 +451,7 @@ export function buildToolHandlers(
           engine.openVoting(cr.id);
           let targetItemTitle = "";
           try { targetItemTitle = engine.getItem(args.targetItemId ?? "").title; } catch { /* remote item */ }
+          const pendingVoters = await fetchOnlineNodes(config.server.url, config.server.token, config.node.id);
           if (wsClient?.connected) {
             wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "proposal_create",
@@ -422,9 +461,19 @@ export function buildToolHandlers(
               proposerNode: config.node.id,
               targetItemTitle,
               proposerNodeName: config.node.name,
+              pendingVoters: pendingVoters.map((n) => n.name),
             });
           }
-          return text(JSON.stringify({ crId: cr.id, status: "voting", targetItemTitle }, null, 2));
+          const waitingFor = pendingVoters.map((n) => `  waiting for ${n.name} (${n.vertical})...`).join("\n");
+          return text(JSON.stringify({
+            crId: cr.id,
+            status: "voting",
+            targetItemTitle,
+            pendingVoters: pendingVoters.map((n) => ({ name: n.name, vertical: n.vertical })),
+            waitingMessage: pendingVoters.length > 0
+              ? `Waiting for ${pendingVoters.length} node(s) to vote:\n${waitingFor}`
+              : "No other nodes online to vote.",
+          }, null, 2));
         }
 
         case "inv_proposal_vote": {
@@ -448,6 +497,7 @@ export function buildToolHandlers(
           engine.openVoting(cr.id);
           let challengeItemTitle = "";
           try { challengeItemTitle = engine.getItem(args.targetItemId ?? "").title; } catch { /* remote item */ }
+          const challengeVoters = await fetchOnlineNodes(config.server.url, config.server.token, config.node.id);
           if (wsClient?.connected) {
             wsClient.broadcast(config.node.projects[0] ?? "", {
               type: "challenge_create",
@@ -457,9 +507,19 @@ export function buildToolHandlers(
               challengerNode: config.node.id,
               targetItemTitle: challengeItemTitle,
               challengerNodeName: config.node.name,
+              pendingVoters: challengeVoters.map((n) => n.name),
             });
           }
-          return text(JSON.stringify({ challengeId: cr.id, status: "voting", targetItemTitle: challengeItemTitle }, null, 2));
+          const waitingFor = challengeVoters.map((n) => `  waiting for ${n.name} (${n.vertical})...`).join("\n");
+          return text(JSON.stringify({
+            challengeId: cr.id,
+            status: "voting",
+            targetItemTitle: challengeItemTitle,
+            pendingVoters: challengeVoters.map((n) => ({ name: n.name, vertical: n.vertical })),
+            waitingMessage: challengeVoters.length > 0
+              ? `Waiting for ${challengeVoters.length} node(s) to vote:\n${waitingFor}`
+              : "No other nodes online to vote.",
+          }, null, 2));
         }
 
         case "inv_challenge_respond": {
@@ -562,7 +622,7 @@ export function buildToolHandlers(
             } else {
               for (const node of proj.nodes) {
                 const vLabel = node.vertical ? ` (${node.vertical})` : "";
-                lines.push(`  ${node.nodeId}${vLabel} — online`);
+                lines.push(`  ${node.name} (${node.nodeId})${vLabel} — online`);
                 totalNodes++;
               }
             }

@@ -20,10 +20,10 @@ export type MessagePayload =
   | { type: "ack"; originalMessageId: string }
   | ({ type: "permission_request"; requestId: string } & ToolArgs)
   | { type: "permission_verdict"; requestId: string; allowed: boolean; reason?: string }
-  | { type: "proposal_create"; crId: string; targetItemId: string; description: string; proposerNode: string; targetItemTitle?: string; proposerNodeName?: string }
+  | { type: "proposal_create"; crId: string; targetItemId: string; description: string; proposerNode: string; targetItemTitle?: string; proposerNodeName?: string; pendingVoters?: string[] }
   | { type: "proposal_vote"; crId: string; approve: boolean; reason: string; voterNodeName?: string }
   | { type: "proposal_result"; crId: string; approved: boolean; tally: { approved: number; rejected: number; total: number } }
-  | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string; targetItemTitle?: string; challengerNodeName?: string }
+  | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string; targetItemTitle?: string; challengerNodeName?: string; pendingVoters?: string[] }
   | { type: "pair_invite"; sessionId: string; initiatorNode: string }
   | { type: "pair_respond"; sessionId: string; accepted: boolean }
   | { type: "pair_end"; sessionId: string }
