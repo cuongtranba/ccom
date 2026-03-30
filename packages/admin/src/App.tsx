@@ -1,18 +1,19 @@
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGate } from "@/components/auth-gate";
 import { MetricsStrip } from "@/components/metrics-strip";
-import { ConnectedNodes } from "@/components/connected-nodes";
 import { ServerLogs } from "@/components/server-logs";
 import { RegisterForm } from "@/components/register-form";
 import { ProjectsTable } from "@/components/projects-table";
 import { NodesTable } from "@/components/nodes-table";
-import { useMetrics, useNodes, useLogs } from "@/hooks/queries";
+import { SignalFlow } from "@/components/signal-flow";
+import { useMetrics, useNodes } from "@/hooks/queries";
+import { useSignalStream } from "@/hooks/use-signal-stream";
 
 export default function App() {
   const { adminKey, setAdminKey, isAuthed } = useAuth();
   const metrics = useMetrics(isAuthed);
   const nodes = useNodes(adminKey);
-  const logs = useLogs(adminKey);
+  const { logs, signals } = useSignalStream(isAuthed ? adminKey : "");
 
   return (
     <div className="mx-auto max-w-[960px] px-[clamp(1rem,3vw,2rem)] py-8 font-sans">
@@ -32,12 +33,17 @@ export default function App() {
           <MetricsStrip metrics={metrics.data} changedFields={metrics.changedFields} />
           <ProjectsTable adminKey={adminKey} />
           <NodesTable adminKey={adminKey} />
-          <ConnectedNodes
-            nodes={nodes.data ?? []}
+          <SignalFlow
+            connectedNodes={nodes.data ?? []}
+            signals={signals}
             isAuthed={isAuthed}
-            onDisconnect={nodes.disconnect}
           />
-          <ServerLogs logs={logs.data ?? []} isAuthed={isAuthed} />
+          <ServerLogs
+            logs={logs}
+            signals={signals}
+            connectedNodes={nodes.data ?? []}
+            isAuthed={isAuthed}
+          />
         </>
       )}
     </div>

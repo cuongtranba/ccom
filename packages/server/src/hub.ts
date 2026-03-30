@@ -26,6 +26,7 @@ export interface ConnectedNode {
 }
 
 export class RedisHub {
+  onRoute?: (envelope: Envelope) => void;
   private localConns = new Map<string, HubWebSocket>();
   private subRedis: Redis;
   private counters = {
@@ -120,6 +121,7 @@ export class RedisHub {
 
   /** Routes an envelope: if toNode is set, deliver to that node; otherwise broadcast to all except sender. */
   async route(envelope: Envelope): Promise<void> {
+    this.onRoute?.(envelope);
     // Update lastMessageAt for the sender
     const senderMeta = this.connMeta.get(envelope.fromNode);
     if (senderMeta) {

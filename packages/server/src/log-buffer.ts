@@ -8,9 +8,14 @@ export interface LogEntry {
 export class LogBuffer {
   private buffer: LogEntry[] = [];
   private maxSize: number;
+  private pushCallback?: (entry: LogEntry) => void;
 
   constructor(maxSize = 200) {
     this.maxSize = maxSize;
+  }
+
+  setOnPush(fn: (entry: LogEntry) => void): void {
+    this.pushCallback = fn;
   }
 
   push(level: LogEntry["level"], message: string, meta?: Record<string, string>): void {
@@ -24,6 +29,7 @@ export class LogBuffer {
     if (this.buffer.length > this.maxSize) {
       this.buffer.shift();
     }
+    this.pushCallback?.(entry);
   }
 
   info(message: string, meta?: Record<string, string>): void {
