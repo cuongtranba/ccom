@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { WSClient } from "../src/ws-client";
-import { createEnvelope, type Envelope } from "@inv/shared";
+import type { Envelope } from "@inv/shared";
 
 /**
  * Live E2E scenario: 4 nodes connect to the deployed inv-server and
@@ -42,10 +42,10 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
   let designMsgs: Envelope[];
 
   beforeAll(async () => {
-    dev = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.dev, nodeId: "dev-node", projectId: PROJECT });
-    pm = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.pm, nodeId: "pm-node", projectId: PROJECT });
-    qa = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.qa, nodeId: "qa-node", projectId: PROJECT });
-    design = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.design, nodeId: "design-node", projectId: PROJECT });
+    dev = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.dev, nodeId: "dev-node", projectIds: [PROJECT] });
+    pm = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.pm, nodeId: "pm-node", projectIds: [PROJECT] });
+    qa = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.qa, nodeId: "qa-node", projectIds: [PROJECT] });
+    design = new WSClient({ serverUrl: SERVER_URL, token: TOKENS.design, nodeId: "design-node", projectIds: [PROJECT] });
 
     await Promise.all([dev.connect(), pm.connect(), qa.connect(), design.connect()]);
 
@@ -68,7 +68,7 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
   // ── Scenario 1: Broadcast reaches all peers ────────────────────────
 
   it("PM broadcasts signal_change, all 3 other nodes receive it", async () => {
-    pm.broadcast({
+    pm.broadcast(PROJECT, {
       type: "signal_change",
       itemId: "prd-001",
       oldState: "proven",
@@ -94,7 +94,7 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     qaMsgs.length = 0;
     designMsgs.length = 0;
 
-    dev.sendMessage("qa-node", {
+    dev.sendMessage("qa-node", PROJECT, {
       type: "query_ask",
       question: "Did the regression suite pass?",
       askerId: "dev-node",
@@ -120,7 +120,7 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     qaMsgs.length = 0;
     designMsgs.length = 0;
 
-    qa.broadcast({
+    qa.broadcast(PROJECT, {
       type: "query_ask",
       question: "Anyone seeing flaky check-in on staging?",
       askerId: "qa-node",
@@ -134,14 +134,14 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     expect(designMsgs.filter((e) => e.payload.type === "query_ask")).toHaveLength(1);
 
     // Dev responds
-    dev.sendMessage("qa-node", {
+    dev.sendMessage("qa-node", PROJECT, {
       type: "query_respond",
       answer: "Yes, race condition in queue handler",
       responderId: "dev-node",
     });
 
     // Design responds
-    design.sendMessage("qa-node", {
+    design.sendMessage("qa-node", PROJECT, {
       type: "query_respond",
       answer: "UI shows stale state after redirect",
       responderId: "design-node",
@@ -161,7 +161,7 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     qaMsgs.length = 0;
     designMsgs.length = 0;
 
-    pm.broadcast({
+    pm.broadcast(PROJECT, {
       type: "sweep",
       externalRef: "JIRA-101",
       newValue: "requirements changed",
@@ -199,7 +199,7 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     qaMsgs.length = 0;
     designMsgs.length = 0;
 
-    dev.broadcast({
+    dev.broadcast(PROJECT, {
       type: "proposal_create",
       crId: "cr-live-001",
       targetItemId: "api-spec-001",
@@ -220,14 +220,14 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
   it("PM and QA vote on Dev's proposal via direct messages", async () => {
     devMsgs.length = 0;
 
-    pm.sendMessage("dev-node", {
+    pm.sendMessage("dev-node", PROJECT, {
       type: "proposal_vote",
       crId: "cr-live-001",
       approve: true,
       reason: "Aligns with roadmap",
     });
 
-    qa.sendMessage("dev-node", {
+    qa.sendMessage("dev-node", PROJECT, {
       type: "proposal_vote",
       crId: "cr-live-001",
       approve: false,

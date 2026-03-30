@@ -122,7 +122,7 @@ describe("RedisHub", () => {
     if (!redisAvailable) return;
 
     const fakeWs = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", fakeWs);
+    await hub.register(["proj-1"], "node-a", fakeWs);
 
     expect(await hub.isOnline("proj-1", "node-a")).toBe(true);
   });
@@ -131,8 +131,8 @@ describe("RedisHub", () => {
     if (!redisAvailable) return;
 
     const fakeWs = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", fakeWs);
-    await hub.unregister("proj-1", "node-a");
+    await hub.register(["proj-1"], "node-a", fakeWs);
+    await hub.unregister(["proj-1"], "node-a");
 
     expect(await hub.isOnline("proj-1", "node-a")).toBe(false);
   });
@@ -142,8 +142,8 @@ describe("RedisHub", () => {
 
     const ws1 = createFakeWebSocket();
     const ws2 = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", ws1);
-    await hub.register("proj-1", "node-b", ws2);
+    await hub.register(["proj-1"], "node-a", ws1);
+    await hub.register(["proj-1"], "node-b", ws2);
 
     const online = await hub.listOnline("proj-1");
     expect(online.sort()).toEqual(["node-a", "node-b"]);
@@ -154,9 +154,9 @@ describe("RedisHub", () => {
 
     const ws1 = createFakeWebSocket();
     const ws2 = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", ws1);
-    await hub.register("proj-1", "node-b", ws2);
-    await hub.unregister("proj-1", "node-a");
+    await hub.register(["proj-1"], "node-a", ws1);
+    await hub.register(["proj-1"], "node-b", ws2);
+    await hub.unregister(["proj-1"], "node-a");
 
     const online = await hub.listOnline("proj-1");
     expect(online).toEqual(["node-b"]);
@@ -172,7 +172,7 @@ describe("RedisHub", () => {
     if (!redisAvailable) return;
 
     const fakeWs = createFakeWebSocket();
-    await hub.register("proj-1", "node-b", fakeWs);
+    await hub.register(["proj-1"], "node-b", fakeWs);
 
     const envelope = {
       messageId: "msg-1",
@@ -195,9 +195,9 @@ describe("RedisHub", () => {
     const wsA = createFakeWebSocket();
     const wsB = createFakeWebSocket();
     const wsC = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", wsA);
-    await hub.register("proj-1", "node-b", wsB);
-    await hub.register("proj-1", "node-c", wsC);
+    await hub.register(["proj-1"], "node-a", wsA);
+    await hub.register(["proj-1"], "node-b", wsB);
+    await hub.register(["proj-1"], "node-c", wsC);
 
     const envelope = {
       messageId: "msg-1",
@@ -277,7 +277,7 @@ describe("RedisHub", () => {
 
     // node-b reconnects
     const fakeWs = createFakeWebSocket();
-    await hub.register("proj-1", "node-b", fakeWs);
+    await hub.register(["proj-1"], "node-b", fakeWs);
     await hub.drainOutbox("proj-1", "node-b", fakeWs);
 
     // All messages delivered in order, outbox empty
@@ -299,8 +299,8 @@ describe("RedisHub", () => {
       const wsA = createFakeWebSocket();
       const wsB = createFakeWebSocket();
 
-      await hub.register("proj-1", "node-a", wsA);   // node-a on instance-1
-      await hub2.register("proj-1", "node-b", wsB);  // node-b on instance-2
+      await hub.register(["proj-1"], "node-a", wsA);   // node-a on instance-1
+      await hub2.register(["proj-1"], "node-b", wsB);  // node-b on instance-2
 
       const envelope = {
         messageId: "msg-cross",
@@ -333,7 +333,7 @@ describe("RedisHub", () => {
     if (!redisAvailable) return;
 
     const wsA = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", wsA);
+    await hub.register(["proj-1"], "node-a", wsA);
 
     const envelope = {
       messageId: "msg-1",
@@ -355,7 +355,7 @@ describe("RedisHub", () => {
     if (!redisAvailable) return;
 
     const fakeWs = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", fakeWs);
+    await hub.register(["proj-1"], "node-a", fakeWs);
     expect(await hub.isOnline("proj-1", "node-a")).toBe(true);
 
     const result = await hub.disconnect("proj-1", "node-a");
@@ -376,8 +376,8 @@ describe("RedisHub", () => {
 
     const ws1 = createFakeWebSocket();
     const ws2 = createFakeWebSocket();
-    await hub.register("proj-1", "node-a", ws1);
-    await hub.register("proj-1", "node-b", ws2);
+    await hub.register(["proj-1"], "node-a", ws1);
+    await hub.register(["proj-1"], "node-b", ws2);
 
     const count = await hub.disconnectProject("proj-1");
     expect(count).toBe(2);
