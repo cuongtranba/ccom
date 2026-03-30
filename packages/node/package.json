@@ -1,6 +1,6 @@
 {
   "name": "@tini-works/inv-node",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "bin": {
     "inv-node": "./dist/cli.js"
   },
