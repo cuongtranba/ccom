@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Tests
-bun test                                    # full suite (351 tests, 21 files)
+bun test                                    # full suite (377 tests, 23 files)
 bun test packages/node                      # node tests only
 bun test packages/server                    # server tests (requires Redis)
 bun test packages/node/test/engine.test.ts  # single file
@@ -40,6 +40,7 @@ Claude → MCP stdio → channel.ts → Engine → Store (SQLite)
 - `store.ts` — SQLite CRUD via `bun:sqlite` prepared statements (13 tables, 50+ methods)
 - `ws-client.ts` — WebSocket with exponential backoff reconnect
 - `ws-handlers.ts` — dispatches inbound envelopes from server to engine
+- `log-buffer.ts` — in-memory ring buffer (200 entries) with `setOnPush` callback hook for SSE streaming
 
 ### State Machines
 
@@ -57,6 +58,14 @@ Central server (`packages/server`) routes envelopes:
 1. Target node online on this instance → direct `ws.send()`
 2. Online on another instance → Redis pub/sub
 3. Offline → Redis outbox queue, drained on reconnect
+
+### Admin Real-Time Stream
+
+The server exposes `GET /api/stream` (SSE, `?key=<ADMIN_KEY>`) that pushes two event types:
+- `signal` — every routed envelope: `{ from, to, project, type, content, timestamp }`
+- `log` — every `LogBuffer` entry as it's pushed
+
+`RedisHub.onRoute` and `LogBuffer.setOnPush` are the hooks that feed the broadcast. The admin UI (`packages/admin`) connects via `useSignalStream` hook on `EventSource`, feeds signals into the `SignalFlow` React Flow graph (real-time node topology with animated edges), and populates the live log stream + peers sidebar in `ServerLogs`.
 
 ### Verticals
 
@@ -97,6 +106,7 @@ All deployments are triggered by **push to `main`** — never publish or deploy 
 - **Docker**: `packages/server/Dockerfile` + `docker-compose.yml` (Redis + server)
 - **Config**: `.dokploy.json` in `packages/server/`
 - **Port**: 4400, requires `ADMIN_KEY` env var and Redis
+- **Admin UI sections**: Metrics → Projects → Nodes → Signal Flow (React Flow graph) → Server Logs (with live peers sidebar)
 
 ### Dashboard (packages/dashboard)
 - **Framework**: Astro SSR with `@astrojs/node` adapter (standalone mode)
