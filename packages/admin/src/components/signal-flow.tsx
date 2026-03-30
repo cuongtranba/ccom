@@ -16,24 +16,25 @@ import type { ConnectedNode, SignalEvent } from "@/lib/api";
 
 // ── Desert node ──────────────────────────────────────────────────────────────
 
-interface DesertNodeData {
+interface DesertNodeData extends Record<string, unknown> {
   nodeId: string;
   projects: string[];
   isActive: boolean;
-  [key: string]: unknown;
 }
 
-function DesertNode({ data, selected }: NodeProps) {
-  const d = data as DesertNodeData;
+type DesertNodeType = Node<DesertNodeData, "desertNode">;
+
+function DesertNode({ data, selected }: NodeProps<DesertNodeType>) {
+  // data is now fully typed as DesertNodeData — no cast needed
   return (
     <div
       style={{
         background: "oklch(0.16 0.025 65)",
-        border: `1px solid ${d.isActive ? "oklch(0.72 0.16 55)" : "oklch(0.28 0.04 65)"}`,
+        border: `1px solid ${data.isActive ? "oklch(0.72 0.16 55)" : "oklch(0.28 0.04 65)"}`,
         borderRadius: "0.25rem",
         padding: "10px 14px",
         minWidth: 120,
-        boxShadow: d.isActive
+        boxShadow: data.isActive
           ? "0 0 16px oklch(0.72 0.16 55 / 0.35)"
           : selected
             ? "0 0 12px oklch(0.72 0.16 55 / 0.2)"
@@ -51,12 +52,12 @@ function DesertNode({ data, selected }: NodeProps) {
           fontFamily: "Space Grotesk, sans-serif",
           fontSize: "0.7rem",
           fontWeight: 700,
-          color: d.isActive ? "oklch(0.82 0.18 55)" : "oklch(0.82 0.04 70)",
+          color: data.isActive ? "oklch(0.82 0.18 55)" : "oklch(0.82 0.04 70)",
           letterSpacing: "0.08em",
           textTransform: "uppercase",
         }}
       >
-        {d.nodeId}
+        {data.nodeId}
       </div>
       <div
         style={{
@@ -66,7 +67,7 @@ function DesertNode({ data, selected }: NodeProps) {
           marginTop: 2,
         }}
       >
-        {d.projects.join(", ")}
+        {data.projects.join(", ")}
       </div>
       <Handle
         type="source"
@@ -81,7 +82,7 @@ const nodeTypes = { desertNode: DesertNode };
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 
-function circularLayout(connectedNodes: ConnectedNode[]): Node[] {
+function circularLayout(connectedNodes: ConnectedNode[]): DesertNodeType[] {
   const n = connectedNodes.length;
   if (n === 0) return [];
   const cx = 400;
@@ -170,7 +171,7 @@ interface SignalFlowProps {
 }
 
 export function SignalFlow({ connectedNodes, signals, isAuthed }: SignalFlowProps) {
-  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([]);
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<DesertNodeType>([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 

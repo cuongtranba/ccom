@@ -163,7 +163,7 @@ export function ServerLogs({
               <ScrollArea className="h-[300px] bg-card">
                 <div className="p-4 font-mono text-xs">
                   {logs.map((entry, i) => (
-                    <LogLine key={i} entry={entry} />
+                    <LogLine key={`${entry.timestamp}-${i}`} entry={entry} />
                   ))}
                   <div ref={bottomRef} />
                 </div>

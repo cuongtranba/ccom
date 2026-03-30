@@ -71,7 +71,7 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   hub.onRoute = (envelope) => {
     broadcastSSE("signal", {
       from: envelope.fromNode,
-      to: envelope.toNode,
+      to: envelope.toNode ?? "",
       project: envelope.projectId,
       type: envelope.payload.type,
       content: JSON.stringify(envelope.payload).slice(0, 300),
