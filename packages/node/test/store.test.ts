@@ -561,51 +561,6 @@ describe("Store", () => {
     });
   });
 
-  // ── Pair Sessions ──────────────────────────────────────────────────────
-
-  describe("pair sessions", () => {
-    let pmNode: Node;
-    let devNode: Node;
-
-    beforeEach(() => {
-      pmNode = store.createNode({ name: "PM", vertical: "pm", project: "proj", owner: "alice", isAI: false });
-      devNode = store.createNode({ name: "Dev", vertical: "dev", project: "proj", owner: "cuong", isAI: false });
-    });
-
-    it("creates a pair session in pending status", () => {
-      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
-      expect(session.id).toBeTruthy();
-      expect(session.status).toBe("pending");
-      expect(session.initiatorNode).toBe(pmNode.id);
-      expect(session.partnerNode).toBe(devNode.id);
-      expect(session.endedAt).toBeNull();
-    });
-
-    it("activates a pair session", () => {
-      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
-      const activated = store.updatePairSessionStatus(session.id, "active");
-      expect(activated.status).toBe("active");
-    });
-
-    it("ends a pair session with endedAt set", () => {
-      const session = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
-      store.updatePairSessionStatus(session.id, "active");
-      const ended = store.updatePairSessionStatus(session.id, "ended");
-      expect(ended.status).toBe("ended");
-      expect(ended.endedAt).not.toBeNull();
-    });
-
-    it("lists active sessions for a node", () => {
-      store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
-      const ended = store.createPairSession({ initiatorNode: pmNode.id, partnerNode: devNode.id, project: "proj" });
-      store.updatePairSessionStatus(ended.id, "active");
-      store.updatePairSessionStatus(ended.id, "ended");
-
-      const sessions = store.listPairSessions(pmNode.id);
-      expect(sessions).toHaveLength(1); // only the pending one, not the ended one
-    });
-  });
-
   // ── Checklists ─────────────────────────────────────────────────────────
 
   describe("checklists", () => {

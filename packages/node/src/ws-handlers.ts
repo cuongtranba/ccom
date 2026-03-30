@@ -43,9 +43,6 @@ export class WSHandlers {
       case "proposal_vote":
       case "proposal_result":
       case "challenge_create":
-      case "pair_invite":
-      case "pair_respond":
-      case "pair_end":
       case "checklist_update":
         // Forwarded to Claude Code via channel server's EventBus listener
         break;

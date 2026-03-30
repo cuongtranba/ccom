@@ -10,8 +10,8 @@ import { Engine } from "../src/engine";
 import type { NodeConfig } from "../src/config";
 
 describe("channel tool definitions", () => {
-  test("defines 20 tools", () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(20);
+  test("defines 16 tools", () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(16);
   });
 
   test("all tools have name, description, inputSchema", () => {
@@ -36,10 +36,6 @@ describe("channel tool definitions", () => {
       "inv_proposal_vote",
       "inv_challenge_create",
       "inv_challenge_respond",
-      "inv_pair_invite",
-      "inv_pair_join",
-      "inv_pair_end",
-      "inv_pair_list",
       "inv_checklist_add",
       "inv_checklist_check",
       "inv_checklist_uncheck",
@@ -107,22 +103,6 @@ describe("buildToolHandlers V2 tools", () => {
     const listResult2 = await handleTool("inv_checklist_list", { itemId: item.id });
     const items2 = JSON.parse(listResult2.content[0].text);
     expect(items2[0].checked).toBe(false);
-  });
-
-  test("inv_pair_invite creates a pending session", async () => {
-    const partner = engine.registerNode("partner", "pm", "proj", "alice", false);
-    const result = await handleTool("inv_pair_invite", { targetNode: partner.id });
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.sessionId).toBeTruthy();
-    expect(parsed.status).toBe("pending");
-  });
-
-  test("inv_pair_list lists sessions", async () => {
-    const partner = engine.registerNode("partner", "pm", "proj", "alice", false);
-    await handleTool("inv_pair_invite", { targetNode: partner.id });
-    const result = await handleTool("inv_pair_list", {});
-    const sessions = JSON.parse(result.content[0].text);
-    expect(sessions).toHaveLength(1);
   });
 
   test("inv_online_nodes returns error when not configured", async () => {

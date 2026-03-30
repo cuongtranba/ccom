@@ -732,45 +732,6 @@ describe("Engine", () => {
     });
   });
 
-  // ── Pairing Sessions ──────────────────────────────────────────────────
-
-  describe("Pairing Sessions", () => {
-    const PROJECT = "proj";
-    let pmNode: ReturnType<typeof engine.registerNode>;
-    let devNode: ReturnType<typeof engine.registerNode>;
-
-    beforeEach(() => {
-      pmNode = engine.registerNode("pm-node", "pm", PROJECT, "alice", false);
-      devNode = engine.registerNode("dev-node", "dev", PROJECT, "cuong", false);
-    });
-
-    it("initiates a pair session", () => {
-      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
-      expect(session.status).toBe("pending");
-      expect(session.initiatorNode).toBe(pmNode.id);
-      expect(session.partnerNode).toBe(devNode.id);
-    });
-
-    it("joins a pending pair session", () => {
-      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
-      const active = engine.joinPair(session.id);
-      expect(active.status).toBe("active");
-    });
-
-    it("ends an active pair session", () => {
-      const session = engine.invitePair(pmNode.id, devNode.id, PROJECT);
-      engine.joinPair(session.id);
-      const ended = engine.endPair(session.id);
-      expect(ended.status).toBe("ended");
-    });
-
-    it("lists active sessions for a node", () => {
-      engine.invitePair(pmNode.id, devNode.id, PROJECT);
-      const sessions = engine.listPairSessions(pmNode.id);
-      expect(sessions).toHaveLength(1);
-    });
-  });
-
   // ── Checklists ────────────────────────────────────────────────────────
 
   describe("Checklists", () => {

@@ -187,47 +187,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
-    name: "inv_pair_invite",
-    description: "Invite another node to a pairing session.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        targetNode: { type: "string", description: "Target node UUID to pair with" },
-      },
-      required: ["targetNode"],
-    },
-  },
-  {
-    name: "inv_pair_join",
-    description: "Accept a pending pairing session invitation.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        sessionId: { type: "string", description: "Pair session UUID" },
-      },
-      required: ["sessionId"],
-    },
-  },
-  {
-    name: "inv_pair_end",
-    description: "End an active pairing session.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        sessionId: { type: "string", description: "Pair session UUID" },
-      },
-      required: ["sessionId"],
-    },
-  },
-  {
-    name: "inv_pair_list",
-    description: "List active pairing sessions for this node.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
     name: "inv_checklist_add",
     description: "Add a checklist item to an inventory item.",
     inputSchema: {
@@ -539,47 +498,6 @@ export function buildToolHandlers(
           return text(JSON.stringify({ voted: true, challengeId: args.challengeId, approve: vote.approve }, null, 2));
         }
 
-        case "inv_pair_invite": {
-          const session = engine.invitePair(config.node.id, args.targetNode ?? "", config.node.projects[0] ?? "");
-          if (wsClient?.connected) {
-            wsClient.sendMessage(args.targetNode ?? "", config.node.projects[0] ?? "", {
-              type: "pair_invite",
-              sessionId: session.id,
-              initiatorNode: config.node.id,
-            });
-          }
-          return text(JSON.stringify({ sessionId: session.id, status: "pending" }, null, 2));
-        }
-
-        case "inv_pair_join": {
-          const session = engine.joinPair(args.sessionId ?? "");
-          if (wsClient?.connected) {
-            wsClient.sendMessage(session.initiatorNode, config.node.projects[0] ?? "", {
-              type: "pair_respond",
-              sessionId: session.id,
-              accepted: true,
-            });
-          }
-          return text(JSON.stringify({ sessionId: session.id, status: "active" }, null, 2));
-        }
-
-        case "inv_pair_end": {
-          const session = engine.endPair(args.sessionId ?? "");
-          if (wsClient?.connected) {
-            const partner = session.initiatorNode === config.node.id ? session.partnerNode : session.initiatorNode;
-            wsClient.sendMessage(partner, config.node.projects[0] ?? "", {
-              type: "pair_end",
-              sessionId: session.id,
-            });
-          }
-          return text(JSON.stringify({ sessionId: session.id, status: "ended" }, null, 2));
-        }
-
-        case "inv_pair_list": {
-          const sessions = engine.listPairSessions(config.node.id);
-          return text(JSON.stringify(sessions, null, 2));
-        }
-
         case "inv_checklist_add": {
           const cl = engine.addChecklistItem(args.itemId ?? "", args.text ?? "");
           return text(JSON.stringify(cl, null, 2));
@@ -761,10 +679,9 @@ Events from the inventory network arrive as <channel source="inventory"> tags. T
 - permission_request/permission_verdict: approval workflows
 - proposal_create/proposal_vote/proposal_result: change request voting
 - challenge_create: a node challenges an item
-- pair_invite/pair_respond/pair_end: pairing session events
 - checklist_update: checklist item checked/unchecked
 
-Use the inv_* tools to manage inventory, propose changes, vote, challenge items, pair with other nodes, and manage checklists.`,
+Use the inv_* tools to manage inventory, propose changes, vote, challenge items, and manage checklists.`,
     },
   );
 
@@ -792,9 +709,6 @@ Use the inv_* tools to manage inventory, propose changes, vote, challenge items,
     "proposal_vote",
     "proposal_result",
     "challenge_create",
-    "pair_invite",
-    "pair_respond",
-    "pair_end",
     "checklist_update",
     "error",
   ] as const;
