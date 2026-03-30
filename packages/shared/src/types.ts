@@ -167,16 +167,6 @@ export interface VoteTally {
   total: number;
 }
 
-export interface PairSession {
-  id: string;
-  initiatorNode: string;
-  partnerNode: string;
-  project: string;
-  status: "pending" | "active" | "ended";
-  startedAt: string;
-  endedAt: string | null;
-}
-
 export interface ChecklistItem {
   id: string;
   itemId: string;
@@ -206,10 +196,6 @@ export type ToolArgs =
   | { tool: "inv_proposal_vote"; crId: string; approve: boolean; reason: string }
   | { tool: "inv_challenge_create"; targetItemId: string; reason: string }
   | { tool: "inv_challenge_respond"; challengeId: string; approve: boolean; reason: string }
-  | { tool: "inv_pair_invite"; targetNode: string }
-  | { tool: "inv_pair_end"; sessionId: string }
-  | { tool: "inv_pair_join"; sessionId: string }
-  | { tool: "inv_pair_list" }
   | { tool: "inv_checklist_add"; itemId: string; text: string }
   | { tool: "inv_checklist_check"; checklistItemId: string }
   | { tool: "inv_checklist_uncheck"; checklistItemId: string }

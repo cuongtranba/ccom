@@ -252,21 +252,4 @@ describe.skipIf(skip)("Live E2E: 4 nodes on inv-server.apps.quickable.co", () =>
     expect(rejections).toHaveLength(1);
   });
 
-  // ── Scenario 8: Pair invite ────────────────────────────────────────
-
-  it("Dev invites Design to pair, Design receives invite", async () => {
-    designMsgs.length = 0;
-
-    dev.sendMessage("design-node", {
-      type: "pair_invite",
-      sessionId: "ps-live-001",
-      initiatorNode: "dev-node",
-    });
-
-    await Bun.sleep(500);
-
-    const invites = designMsgs.filter((e) => e.payload.type === "pair_invite");
-    expect(invites).toHaveLength(1);
-    expect(invites[0].fromNode).toBe("dev-node");
-  });
 });

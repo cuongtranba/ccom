@@ -19,7 +19,6 @@ import type {
   Vote,
   VoteTally,
   CRStatus,
-  PairSession,
   ChecklistItem,
   KindMapping,
 } from "@inv/shared";
@@ -140,16 +139,6 @@ interface VoteRow {
   created_at: string;
 }
 
-interface PairSessionRow {
-  id: string;
-  initiator_node: string;
-  partner_node: string;
-  project: string;
-  status: string;
-  started_at: string;
-  ended_at: string | null;
-}
-
 interface ChecklistItemRow {
   id: string;
   item_id: string;
@@ -248,12 +237,6 @@ interface CreateVoteInput {
   vertical: Vertical;
   approve: boolean;
   reason: string;
-}
-
-interface CreatePairSessionInput {
-  initiatorNode: string;
-  partnerNode: string;
-  project: string;
 }
 
 interface CreateChecklistItemInput {
@@ -401,18 +384,6 @@ function mapVoteRow(row: VoteRow): Vote {
     approve: row.approve === 1,
     reason: row.reason,
     createdAt: row.created_at,
-  };
-}
-
-function mapPairSessionRow(row: PairSessionRow): PairSession {
-  return {
-    id: row.id,
-    initiatorNode: row.initiator_node,
-    partnerNode: row.partner_node,
-    project: row.project,
-    status: row.status as PairSession["status"],
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
   };
 }
 
@@ -588,18 +559,6 @@ export class Store {
         reason TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(cr_id, node_id)
-      )
-    `);
-
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS pair_sessions (
-        id TEXT PRIMARY KEY,
-        initiator_node TEXT NOT NULL,
-        partner_node TEXT NOT NULL,
-        project TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        started_at TEXT DEFAULT (datetime('now')),
-        ended_at TEXT
       )
     `);
 
@@ -974,51 +933,6 @@ export class Store {
       }
     }
     return { approved, rejected, total: votes.length };
-  }
-
-  // ── Pair Sessions ────────────────────────────────────────────────────
-
-  createPairSession(input: CreatePairSessionInput): PairSession {
-    const id = randomUUID();
-    const stmt = this.db.query<PairSessionRow, [string, string, string, string]>(
-      `INSERT INTO pair_sessions (id, initiator_node, partner_node, project)
-       VALUES (?, ?, ?, ?)
-       RETURNING *`,
-    );
-    const row = stmt.get(id, input.initiatorNode, input.partnerNode, input.project);
-    if (!row) throw new Error("Failed to create pair session");
-    return mapPairSessionRow(row);
-  }
-
-  getPairSession(id: string): PairSession | null {
-    const row = this.db.query<PairSessionRow, [string]>(
-      "SELECT * FROM pair_sessions WHERE id = ?",
-    ).get(id);
-    return row ? mapPairSessionRow(row) : null;
-  }
-
-  updatePairSessionStatus(id: string, status: PairSession["status"]): PairSession {
-    if (status === "ended") {
-      const stmt = this.db.query<PairSessionRow, [string, string]>(
-        `UPDATE pair_sessions SET status = ?, ended_at = datetime('now') WHERE id = ? RETURNING *`,
-      );
-      const row = stmt.get(status, id);
-      if (!row) throw new Error(`Pair session not found: ${id}`);
-      return mapPairSessionRow(row);
-    }
-    const stmt = this.db.query<PairSessionRow, [string, string]>(
-      `UPDATE pair_sessions SET status = ? WHERE id = ? RETURNING *`,
-    );
-    const row = stmt.get(status, id);
-    if (!row) throw new Error(`Pair session not found: ${id}`);
-    return mapPairSessionRow(row);
-  }
-
-  listPairSessions(nodeId: string): PairSession[] {
-    const rows = this.db.query<PairSessionRow, [string, string]>(
-      "SELECT * FROM pair_sessions WHERE (initiator_node = ? OR partner_node = ?) AND status != 'ended' ORDER BY started_at",
-    ).all(nodeId, nodeId);
-    return rows.map(mapPairSessionRow);
   }
 
   // ── Checklists ───────────────────────────────────────────────────────

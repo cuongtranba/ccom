@@ -13,7 +13,6 @@ import type {
   ChangeRequest,
   Vote,
   CRTransitionKind,
-  PairSession,
   ChecklistItem,
   KindMapping,
 } from "@inv/shared";
@@ -379,32 +378,6 @@ export class Engine {
     }
     this.crSm.apply(cr.status, "archive");
     return this.store.updateChangeRequestStatus(crId, "archived");
-  }
-
-  // ── Pairing ─────────────────────────────────────────────────────────
-
-  invitePair(initiatorNode: string, partnerNode: string, project: string): PairSession {
-    this.getNode(initiatorNode);
-    this.getNode(partnerNode);
-    return this.store.createPairSession({ initiatorNode, partnerNode, project });
-  }
-
-  joinPair(sessionId: string): PairSession {
-    const session = this.store.getPairSession(sessionId);
-    if (!session) throw new Error(`Pair session not found: ${sessionId}`);
-    if (session.status !== "pending") throw new Error(`Session is "${session.status}", cannot join`);
-    return this.store.updatePairSessionStatus(sessionId, "active");
-  }
-
-  endPair(sessionId: string): PairSession {
-    const session = this.store.getPairSession(sessionId);
-    if (!session) throw new Error(`Pair session not found: ${sessionId}`);
-    if (session.status !== "active") throw new Error(`Session is "${session.status}", cannot end`);
-    return this.store.updatePairSessionStatus(sessionId, "ended");
-  }
-
-  listPairSessions(nodeId: string): PairSession[] {
-    return this.store.listPairSessions(nodeId);
   }
 
   // ── Checklists ──────────────────────────────────────────────────────

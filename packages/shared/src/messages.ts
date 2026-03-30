@@ -24,9 +24,6 @@ export type MessagePayload =
   | { type: "proposal_vote"; crId: string; approve: boolean; reason: string; voterNodeName?: string }
   | { type: "proposal_result"; crId: string; approved: boolean; tally: { approved: number; rejected: number; total: number } }
   | { type: "challenge_create"; challengeId: string; targetItemId: string; reason: string; challengerNode: string; targetItemTitle?: string; challengerNodeName?: string; pendingVoters?: string[] }
-  | { type: "pair_invite"; sessionId: string; initiatorNode: string }
-  | { type: "pair_respond"; sessionId: string; accepted: boolean }
-  | { type: "pair_end"; sessionId: string }
   | { type: "checklist_update"; itemId: string; checklistItemId: string; checked: boolean }
   | { type: "error"; code: string; message: string };
 
