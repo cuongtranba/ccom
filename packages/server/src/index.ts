@@ -52,6 +52,33 @@ export function startServer(options: { port: number; redisUrl: string }): void {
   const log = new LogBuffer(200);
   log.info("Server started", { instanceId, port: String(options.port) });
 
+  // ── SSE broadcast ─────────────────────────────────────────────────────────
+  interface SSEClient {
+    write: (data: string) => void;
+    close: () => void;
+  }
+  const sseClients = new Set<SSEClient>();
+
+  function broadcastSSE(event: string, data: unknown): void {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of sseClients) {
+      client.write(payload);
+    }
+  }
+
+  log.setOnPush((entry) => broadcastSSE("log", entry));
+
+  hub.onRoute = (envelope) => {
+    broadcastSSE("signal", {
+      from: envelope.fromNode,
+      to: envelope.toNode,
+      project: envelope.projectId,
+      type: envelope.payload.type,
+      content: JSON.stringify(envelope.payload).slice(0, 300),
+      timestamp: new Date().toISOString(),
+    });
+  };
+
   function requireAdmin(req: Request): Response | null {
     if (!adminKey) {
       return Response.json({ error: "ADMIN_KEY not configured" }, { status: 503 });
@@ -282,6 +309,53 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json({ logs: log.entries() });
       }
 
+      if (url.pathname === "/api/stream" && req.method === "GET") {
+        // EventSource doesn't support custom headers — accept key via query param
+        const key = url.searchParams.get("key") ?? "";
+        if (!adminKey || key !== adminKey) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const encoder = new TextEncoder();
+        let clientController: ReadableStreamDefaultController<Uint8Array> | null = null;
+
+        // Declare client before stream so cancel() can reference it
+        const client: SSEClient = {
+          write(data: string) {
+            try {
+              clientController?.enqueue(encoder.encode(data));
+            } catch {
+              sseClients.delete(client);
+            }
+          },
+          close() {
+            try { clientController?.close(); } catch { /* ignore */ }
+            sseClients.delete(client);
+          },
+        };
+
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            clientController = controller;
+            controller.enqueue(encoder.encode(": connected\n\n"));
+          },
+          cancel() {
+            sseClients.delete(client);
+          },
+        });
+
+        sseClients.add(client);
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+
       // ── Node & project removal (admin-key protected) ────────
 
       if (url.pathname.startsWith("/api/project/") && req.method === "DELETE") {
@@ -413,6 +487,12 @@ export function startServer(options: { port: number; redisUrl: string }): void {
           const envelope = parseEnvelope(raw);
           // Override with server-authenticated identity so routing is consistent
           envelope.fromNode = ws.data.nodeId;
+          log.info(`msg: ${envelope.payload.type}`, {
+            from: envelope.fromNode,
+            to: envelope.toNode ?? "",
+            project: envelope.projectId,
+            content: JSON.stringify(envelope.payload).slice(0, 300),
+          });
           await hub.route(envelope);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Unknown error";
