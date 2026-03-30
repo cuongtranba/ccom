@@ -131,6 +131,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         answer: { type: "string", description: "The answer to the question" },
         targetNode: { type: "string", description: "Target node name or UUID" },
+        queryId: { type: "string", description: "Optional query UUID this reply is in response to (for correlation)" },
       },
       required: ["answer", "targetNode"],
     },
@@ -403,7 +404,7 @@ export function buildToolHandlers(
             args.targetNode,
           );
 
-          if (wsClient?.connected) {
+          if (wsClient) {
             if (args.targetNode) {
               wsClient.sendMessage(args.targetNode, config.node.projects[0] ?? "", {
                 type: "query_ask",
@@ -422,12 +423,12 @@ export function buildToolHandlers(
           return text(JSON.stringify({
             queryId: query.id,
             broadcast: !args.targetNode,
-            networkSent: wsClient?.connected ?? false,
+            networkSent: wsClient !== null,
           }, null, 2));
         }
 
         case "inv_reply": {
-          if (!wsClient?.connected) {
+          if (!wsClient) {
             return text(JSON.stringify({ error: "Not connected to server" }));
           }
           const answer = args.answer ?? "";
@@ -438,6 +439,7 @@ export function buildToolHandlers(
             type: "query_respond",
             answer,
             responderId: config.node.id,
+            ...(args.queryId ? { replyTo: args.queryId } : {}),
           });
           return text(JSON.stringify({
             sent: true,
@@ -696,9 +698,7 @@ export async function startChannelServer(configPath: string): Promise<void> {
     });
 
     wsHandlers.setSendFn((toNode, payload) => {
-      if (wsClient?.connected) {
-        wsClient.sendMessage(toNode, config.node.projects[0] ?? "", payload);
-      }
+      wsClient?.sendMessage(toNode, config.node.projects[0] ?? "", payload);
     });
 
     try {
@@ -736,7 +736,8 @@ export async function startChannelServer(configPath: string): Promise<void> {
         // Non-fatal — status line is best-effort
       }
     } catch {
-      wsClient = null;
+      // Initial connect failed — wsClient keeps retrying via internal reconnect.
+      // Do NOT null wsClient here: it will reconnect and resume normal operation.
     }
   }
 

@@ -253,6 +253,73 @@ describe("inv_reply with connected wsClient", () => {
     expect(parsed.error).toBe("Answer cannot be empty");
     expect(sentMessages).toHaveLength(0);
   });
+
+  test("inv_reply includes replyTo in payload when queryId provided", async () => {
+    const queryId = "4c3915a8-8dc1-477f-877b-be85cdd62388";
+    await handleTool("inv_reply", { answer: "My answer", targetNode: "pm-node", queryId });
+
+    const payload = sentMessages[0].payload as { type: string; replyTo?: string };
+    expect(payload.type).toBe("query_respond");
+    expect(payload.replyTo).toBe(queryId);
+  });
+
+  test("inv_reply omits replyTo when queryId not provided", async () => {
+    await handleTool("inv_reply", { answer: "My answer", targetNode: "pm-node" });
+
+    const payload = sentMessages[0].payload as { replyTo?: string };
+    expect(payload.replyTo).toBeUndefined();
+  });
+});
+
+describe("inv_ask networkSent reflects wsClient presence", () => {
+  let store: Store;
+  let engine: Engine;
+  let nodeId: string;
+
+  beforeEach(() => {
+    store = new Store(":memory:");
+    const sm = new StateMachine();
+    const propagator = new SignalPropagator(store, sm);
+    engine = new Engine(store, sm, propagator);
+    const node = engine.registerNode("test-node", "dev", "proj", "tester", false);
+    nodeId = node.id;
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  test("networkSent is false when wsClient is null", async () => {
+    const config: NodeConfig = {
+      node: { id: nodeId, name: "test-node", vertical: "dev", projects: ["proj"], owner: "tester", isAI: false },
+      server: { url: "", token: "" },
+      database: { path: ":memory:" },
+      autonomy: { auto: [], approval: [] },
+    };
+    const handleTool = buildToolHandlers(engine, config, null);
+    const result = await handleTool("inv_ask", { question: "Hello?" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.networkSent).toBe(false);
+  });
+
+  test("networkSent is true when wsClient exists (even if not currently connected)", async () => {
+    const sentMessages: unknown[] = [];
+    const mockWsClient = {
+      broadcast(_projectId: string, payload: unknown) { sentMessages.push(payload); },
+      sendMessage(_toNode: string, _projectId: string, payload: unknown) { sentMessages.push(payload); },
+    };
+    const config: NodeConfig = {
+      node: { id: nodeId, name: "test-node", vertical: "dev", projects: ["proj"], owner: "tester", isAI: false },
+      server: { url: "", token: "" },
+      database: { path: ":memory:" },
+      autonomy: { auto: [], approval: [] },
+    };
+    const handleTool = buildToolHandlers(engine, config, mockWsClient as any);
+    const result = await handleTool("inv_ask", { question: "Hello?" });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.networkSent).toBe(true);
+    expect(sentMessages).toHaveLength(1);
+  });
 });
 
 describe("proposal voting flow with pending voters", () => {

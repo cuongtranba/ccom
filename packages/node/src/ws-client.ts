@@ -19,6 +19,8 @@ export class WSClient {
   private reconnectDelay = 1000;
   private maxReconnectDelay = 30000;
   private shouldReconnect = true;
+  private sendQueue: string[] = [];
+  private readonly maxQueueSize = 100;
   private log = new Logger("ws-client");
 
   constructor(private config: WSClientConfig) {}
@@ -30,6 +32,7 @@ export class WSClient {
 
       this.ws.onopen = () => {
         this.reconnectDelay = 1000;
+        this.drainSendQueue();
         resolve();
       };
 
@@ -59,7 +62,7 @@ export class WSClient {
         }
       };
 
-      this.ws.onerror = (event) => {
+      this.ws.onerror = () => {
         this.log.error("WebSocket error");
         if (!this.connected) {
           reject(new Error("WebSocket connection failed"));
@@ -69,10 +72,16 @@ export class WSClient {
   }
 
   send(envelope: Envelope): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket is not connected");
+    const msg = JSON.stringify(envelope);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(msg);
+    } else {
+      if (this.sendQueue.length < this.maxQueueSize) {
+        this.sendQueue.push(msg);
+      } else {
+        this.log.error("Send queue full, dropping message", { type: envelope.payload.type });
+      }
     }
-    this.ws.send(JSON.stringify(envelope));
   }
 
   sendMessage(toNode: string, projectId: string, payload: MessagePayload): void {
@@ -101,6 +110,7 @@ export class WSClient {
 
   close(): void {
     this.shouldReconnect = false;
+    this.sendQueue = [];
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -109,5 +119,20 @@ export class WSClient {
 
   get connected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  get queueDepth(): number {
+    return this.sendQueue.length;
+  }
+
+  private drainSendQueue(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const queued = this.sendQueue.splice(0);
+    for (const msg of queued) {
+      this.ws.send(msg);
+    }
+    if (queued.length > 0) {
+      this.log.error("Drained send queue after reconnect", { count: String(queued.length) });
+    }
   }
 }
