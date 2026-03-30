@@ -41,6 +41,15 @@ export interface LogEntry {
   meta?: Record<string, string>;
 }
 
+export interface SignalEvent {
+  from: string;
+  to: string;
+  project: string;
+  type: string;
+  content: string;
+  timestamp: string;
+}
+
 export interface RegisterResponse {
   token: string;
   nodeId: string;
