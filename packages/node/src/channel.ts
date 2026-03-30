@@ -369,12 +369,14 @@ export function buildToolHandlers(
                 type: "query_ask",
                 question,
                 askerId: config.node.id,
+                queryId: query.id,
               });
             } else {
               wsClient.broadcast(config.node.projects[0] ?? "", {
                 type: "query_ask",
                 question,
                 askerId: config.node.id,
+                queryId: query.id,
               });
             }
           }

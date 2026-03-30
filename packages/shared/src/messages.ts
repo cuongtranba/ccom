@@ -15,7 +15,7 @@ export type MessagePayload =
   | { type: "sweep"; externalRef: string; newValue: string }
   | { type: "trace_resolve_request"; itemId: string }
   | { type: "trace_resolve_response"; itemId: string; title: string; kind: string; state: string }
-  | { type: "query_ask"; question: string; askerId: string }
+  | { type: "query_ask"; question: string; askerId: string; queryId?: string }
   | { type: "query_respond"; answer: string; responderId: string; replyTo?: string }
   | { type: "ack"; originalMessageId: string }
   | ({ type: "permission_request"; requestId: string } & ToolArgs)
