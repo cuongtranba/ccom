@@ -623,38 +623,6 @@ export async function startChannelServer(configPath: string): Promise<void> {
 
     try {
       await wsClient.connect();
-
-      // Set Claude Code status line
-      try {
-        const httpUrl = config.server.url
-          .replace(/^ws/, "http")
-          .replace(/\/ws$/, "/api/online");
-        const onlineRes = await fetch(`${httpUrl}?token=${config.server.token}`);
-        let onlineCount = 0;
-        if (onlineRes.ok) {
-          const onlineData = await onlineRes.json() as {
-            projects: { nodes: { nodeId: string }[] }[];
-          };
-          const nodeIds = new Set<string>();
-          for (const proj of onlineData.projects) {
-            for (const n of proj.nodes) {
-              nodeIds.add(n.nodeId);
-            }
-          }
-          onlineCount = nodeIds.size;
-        }
-
-        const statusText = `inv: ${config.node.name} (${config.node.vertical}) · ${config.node.projects[0] ?? "no project"} · ${onlineCount} online`;
-        const homedir = process.env.HOME || process.env.USERPROFILE || "~";
-        const settingsPath = `${homedir}/.claude/settings.json`;
-        const existingRaw = existsSync(settingsPath)
-          ? JSON.parse(readFileSync(settingsPath, "utf-8"))
-          : {};
-        existingRaw.statusline = statusText;
-        writeFileSync(settingsPath, JSON.stringify(existingRaw, null, 2) + "\n");
-      } catch {
-        // Non-fatal — status line is best-effort
-      }
     } catch {
       // Initial connect failed — wsClient keeps retrying via internal reconnect.
       // Do NOT null wsClient here: it will reconnect and resume normal operation.

@@ -1,5 +1,5 @@
 import * as readline from "readline";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, existsSync } from "fs";
 import { slugify } from "@inv/shared";
 
 // ── Config Generators (exported for testing) ────────────────────────
@@ -56,10 +56,6 @@ export function generateMcpConfig(configPath: string): McpConfig {
       },
     },
   };
-}
-
-export function generateStatusLine(name: string, vertical: string, primaryProject: string): string {
-  return `inv: ${name} (${vertical}) · ${primaryProject || "no project"} · 0 online`;
 }
 
 // ── Fetch token info from server ────────────────────────────────────
@@ -180,28 +176,6 @@ export async function runWizard(): Promise<void> {
   const mcpConfigPath = "./.mcp.json";
   writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + "\n");
   console.log(`Writing ${mcpConfigPath}... ✓`);
-
-  // Write initial Claude Code statusline
-  try {
-    const homedir = process.env.HOME || process.env.USERPROFILE || "~";
-    const settingsDir = `${homedir}/.claude`;
-    const settingsPath = `${settingsDir}/settings.json`;
-    if (!existsSync(settingsDir)) {
-      mkdirSync(settingsDir, { recursive: true });
-    }
-    const existing = existsSync(settingsPath)
-      ? JSON.parse(readFileSync(settingsPath, "utf-8"))
-      : {};
-    existing.statusline = generateStatusLine(
-      info.name,
-      info.vertical,
-      info.projects[0]?.name ?? "",
-    );
-    writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
-    console.log(`Writing ${settingsPath}... ✓`);
-  } catch {
-    // Non-fatal — status line is best-effort
-  }
 
   console.log("");
   console.log("Setup complete! Start Claude Code:");

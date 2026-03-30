@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { generateInvConfig, generateMcpConfig, generateStatusLine, detectExistingFiles } from "../src/cli";
+import { generateInvConfig, generateMcpConfig, detectExistingFiles } from "../src/cli";
 
 describe("CLI config generation", () => {
   test("generateInvConfig creates valid config", () => {
@@ -48,16 +48,6 @@ describe("CLI config generation", () => {
         },
       },
     });
-  });
-
-  test("generateStatusLine creates initial status text", () => {
-    const line = generateStatusLine("dev-node", "dev", "clinic-checkin");
-    expect(line).toBe("inv: dev-node (dev) · clinic-checkin · 0 online");
-  });
-
-  test("generateStatusLine handles missing project", () => {
-    const line = generateStatusLine("dev-node", "dev", "");
-    expect(line).toBe("inv: dev-node (dev) · no project · 0 online");
   });
 
   test("generateInvConfig accepts any vertical string", () => {

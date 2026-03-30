@@ -1,46 +1,46 @@
 export type EventType =
-  | "signal_change"
-  | "sweep"
-  | "trace_resolve_request"
-  | "trace_resolve_response"
-  | "query_ask"
-  | "query_respond"
-  | "ack"
-  | "error"
-  | "permission_request"
-  | "permission_verdict"
-  | "proposal_create"
-  | "proposal_vote"
-  | "proposal_result"
-  | "challenge_create"
-  | "checklist_update";
+	| "signal_change"
+	| "sweep"
+	| "trace_resolve_request"
+	| "trace_resolve_response"
+	| "query_ask"
+	| "query_respond"
+	| "ack"
+	| "error"
+	| "permission_request"
+	| "permission_verdict"
+	| "proposal_create"
+	| "proposal_vote"
+	| "proposal_result"
+	| "challenge_create"
+	| "checklist_update";
 
 type EventHandler = (data: unknown) => void;
 
 export class EventBus {
-  private listeners = new Map<EventType, Set<EventHandler>>();
+	private listeners = new Map<EventType, Set<EventHandler>>();
 
-  on(event: EventType, handler: EventHandler): void {
-    let handlers = this.listeners.get(event);
-    if (!handlers) {
-      handlers = new Set();
-      this.listeners.set(event, handlers);
-    }
-    handlers.add(handler);
-  }
+	on(event: EventType, handler: EventHandler): void {
+		let handlers = this.listeners.get(event);
+		if (!handlers) {
+			handlers = new Set();
+			this.listeners.set(event, handlers);
+		}
+		handlers.add(handler);
+	}
 
-  off(event: EventType, handler: EventHandler): void {
-    const handlers = this.listeners.get(event);
-    if (handlers) {
-      handlers.delete(handler);
-    }
-  }
+	off(event: EventType, handler: EventHandler): void {
+		const handlers = this.listeners.get(event);
+		if (handlers) {
+			handlers.delete(handler);
+		}
+	}
 
-  emit(event: EventType, data: unknown): void {
-    const handlers = this.listeners.get(event);
-    if (!handlers) return;
-    for (const handler of handlers) {
-      handler(data);
-    }
-  }
+	emit(event: EventType, data: unknown): void {
+		const handlers = this.listeners.get(event);
+		if (!handlers) return;
+		for (const handler of handlers) {
+			handler(data);
+		}
+	}
 }

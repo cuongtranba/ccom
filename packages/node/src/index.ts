@@ -1,10 +1,16 @@
 import { runWizard } from "./cli";
 import { startChannelServer } from "./channel";
+import { version } from "../package.json";
 
 async function main(): Promise<void> {
   const command = process.argv[2];
 
   switch (command) {
+    case "version":
+    case "--version":
+    case "-v":
+      console.log(`@tini-works/inv-node v${version}`);
+      break;
     case "init":
       await runWizard();
       break;
@@ -24,6 +30,7 @@ async function main(): Promise<void> {
     default:
       console.error(`Unknown command: ${command}`);
       console.error("Usage:");
+      console.error("  inv-node version           Show current version");
       console.error("  inv-node init              Set up a new node");
       console.error("  inv-node serve [config]    Start MCP server");
       console.error("  inv-node update            Update to latest version");
