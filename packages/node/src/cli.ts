@@ -1,5 +1,5 @@
 import * as readline from "readline";
-import { writeFileSync, existsSync } from "fs";
+import { writeFileSync, existsSync, readFileSync } from "fs";
 import { slugify } from "@inv/shared";
 
 // ── Config Generators (exported for testing) ────────────────────────
@@ -20,13 +20,13 @@ interface InvConfig {
   database: { path: string };
 }
 
+interface McpServerEntry {
+  command: string;
+  args: string[];
+}
+
 interface McpConfig {
-  mcpServers: {
-    inventory: {
-      command: string;
-      args: string[];
-    };
-  };
+  mcpServers: Record<string, McpServerEntry>;
 }
 
 export function generateInvConfig(input: WizardInput): InvConfig {
@@ -174,7 +174,19 @@ export async function runWizard(): Promise<void> {
   console.log(`Writing ${invConfigPath}... ✓`);
 
   const mcpConfigPath = "./.mcp.json";
-  writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + "\n");
+  let finalMcpConfig = mcpConfig;
+  if (existsSync(mcpConfigPath)) {
+    try {
+      const existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")) as McpConfig;
+      finalMcpConfig = {
+        ...existing,
+        mcpServers: { ...existing.mcpServers, ...mcpConfig.mcpServers },
+      };
+    } catch {
+      console.warn(`Warning: could not parse existing ${mcpConfigPath}, overwriting.`);
+    }
+  }
+  writeFileSync(mcpConfigPath, JSON.stringify(finalMcpConfig, null, 2) + "\n");
   console.log(`Writing ${mcpConfigPath}... ✓`);
 
   console.log("");
