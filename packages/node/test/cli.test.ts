@@ -2,18 +2,17 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { generateInvConfig, generateMcpConfig, detectExistingFiles } from "../src/cli";
+import { generateCcomConfig, generateMcpConfig, detectExistingFiles } from "../src/cli";
 
 describe("CLI config generation", () => {
-  test("generateInvConfig creates valid config", () => {
-    const config = generateInvConfig({
+  test("generateCcomConfig creates valid config", () => {
+    const config = generateCcomConfig({
       name: "dev-node",
       vertical: "dev",
       projects: ["clinic-checkin"],
       owner: "cuong",
       serverUrl: "ws://localhost:8080/ws",
       token: "test-token",
-      dbPath: "./inventory.db",
     });
 
     expect(config.node.name).toBe("dev-node");
@@ -22,50 +21,48 @@ describe("CLI config generation", () => {
     expect(config.node.owner).toBe("cuong");
     expect(config.server.url).toBe("ws://localhost:8080/ws");
     expect(config.server.token).toBe("test-token");
-    expect(config.database.path).toBe("./inventory.db");
+    expect((config as any).database).toBeUndefined();
   });
 
-  test("generateInvConfig handles multiple projects", () => {
-    const config = generateInvConfig({
+  test("generateCcomConfig handles multiple projects", () => {
+    const config = generateCcomConfig({
       name: "multi-node",
       vertical: "frontend",
       projects: ["project-a", "project-b", "project-c"],
       owner: "tester",
       serverUrl: "ws://localhost:8080/ws",
       token: "tok",
-      dbPath: "./test.db",
     });
     expect(config.node.projects).toEqual(["project-a", "project-b", "project-c"]);
   });
 
   test("generateMcpConfig creates valid .mcp.json structure", () => {
-    const config = generateMcpConfig("./inv-config.json");
+    const config = generateMcpConfig("./ccom-config.json");
     expect(config).toEqual({
       mcpServers: {
-        inventory: {
+        ccom: {
           command: "bunx",
-          args: ["@tini-works/inv-node@latest", "serve", "./inv-config.json"],
+          args: ["@tini-works/ccom@latest", "serve", "./ccom-config.json"],
         },
       },
     });
   });
 
-  test("generateInvConfig accepts any vertical string", () => {
-    const config = generateInvConfig({
+  test("generateCcomConfig accepts any vertical string", () => {
+    const config = generateCcomConfig({
       name: "custom-node",
       vertical: "frontend",
       projects: ["my-project"],
       owner: "tester",
       serverUrl: "ws://localhost:8080/ws",
       token: "tok",
-      dbPath: "./test.db",
     });
     expect(config.node.vertical).toBe("frontend");
   });
 });
 
 describe("detectExistingFiles", () => {
-  const testDir = join(tmpdir(), `inv-cli-test-${Date.now()}`);
+  const testDir = join(tmpdir(), `ccom-cli-test-${Date.now()}`);
   let origCwd: string;
 
   beforeEach(() => {
@@ -85,9 +82,9 @@ describe("detectExistingFiles", () => {
     expect(detectExistingFiles()).toEqual([]);
   });
 
-  test("detects inv-config.json", () => {
-    writeFileSync("./inv-config.json", "{}");
-    expect(detectExistingFiles()).toContain("./inv-config.json");
+  test("detects ccom-config.json", () => {
+    writeFileSync("./ccom-config.json", "{}");
+    expect(detectExistingFiles()).toContain("./ccom-config.json");
   });
 
   test("detects .mcp.json", () => {
@@ -95,24 +92,12 @@ describe("detectExistingFiles", () => {
     expect(detectExistingFiles()).toContain("./.mcp.json");
   });
 
-  test("detects database file with default path", () => {
-    writeFileSync("./inventory.db", "");
-    expect(detectExistingFiles()).toContain("./inventory.db");
-  });
-
-  test("detects database file with custom path", () => {
-    writeFileSync("./custom.db", "");
-    expect(detectExistingFiles("./custom.db")).toContain("./custom.db");
-  });
-
   test("detects all files when all exist", () => {
-    writeFileSync("./inv-config.json", "{}");
+    writeFileSync("./ccom-config.json", "{}");
     writeFileSync("./.mcp.json", "{}");
-    writeFileSync("./inventory.db", "");
     const found = detectExistingFiles();
-    expect(found).toHaveLength(3);
-    expect(found).toContain("./inv-config.json");
+    expect(found).toHaveLength(2);
+    expect(found).toContain("./ccom-config.json");
     expect(found).toContain("./.mcp.json");
-    expect(found).toContain("./inventory.db");
   });
 });

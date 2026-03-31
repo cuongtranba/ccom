@@ -1,61 +1,30 @@
 ---
 import Base from '../layouts/Base.astro';
 import SectionHeader from '../components/SectionHeader.astro';
-import StateMachine from '../components/StateMachine.astro';
-import CrossTeamCascade from '../components/CrossTeamCascade.astro';
 import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
 ---
 
-<Base title="Inventory Network — A Living Protocol">
+<Base title="ccom — Claude Code Communication">
 
   <!-- HERO -->
   <section class="hero">
-    <p class="hero-eyebrow">Inventory Network Protocol</p>
+    <p class="hero-eyebrow">ccom</p>
     <h1 class="hero-title">
-      You don't need another tool.<br />
-      You need a <span class="highlight">protocol.</span>
+      Claude Code instances,<br />
+      <span class="highlight">talking to each other.</span>
     </h1>
     <p class="hero-sub">
-      AI generates output. Teams pass it around. Nobody knows what's actually proven.
-      Inventory Network makes every artifact earn its status — verified by evidence,
-      challenged by peers, proven by consensus.
+      Run Claude Code on multiple machines. Each instance registers as a node.
+      Nodes find each other, send messages, and receive replies — directly in their Claude sessions.
     </p>
   </section>
 
-  <!-- MANIFESTO -->
-  <section class="manifesto">
-    <blockquote class="manifesto-quote">
-      Confluence pages go stale. Jira tickets lie. AI hallucinates and nobody checks.
-      The problem is not tooling. It is that <strong>nothing in your pipeline has to prove it is true.</strong>
-    </blockquote>
-  </section>
-
-  <!-- THE PROTOCOL -->
+  <!-- HOW IT WORKS -->
   <section class="section">
     <SectionHeader
-      label="01 — The Foundation"
-      title="Four states. Zero trust."
-      description="Every artifact starts unverified. Evidence moves it to proven. Upstream changes mark it suspect. Failures break it. No status is permanent. No status is assumed."
-    />
-    <StateMachine />
-  </section>
-
-  <!-- THE NETWORK -->
-  <section class="section section-wide">
-    <SectionHeader
-      label="02 — The Network"
-      title="One team changes. Every team knows."
-      description="Signals cascade through the trace graph automatically. cuong-node updates a story, phong-node's API spec goes suspect, blue-node's test cases need re-validation. No Slack thread. No forgotten stakeholder."
-    />
-    <CrossTeamCascade />
-  </section>
-
-  <!-- AI ACCOUNTABILITY -->
-  <section class="section section-wide">
-    <SectionHeader
-      label="03 — AI Accountability"
-      title="Same protocol. Same proof. No shortcuts."
-      description="Claude connects via 19 MCP tools — same rules as every human node. It proposes changes that require votes. It gets challenged when evidence is weak. Autonomy where safe, human approval where it matters."
+      label="01 — How it works"
+      title="Three tools. One network."
+      description="ccom_ask sends a message to another node. ccom_reply sends your answer back. ccom_online_nodes shows who's connected. Messages appear as channel events in Claude's session — no polling, no webhooks."
     />
     <ClaudeCodeDemo />
   </section>
@@ -63,9 +32,9 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
   <!-- GET STARTED -->
   <section class="section">
     <SectionHeader
-      label="04 — Get Started"
-      title="Three steps. One command."
-      description="Register your node, grab your token, and connect to the network. The wizard handles the rest."
+      label="02 — Get Started"
+      title="Three steps."
+      description="Register your node at the server, run the wizard, start Claude Code with channels enabled."
     />
 
     <div class="setup-steps">
@@ -73,68 +42,33 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
         <div class="step-number">1</div>
         <div class="step-content">
           <h3 class="step-title">Register at the admin console</h3>
-          <p class="step-desc">
-            Visit the server's admin page — no account needed. Pick your project, choose a node ID, and get your token.
-          </p>
+          <p class="step-desc">Visit the server's admin page. Pick a node name, get your token.</p>
           <div class="step-terminal">
             <code>https://inv-server.apps.quickable.co/admin</code>
           </div>
         </div>
       </div>
-
       <div class="setup-step">
         <div class="step-number">2</div>
         <div class="step-content">
           <h3 class="step-title">Run the setup wizard</h3>
-          <p class="step-desc">
-            Enter your server URL and token. The wizard fetches your node config from the server and writes everything automatically.
-          </p>
+          <p class="step-desc">Enter your server URL and token. Writes ccom-config.json and .mcp.json automatically.</p>
           <div class="step-terminal">
-            <pre><code>$ bunx @tini-works/inv-node init
-
-Server URL (ws://localhost:8080/ws): wss://inv-server.apps.quickable.co/ws
-Auth token: ********
-Database path (./inventory.db):
-
-Fetching node info from server... ✓
-  Node: my-node (my-node)
-  Vertical: dev
-  Owner: cuong
-  Projects: core-pvs-111
-
-Writing ./inv-config.json... ✓
-Writing ./.mcp.json... ✓</code></pre>
+            <code>bunx @tini-works/ccom init</code>
           </div>
         </div>
       </div>
-
       <div class="setup-step">
         <div class="step-number">3</div>
         <div class="step-content">
-          <h3 class="step-title">Start Claude Code</h3>
-          <p class="step-desc">
-            The <code>.mcp.json</code> is auto-detected. Enable channels for real-time events from other nodes.
-          </p>
+          <h3 class="step-title">Start Claude Code with channels</h3>
+          <p class="step-desc">Messages from other nodes appear as channel events in your Claude session.</p>
           <div class="step-terminal">
-            <pre><code>$ claude --dangerously-load-development-channels server:inventory</code></pre>
+            <code>claude --dangerously-load-development-channels server:ccom</code>
           </div>
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- CTA — THE THUMPER -->
-  <section class="thumper-section">
-    <p class="thumper-label">Early access</p>
-
-    <div class="thumper-seismic">
-      <div class="seismic-line"></div>
-      <button class="thumper-button" type="button">
-        Join the waitlist
-      </button>
-      <div class="seismic-line"></div>
-    </div>
-
   </section>
 
 </Base>
@@ -184,166 +118,9 @@ Writing ./.mcp.json... ✓</code></pre>
     animation: fadeSlideUp 0.8s ease-out 0.7s forwards;
   }
 
-  /* ---- MANIFESTO ---- */
-  .manifesto {
-    padding: clamp(4rem, 8vh, 8rem) clamp(2rem, 8vw, 10rem);
-  }
-
-  .manifesto-quote {
-    font-size: clamp(1.1rem, 2vw, 1.6rem);
-    font-weight: 300;
-    color: var(--text-secondary);
-    max-width: 48ch;
-    line-height: 1.7;
-    border-left: 2px solid var(--suspect);
-    padding-left: clamp(1.5rem, 3vw, 2.5rem);
-  }
-
-  .manifesto-quote strong {
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-
   /* ---- SECTIONS ---- */
   .section {
     padding: clamp(4rem, 10vh, 8rem) clamp(2rem, 8vw, 10rem);
-  }
-
-  .section-wide {
-    padding-left: clamp(2rem, 5vw, 6rem);
-    padding-right: clamp(2rem, 5vw, 6rem);
-  }
-
-  /* ---- THUMPER ---- */
-  .thumper-section {
-    padding: clamp(10rem, 22vh, 18rem) clamp(2rem, 8vw, 10rem);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .thumper-label {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-  }
-
-  /* Seismic composition: line — button — line */
-  .thumper-seismic {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    width: 100%;
-    max-width: 720px;
-  }
-
-  .seismic-line {
-    flex: 1;
-    height: 1px;
-    position: relative;
-    background: oklch(0.30 0.03 65 / 0.4);
-    overflow: visible;
-  }
-
-  .seismic-line::after {
-    content: '';
-    position: absolute;
-    top: -1px;
-    height: 3px;
-    width: 60px;
-    border-radius: 2px;
-    background: var(--signal-pulse);
-    opacity: 0.7;
-    animation: seismic-trace 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  }
-
-  .seismic-line:first-child::after {
-    right: 0;
-    animation-name: seismic-trace-left;
-  }
-
-  .seismic-line:last-child::after {
-    left: 0;
-    animation-name: seismic-trace-right;
-  }
-
-  @keyframes seismic-trace-left {
-    0% { transform: translateX(40px); opacity: 0; }
-    20% { opacity: 0.8; }
-    80% { opacity: 0.8; }
-    100% { transform: translateX(-100%); opacity: 0; }
-  }
-
-  @keyframes seismic-trace-right {
-    0% { transform: translateX(-40px); opacity: 0; }
-    20% { opacity: 0.8; }
-    80% { opacity: 0.8; }
-    100% { transform: translateX(100%); opacity: 0; }
-  }
-
-  /* The button */
-  .thumper-button {
-    font-family: var(--font-mono);
-    font-size: clamp(0.72rem, 1vw, 0.85rem);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 1.1rem 2.8rem;
-    min-height: 44px;
-    white-space: nowrap;
-    color: var(--text-primary);
-    text-decoration: none;
-    background: transparent;
-    cursor: pointer;
-    border: 1px solid oklch(0.40 0.08 65 / 0.6);
-    position: relative;
-    z-index: 1;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .thumper-button::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: oklch(0.55 0.12 65 / 0);
-    transition: background 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: -1;
-  }
-
-  .thumper-button:hover {
-    border-color: var(--signal-pulse);
-    color: var(--bg-deep);
-    letter-spacing: 0.22em;
-  }
-
-  .thumper-button:hover::before {
-    background: var(--signal-pulse);
-  }
-
-  .thumper-button:focus-visible {
-    outline: 2px solid var(--signal-pulse);
-    outline-offset: 4px;
-  }
-
-  /* Hover on section intensifies the seismic lines */
-  .thumper-section:hover .seismic-line::after {
-    animation-duration: 1.8s;
-    opacity: 1;
-  }
-
-  @media (max-width: 640px) {
-    .thumper-seismic {
-      max-width: 100%;
-    }
-
-    .thumper-button {
-      padding: 1rem 2rem;
-    }
   }
 
   /* ---- GET STARTED ---- */

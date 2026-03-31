@@ -5,15 +5,15 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
 <div class="claude-demo">
   <div class="cast-tabs">
     <button class="cast-tab active" data-cast="setup">network setup</button>
-    <button class="cast-tab" data-cast="query">cross-node query</button>
-    <button class="cast-tab" data-cast="vote">proposal & vote</button>
+    <button class="cast-tab" data-cast="ask">ask a node</button>
+    <button class="cast-tab" data-cast="reply">reply & receive</button>
   </div>
 
   <div class="cast-panels">
     <div class="cast-panel active" data-panel="setup">
       <AsciinemaPlayer
         src="/casts/network-setup.cast"
-        title="cuong-node, phong-node, blue-node, duke-node — 4 nodes come online, create items"
+        title="cuong-node, phong-node, blue-node, duke-node — 4 nodes come online"
         rows={30}
         cols={120}
         speed={1}
@@ -21,10 +21,10 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
         fit="width"
       />
     </div>
-    <div class="cast-panel" data-panel="query">
+    <div class="cast-panel" data-panel="ask">
       <AsciinemaPlayer
-        src="/casts/cross-node-query.cast"
-        title="cuong-node queries phong-node's inventory — blue-node asks about epic status"
+        src="/casts/ccom-ask.cast"
+        title="cuong-node uses ccom_ask to send a message to phong-node"
         rows={30}
         cols={120}
         speed={1}
@@ -32,10 +32,10 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
         fit="width"
       />
     </div>
-    <div class="cast-panel" data-panel="vote">
+    <div class="cast-panel" data-panel="reply">
       <AsciinemaPlayer
-        src="/casts/proposal-vote.cast"
-        title="cuong-node proposes UI auth redesign — phong-node, blue-node, duke-node vote to approve"
+        src="/casts/ccom-reply.cast"
+        title="phong-node receives the message and uses ccom_reply to respond"
         rows={30}
         cols={120}
         speed={1}
