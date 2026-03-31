@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: inv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inv}
+      POSTGRES_DB: inv
+    expose:
+      - "5432"
+    volumes:
+      - pgdata_v2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inv -d inv"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      ccom-internal:
+        aliases:
+          - ccom-postgres
+
+  redis:
+    image: redis:7
+    expose:
+      - "6379"
+    networks:
+      ccom-internal:
+        aliases:
+          - ccom-redis
+
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+      args:
+        - VITE_DEMO_ADMIN_KEY=${ADMIN_KEY:-}
+    command: sh -c "cd /app/packages/server && bunx prisma migrate deploy"
+    environment:
+      - DATABASE_URL=postgresql://inv:${POSTGRES_PASSWORD:-inv}@ccom-postgres:5432/inv
+    restart: no
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ccom-internal
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+      args:
+        - VITE_DEMO_ADMIN_KEY=${ADMIN_KEY:-}
+    ports:
+      - "4400:4400"
+    environment:
+      - DATABASE_URL=postgresql://inv:${POSTGRES_PASSWORD:-inv}@ccom-postgres:5432/inv
+      - REDIS_URL=redis://ccom-redis:6379
+      - ADMIN_KEY=${ADMIN_KEY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ccom-internal
+
+networks:
+  ccom-internal:
+    driver: bridge
+
+volumes:
+  pgdata_v2:

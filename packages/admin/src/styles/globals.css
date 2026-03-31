@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: oklch(0.12 0.02 65);
+  --color-foreground: oklch(0.82 0.04 70);
+
+  --color-card: oklch(0.16 0.025 65);
+  --color-card-foreground: oklch(0.82 0.04 70);
+
+  --color-popover: oklch(0.16 0.025 65);
+  --color-popover-foreground: oklch(0.82 0.04 70);
+
+  --color-primary: oklch(0.72 0.16 55);
+  --color-primary-foreground: oklch(0.12 0.02 65);
+
+  --color-secondary: oklch(0.38 0.05 65);
+  --color-secondary-foreground: oklch(0.82 0.04 70);
+
+  --color-muted: oklch(0.22 0.03 65);
+  --color-muted-foreground: oklch(0.55 0.03 65);
+
+  --color-accent: oklch(0.78 0.14 85);
+  --color-accent-foreground: oklch(0.55 0.08 85);
+
+  --color-destructive: oklch(0.60 0.18 25);
+  --color-destructive-foreground: oklch(0.12 0.02 65);
+
+  --color-success: oklch(0.65 0.14 145);
+  --color-success-foreground: oklch(0.12 0.02 65);
+
+  --color-border: oklch(0.28 0.04 65);
+  --color-input: oklch(0.28 0.04 65);
+  --color-ring: oklch(0.62 0.12 250);
+
+  --color-spice-bright: oklch(0.82 0.18 55);
+  --color-spice-dim: oklch(0.50 0.10 55);
+  --color-sand-dim: oklch(0.22 0.03 65);
+  --color-deep: oklch(0.16 0.025 65);
+
+  --radius: 0.25rem;
+
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, oklch(0.18 0.04 55 / 0.4), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, oklch(0.15 0.03 45 / 0.3), transparent),
+    oklch(0.12 0.02 65);
+}
+
+@keyframes pulse-metric {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-metric {
+  animation: pulse-metric 2s ease-in-out infinite;
+}
+
+/* React Flow theme overrides */
+.react-flow__renderer {
+  background: transparent;
+}
+.react-flow__edge-path {
+  stroke: oklch(0.28 0.04 65);
+}
+.react-flow__minimap {
+  display: none;
+}
+.react-flow__controls {
+  display: none;
+}

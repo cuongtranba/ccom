@@ -1,0 +1,157 @@
+---
+import AsciinemaPlayer from './AsciinemaPlayer.astro';
+---
+
+<div class="claude-demo">
+  <div class="cast-tabs">
+    <button class="cast-tab active" data-cast="setup">network setup</button>
+    <button class="cast-tab" data-cast="ask">ask a node</button>
+    <button class="cast-tab" data-cast="reply">reply & receive</button>
+  </div>
+
+  <div class="cast-panels">
+    <div class="cast-panel active" data-panel="setup">
+      <AsciinemaPlayer
+        src="/casts/network-setup.cast"
+        title="cuong-node, phong-node, blue-node, duke-node — 4 nodes come online"
+        rows={30}
+        cols={120}
+        speed={1}
+        idleTimeLimit={3}
+        fit="width"
+      />
+    </div>
+    <div class="cast-panel" data-panel="ask">
+      <AsciinemaPlayer
+        src="/casts/ccom-ask.cast"
+        title="cuong-node uses ccom_ask to send a message to phong-node"
+        rows={30}
+        cols={120}
+        speed={1}
+        idleTimeLimit={3}
+        fit="width"
+      />
+    </div>
+    <div class="cast-panel" data-panel="reply">
+      <AsciinemaPlayer
+        src="/casts/ccom-reply.cast"
+        title="phong-node receives the message and uses ccom_reply to respond"
+        rows={30}
+        cols={120}
+        speed={1}
+        idleTimeLimit={3}
+        fit="width"
+      />
+    </div>
+  </div>
+</div>
+
+<script>
+  import { loadPlayerAssets, initPlayer } from '../scripts/asciinema-init.ts';
+
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.cast-tab');
+  const panels = document.querySelectorAll<HTMLElement>('.cast-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.cast;
+      tabs.forEach(t => t.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const panel = document.querySelector<HTMLElement>(`.cast-panel[data-panel="${target}"]`);
+      if (panel) {
+        panel.classList.add('active');
+        // Initialize any players in this panel that weren't visible before
+        panel.querySelectorAll<HTMLElement>('.cast-player').forEach(player => {
+          loadPlayerAssets().then(() => initPlayer(player));
+        });
+      }
+    });
+  });
+</script>
+
+<style>
+  .claude-demo {
+    margin-top: 3rem;
+  }
+
+  .cast-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cast-tab {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    padding: 0.65rem 1.4rem;
+    min-height: 44px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+
+  .cast-tab:hover {
+    color: var(--text-secondary);
+  }
+
+  .cast-tab:focus-visible {
+    outline: 2px solid var(--signal-pulse);
+    outline-offset: 2px;
+  }
+
+  .cast-tab.active {
+    background: var(--bg-deep);
+    color: var(--signal-pulse);
+    border-color: var(--border-subtle);
+  }
+
+  .cast-panels {
+    position: relative;
+  }
+
+
+  .cast-panel {
+    display: none;
+  }
+
+  .cast-panel.active {
+    display: block;
+  }
+
+  @media (max-width: 640px) {
+    .cast-tabs {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .cast-tab {
+      font-size: 0.7rem;
+      padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+    }
+
+    .cast-tab.active {
+      border-color: var(--signal-pulse);
+    }
+
+    .cast-panels {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .cast-panel.active {
+      min-width: 720px;
+    }
+  }
+</style>

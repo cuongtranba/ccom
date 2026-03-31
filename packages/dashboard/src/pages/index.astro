@@ -1,0 +1,520 @@
+---
+import "../styles/dune.css";
+import {
+  getStats,
+  getLocalNode,
+  listPendingActions,
+  listVotingCRs,
+  listActiveChallenges,
+  listPendingPairSessions,
+  getVoteTally,
+  getItem,
+  getNode,
+  getVotes,
+} from "../lib/db";
+import type { NodeInfo } from "../lib/db";
+
+let dbError: string | null = null;
+let stats = { pendingCount: 0, votingCount: 0, challengeCount: 0, pairCount: 0, dbPath: "" };
+let localNode: NodeInfo | null = null;
+let pendingActions: Awaited<ReturnType<typeof listPendingActions>> = [];
+let votingCRs: Awaited<ReturnType<typeof listVotingCRs>> = [];
+let challenges: Awaited<ReturnType<typeof listActiveChallenges>> = [];
+let pairSessions: Awaited<ReturnType<typeof listPendingPairSessions>> = [];
+
+// Enriched CR data
+interface EnrichedCR {
+  cr: (typeof votingCRs)[0];
+  tally: { approved: number; rejected: number; total: number };
+  targetItem: Awaited<ReturnType<typeof getItem>>;
+  proposerNode: Awaited<ReturnType<typeof getNode>>;
+  votes: Awaited<ReturnType<typeof getVotes>>;
+  hasVoted: boolean;
+}
+
+let enrichedCRs: EnrichedCR[] = [];
+let enrichedChallenges: EnrichedCR[] = [];
+
+try {
+  stats = getStats();
+  localNode = getLocalNode();
+  pendingActions = listPendingActions();
+
+  // Voting CRs (exclude challenges)
+  const allVoting = listVotingCRs();
+  votingCRs = allVoting.filter((cr) => !cr.description.startsWith("Challenge:"));
+  challenges = allVoting.filter((cr) => cr.description.startsWith("Challenge:"));
+
+  if (localNode) {
+    pairSessions = listPendingPairSessions(localNode.id);
+  }
+
+  // Enrich CRs
+  enrichedCRs = votingCRs.map((cr) => {
+    const tally = getVoteTally(cr.id);
+    const votes = getVotes(cr.id);
+    return {
+      cr,
+      tally,
+      targetItem: getItem(cr.targetItemId),
+      proposerNode: getNode(cr.proposerNode),
+      votes,
+      hasVoted: localNode ? votes.some((v) => v.nodeId === localNode!.id) : false,
+    };
+  });
+
+  enrichedChallenges = challenges.map((cr) => {
+    const tally = getVoteTally(cr.id);
+    const votes = getVotes(cr.id);
+    return {
+      cr,
+      tally,
+      targetItem: getItem(cr.targetItemId),
+      proposerNode: getNode(cr.proposerNode),
+      votes,
+      hasVoted: localNode ? votes.some((v) => v.nodeId === localNode!.id) : false,
+    };
+  });
+} catch (err) {
+  dbError = err instanceof Error ? err.message : String(err);
+}
+
+const totalActions = stats.pendingCount + stats.votingCount + stats.challengeCount + stats.pairCount;
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr + "Z").getTime();
+  const seconds = Math.floor((now - then) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Action Center — Inventory Network</title>
+  </head>
+  <body>
+    <div class="shell">
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header class="header">
+        <p class="header-eyebrow">Inventory Network</p>
+        <h1 class="header-title">
+          <strong>Action Center</strong>
+        </h1>
+
+        {localNode && (
+          <div class="header-node">
+            <div class="seal"><span>&#9670;</span></div>
+            <span class="node-name">{localNode.name}</span>
+            <span class="node-vertical">{localNode.vertical}</span>
+            <span style="color: var(--text-muted);">&middot;</span>
+            <span style="color: var(--text-muted); font-size: 0.75rem;">{localNode.owner}</span>
+          </div>
+        )}
+
+        <div class="stats-row">
+          <div class="stat-chip spice">
+            <span class="stat-count" id="stat-pending">{stats.pendingCount}</span>
+            <span class="stat-label">Pending</span>
+          </div>
+          <div class="stat-chip fremen">
+            <span class="stat-count" id="stat-voting">{stats.votingCount}</span>
+            <span class="stat-label">Votes</span>
+          </div>
+          <div class="stat-chip warn">
+            <span class="stat-count" id="stat-challenges">{stats.challengeCount}</span>
+            <span class="stat-label">Challenges</span>
+          </div>
+          <div class="stat-chip gold">
+            <span class="stat-count" id="stat-pairs">{stats.pairCount}</span>
+            <span class="stat-label">Pair Invites</span>
+          </div>
+        </div>
+
+        <hr class="header-rule" />
+      </header>
+
+      {dbError ? (
+        <div class="db-error">
+          <h2>Cannot reach the inventory</h2>
+          <p>The database could not be opened. Make sure your node is initialized.</p>
+          <p style="margin-top: var(--space-md);">
+            <code>INV_DB_PATH={stats.dbPath}</code>
+          </p>
+          <p style="margin-top: var(--space-sm); font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted);">
+            {dbError}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ── Pending Authorizations ──────────────────────────── */}
+          <section class="section" id="section-pending">
+            <div class="section-header">
+              <span class="section-icon">&#9672;</span>
+              <span class="section-title">Pending Authorizations</span>
+              <span class="section-count">{pendingActions.length}</span>
+              <div class="section-line" />
+            </div>
+
+            {pendingActions.length === 0 ? (
+              <div class="empty-state">
+                <div class="empty-icon">&#9711;</div>
+                <div class="empty-text">No pending authorizations. The spice flows freely.</div>
+              </div>
+            ) : (
+              pendingActions.map((action) => (
+                <div class="card pending" data-action-id={action.id}>
+                  <div class="card-top">
+                    <span class="card-type pending">{action.messageType}</span>
+                    <span class="card-time">{timeAgo(action.createdAt)}</span>
+                  </div>
+                  <div class="card-summary">{action.summary}</div>
+                  <div class="card-detail">{action.proposed}</div>
+                  <div class="card-id">{shortId(action.id)}</div>
+                  <div class="card-actions">
+                    <button class="btn btn-deny" data-action="reject" data-id={action.id}>
+                      Deny
+                    </button>
+                    <button class="btn btn-authorize" data-action="approve" data-id={action.id}>
+                      Authorize &#9654;
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </section>
+
+          {/* ── Council Votes ──────────────────────────────────────── */}
+          <section class="section" id="section-voting">
+            <div class="section-header">
+              <span class="section-icon">&#9878;</span>
+              <span class="section-title">Council Votes</span>
+              <span class="section-count">{enrichedCRs.length}</span>
+              <div class="section-line" />
+            </div>
+
+            {enrichedCRs.length === 0 ? (
+              <div class="empty-state">
+                <div class="empty-icon">&#9878;</div>
+                <div class="empty-text">No proposals awaiting your counsel.</div>
+              </div>
+            ) : (
+              enrichedCRs.map(({ cr, tally, targetItem, proposerNode, hasVoted }) => (
+                <div class="card voting" data-cr-id={cr.id}>
+                  <div class="card-top">
+                    <span class="card-type voting">{cr.status}</span>
+                    <span class="card-time">{timeAgo(cr.createdAt)}</span>
+                  </div>
+                  <div class="card-summary">{cr.description}</div>
+
+                  {targetItem && (
+                    <div class="target-item">
+                      <span class="item-kind">{targetItem.kind}</span>
+                      <span class="item-title">{targetItem.title}</span>
+                      <span class={`item-state ${targetItem.state}`}>{targetItem.state}</span>
+                    </div>
+                  )}
+
+                  {proposerNode && (
+                    <div class="card-detail">
+                      Proposed by {proposerNode.name} ({proposerNode.vertical})
+                    </div>
+                  )}
+
+                  <div class="tally">
+                    <div class="tally-item">
+                      <div class="tally-dot approve" />
+                      <span class="tally-count">{tally.approved}</span>
+                      <span class="tally-label">Sanction</span>
+                    </div>
+                    <div class="tally-sep" />
+                    <div class="tally-item">
+                      <div class="tally-dot reject" />
+                      <span class="tally-count">{tally.rejected}</span>
+                      <span class="tally-label">Oppose</span>
+                    </div>
+                    <div class="tally-sep" />
+                    <div class="tally-item">
+                      <span class="tally-label" style="color: var(--text-secondary);">{tally.total} total</span>
+                    </div>
+                  </div>
+
+                  <div class="card-id">{shortId(cr.id)}</div>
+
+                  {hasVoted ? (
+                    <div class="card-actions">
+                      <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); padding: 8px 0;">
+                        &#10003; Vote recorded
+                      </span>
+                    </div>
+                  ) : (
+                    <div class="vote-form" data-cr-id={cr.id}>
+                      <input class="vote-input" type="text" placeholder="Reason for your vote..." data-reason />
+                      <div class="card-actions">
+                        <button class="btn btn-deny" data-vote="reject" data-cr={cr.id}>
+                          Oppose
+                        </button>
+                        <button class="btn btn-sanction" data-vote="approve" data-cr={cr.id}>
+                          Sanction &#9654;
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </section>
+
+          {/* ── Active Challenges ──────────────────────────────────── */}
+          <section class="section" id="section-challenges">
+            <div class="section-header">
+              <span class="section-icon">&#9876;</span>
+              <span class="section-title">Active Challenges</span>
+              <span class="section-count">{enrichedChallenges.length}</span>
+              <div class="section-line" />
+            </div>
+
+            {enrichedChallenges.length === 0 ? (
+              <div class="empty-state">
+                <div class="empty-icon">&#9876;</div>
+                <div class="empty-text">No active challenges. The Imperium is at peace.</div>
+              </div>
+            ) : (
+              enrichedChallenges.map(({ cr, tally, targetItem, proposerNode, hasVoted }) => (
+                <div class="card challenge" data-cr-id={cr.id}>
+                  <div class="card-top">
+                    <span class="card-type challenge">Challenge</span>
+                    <span class="card-time">{timeAgo(cr.createdAt)}</span>
+                  </div>
+                  <div class="card-summary">{cr.description.replace("Challenge: ", "")}</div>
+
+                  {targetItem && (
+                    <div class="target-item">
+                      <span class="item-kind">{targetItem.kind}</span>
+                      <span class="item-title">{targetItem.title}</span>
+                      <span class={`item-state ${targetItem.state}`}>{targetItem.state}</span>
+                    </div>
+                  )}
+
+                  {proposerNode && (
+                    <div class="card-detail">
+                      Challenged by {proposerNode.name} ({proposerNode.vertical})
+                    </div>
+                  )}
+
+                  <div class="tally">
+                    <div class="tally-item">
+                      <div class="tally-dot approve" />
+                      <span class="tally-count">{tally.approved}</span>
+                      <span class="tally-label">Uphold</span>
+                    </div>
+                    <div class="tally-sep" />
+                    <div class="tally-item">
+                      <div class="tally-dot reject" />
+                      <span class="tally-count">{tally.rejected}</span>
+                      <span class="tally-label">Dismiss</span>
+                    </div>
+                  </div>
+
+                  <div class="card-id">{shortId(cr.id)}</div>
+
+                  {hasVoted ? (
+                    <div class="card-actions">
+                      <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); padding: 8px 0;">
+                        &#10003; Vote recorded
+                      </span>
+                    </div>
+                  ) : (
+                    <div class="vote-form" data-cr-id={cr.id}>
+                      <input class="vote-input" type="text" placeholder="Reason..." data-reason />
+                      <div class="card-actions">
+                        <button class="btn btn-deny" data-vote="reject" data-cr={cr.id}>
+                          Dismiss
+                        </button>
+                        <button class="btn btn-authorize" data-vote="approve" data-cr={cr.id}>
+                          Uphold &#9654;
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </section>
+
+          {/* ── Pair Invitations ───────────────────────────────────── */}
+          {pairSessions.length > 0 && (
+            <section class="section" id="section-pairs">
+              <div class="section-header">
+                <span class="section-icon">&#9741;</span>
+                <span class="section-title">Pair Invitations</span>
+                <span class="section-count">{pairSessions.length}</span>
+                <div class="section-line" />
+              </div>
+
+              {pairSessions.map((session) => {
+                const isInvitee = localNode && session.partnerNode === localNode.id;
+                const otherNodeId = isInvitee ? session.initiatorNode : session.partnerNode;
+                const otherNode = getNode(otherNodeId);
+                return (
+                  <div class="card pair" data-session-id={session.id}>
+                    <div class="card-top">
+                      <span class="card-type pair">Pair Session</span>
+                      <span class="card-time">{timeAgo(session.startedAt)}</span>
+                    </div>
+                    <div class="card-summary">
+                      {isInvitee
+                        ? `${otherNode?.name ?? "Unknown"} invited you to pair`
+                        : `Waiting for ${otherNode?.name ?? "Unknown"} to join`}
+                    </div>
+                    <div class="card-id">{shortId(session.id)}</div>
+                    {isInvitee && (
+                      <div class="card-actions">
+                        <button class="btn btn-accept" data-pair-accept={session.id}>
+                          Accept &#9654;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
+          {/* ── All Clear ──────────────────────────────────────────── */}
+          {totalActions === 0 && (
+            <div class="empty-state" style="margin-top: var(--space-2xl);">
+              <div class="empty-icon">&#9673;</div>
+              <div class="empty-text" style="font-size: 1rem; font-style: normal; color: var(--gold-dim);">
+                The desert is calm. No actions require your attention.
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+
+    <div class="toast-container" id="toasts"></div>
+
+    {/* ── Pass local node info to client ──────────────────────── */}
+    {localNode && (
+      <script
+        id="node-data"
+        type="application/json"
+        set:html={JSON.stringify({ id: localNode.id, vertical: localNode.vertical })}
+      />
+    )}
+
+    <script>
+      // ── Client-side interactivity ────────────────────────────
+      function getNodeData(): { id: string; vertical: string } | null {
+        const el = document.getElementById("node-data");
+        if (!el) return null;
+        return JSON.parse(el.textContent || "null");
+      }
+
+      function showToast(message: string, type: "success" | "error" = "success") {
+        const container = document.getElementById("toasts")!;
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+      }
+
+      function removeCard(card: HTMLElement) {
+        card.classList.add("removing");
+        setTimeout(() => card.remove(), 400);
+      }
+
+      // ── Pending Actions: Approve / Reject ─────────────────────
+      document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id!;
+          const action = btn.dataset.action as "approve" | "reject";
+          btn.disabled = true;
+
+          try {
+            const res = await fetch(`/api/pending/${id}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: action === "approve" ? "approved" : "rejected" }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            const card = btn.closest(".card") as HTMLElement;
+            removeCard(card);
+            showToast(action === "approve" ? "Authorized" : "Denied");
+
+            // Update stat counter
+            const statEl = document.getElementById("stat-pending");
+            if (statEl) {
+              const current = parseInt(statEl.textContent || "0");
+              statEl.textContent = String(Math.max(0, current - 1));
+            }
+          } catch (err) {
+            showToast("Failed: " + (err as Error).message, "error");
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // ── Voting: Sanction / Oppose ─────────────────────────────
+      document.querySelectorAll<HTMLButtonElement>("[data-vote]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const crId = btn.dataset.cr!;
+          const approve = btn.dataset.vote === "approve";
+          const form = btn.closest(".vote-form") as HTMLElement;
+          const reasonInput = form.querySelector<HTMLInputElement>("[data-reason]");
+          const reason = reasonInput?.value || (approve ? "Approved" : "Opposed");
+          const nodeData = getNodeData();
+          if (!nodeData) {
+            showToast("No local node configured", "error");
+            return;
+          }
+
+          btn.disabled = true;
+
+          try {
+            const res = await fetch("/api/vote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                crId,
+                nodeId: nodeData.id,
+                vertical: nodeData.vertical,
+                approve,
+                reason,
+              }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            // Replace form with confirmation
+            form.innerHTML = `<div class="card-actions">
+              <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); padding: 8px 0;">
+                &#10003; Vote recorded
+              </span>
+            </div>`;
+            showToast(approve ? "Vote: Sanctioned" : "Vote: Opposed");
+          } catch (err) {
+            showToast("Vote failed: " + (err as Error).message, "error");
+            btn.disabled = false;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "node": {
+    "id": "duke-node",
+    "name": "Duke Node",
+    "vertical": "dev",
+    "projects": ["test-project"],
+    "owner": "duke",
+    "isAI": true
+  },
+  "server": {
+    "url": "ws://localhost:4400/ws",
+    "token": "00000000-0000-0000-0000-000000000003"
+  }
+}

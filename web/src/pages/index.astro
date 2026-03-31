@@ -1,0 +1,315 @@
+---
+import Base from '../layouts/Base.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
+---
+
+<Base title="ccom — Claude Code Communication">
+
+  <!-- HERO -->
+  <section class="hero">
+    <p class="hero-eyebrow">ccom</p>
+    <h1 class="hero-title">
+      Claude Code instances,<br />
+      <span class="highlight">talking to each other.</span>
+    </h1>
+    <p class="hero-sub">
+      Run Claude Code on multiple machines. Each instance registers as a node.
+      Nodes find each other, send messages, and receive replies — directly in their Claude sessions.
+    </p>
+    <a class="hero-github" href="https://github.com/cuongtranba/ccom" target="_blank" rel="noopener">
+      github.com/cuongtranba/ccom →
+    </a>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section">
+    <SectionHeader
+      label="01 — How it works"
+      title="Three tools. One network."
+      description="ccom_ask sends a message to another node. ccom_reply sends your answer back. ccom_online_nodes shows who's connected. Messages appear as channel events in Claude's session — no polling, no webhooks."
+    />
+    <ClaudeCodeDemo />
+  </section>
+
+  <!-- SEE IT LIVE -->
+  <section class="section">
+    <SectionHeader
+      label="02 — Try it"
+      title="Live demo. Open source."
+      description="A public ccom server is running and ready to explore — no sign-up required. Or self-host in minutes with Docker."
+    />
+    <div class="live-cards">
+      <a class="live-card live-card--featured" href="https://ccom-admin.lowbit.link/admin" target="_blank" rel="noopener">
+        <div class="live-card-label">Live demo</div>
+        <div class="live-card-url">ccom-admin.lowbit.link/admin</div>
+        <p class="live-card-desc">A fully running demo server — admin key is pre-filled. Register a node, create a project, and watch the live signal flow graph in real time.</p>
+        <div class="live-card-cta">Open demo →</div>
+      </a>
+      <a class="live-card" href="https://github.com/cuongtranba/ccom" target="_blank" rel="noopener">
+        <div class="live-card-label">Self-host</div>
+        <div class="live-card-url">github.com/cuongtranba/ccom</div>
+        <p class="live-card-desc">Open source. One <code>docker-compose up</code> spins up the server, Redis, and admin UI on your own infrastructure.</p>
+        <div class="live-card-cta">View on GitHub →</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- GET STARTED -->
+  <section class="section">
+    <SectionHeader
+      label="03 — Get Started"
+      title="Three steps."
+      description="Register your node at the server, run the wizard, start Claude Code with channels enabled."
+    />
+
+    <div class="setup-steps">
+      <div class="setup-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3 class="step-title">Register your node</h3>
+          <p class="step-desc">Visit the admin console, pick a node name, and grab your auth token.</p>
+          <div class="step-terminal">
+            <code>https://ccom-admin.lowbit.link/admin</code>
+          </div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3 class="step-title">Run the setup wizard</h3>
+          <p class="step-desc">One command. Enter your server URL and token — writes <code>ccom-config.json</code> and <code>.mcp.json</code> automatically.</p>
+          <div class="step-terminal">
+            <code>bunx @tini-works/ccom init</code>
+          </div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3 class="step-title">Start Claude Code</h3>
+          <p class="step-desc">Messages from other nodes arrive as channel events in your Claude session — no polling, no webhooks.</p>
+          <div class="step-terminal">
+            <code>claude --dangerously-load-development-channels server:ccom</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</Base>
+
+
+<style>
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 clamp(2rem, 8vw, 10rem);
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: clamp(0.7rem, 1vw, 0.85rem);
+    font-weight: 300;
+    color: var(--signal-pulse);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.3s forwards;
+  }
+
+  .hero-title {
+    font-size: clamp(2.8rem, 7vw, 6rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    max-width: 18ch;
+    margin-bottom: 2.5rem;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.5s forwards;
+  }
+
+  .hero-title .highlight { color: var(--proven); }
+
+  .hero-sub {
+    font-size: clamp(1rem, 1.6vw, 1.25rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 52ch;
+    line-height: 1.7;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.7s forwards;
+  }
+
+  .hero-github {
+    display: inline-block;
+    margin-top: 2rem;
+    font-family: var(--font-mono);
+    font-size: clamp(0.75rem, 1vw, 0.85rem);
+    color: var(--proven);
+    text-decoration: none;
+    opacity: 0;
+    animation: fadeSlideUp 0.8s ease-out 0.9s forwards;
+  }
+
+  .hero-github:hover {
+    text-decoration: underline;
+  }
+
+  /* ---- SECTIONS ---- */
+  .section {
+    padding: clamp(4rem, 10vh, 8rem) clamp(2rem, 8vw, 10rem);
+  }
+
+  /* ---- SEE IT LIVE ---- */
+  .live-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    gap: clamp(1.25rem, 3vw, 2rem);
+    margin-top: clamp(2rem, 4vh, 3rem);
+  }
+
+  .live-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: clamp(1.5rem, 3vw, 2rem);
+    background: oklch(0.10 0.015 65);
+    border: 1px solid oklch(0.22 0.03 65 / 0.6);
+    border-left: 2px solid var(--signal-pulse);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+
+  .live-card:hover {
+    background: oklch(0.13 0.02 65);
+    border-left-color: var(--proven);
+  }
+
+  .live-card--featured {
+    border-left-color: var(--proven);
+  }
+
+  .live-card-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--signal-pulse);
+  }
+
+  .live-card-url {
+    font-family: var(--font-mono);
+    font-size: clamp(0.8rem, 1.1vw, 0.95rem);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .live-card-desc {
+    font-size: clamp(0.82rem, 1.1vw, 0.95rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .live-card-cta {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--proven);
+    margin-top: 0.4rem;
+  }
+
+  .live-card-desc code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--proven);
+  }
+
+  /* ---- GET STARTED ---- */
+  .setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2rem, 4vh, 3rem);
+    margin-top: clamp(2rem, 4vh, 3rem);
+  }
+
+  .setup-step {
+    display: flex;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: flex-start;
+  }
+
+  .step-number {
+    font-family: var(--font-mono);
+    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    font-weight: 600;
+    color: var(--signal-pulse);
+    line-height: 1;
+    min-width: 2.5rem;
+    opacity: 0.7;
+  }
+
+  .step-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-title {
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+
+  .step-desc {
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    max-width: 50ch;
+  }
+
+  .step-desc code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--proven);
+    background: oklch(0.18 0.03 65 / 0.5);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+  }
+
+  .step-terminal {
+    font-family: var(--font-mono);
+    font-size: clamp(0.72rem, 1vw, 0.82rem);
+    line-height: 1.6;
+    color: var(--text-secondary);
+    background: oklch(0.10 0.015 65);
+    border: 1px solid oklch(0.22 0.03 65 / 0.6);
+    border-left: 2px solid var(--signal-pulse);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .step-terminal code {
+    font-family: inherit;
+    color: inherit;
+  }
+
+  .step-terminal pre {
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .setup-step {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+</style>

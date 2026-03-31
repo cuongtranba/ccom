@@ -1,0 +1,591 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Node Monitor — Inventory Network">
+  <div class="monitor">
+    <header class="monitor-header">
+      <div class="header-left">
+        <div class="sigil"></div>
+        <div>
+          <h1 class="header-title">Inventory Network</h1>
+          <p class="header-sub">Node Monitor</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="connection-status" id="conn-status">
+          <span class="conn-dot"></span>
+          <span class="conn-label">Connecting...</span>
+        </div>
+        <div class="header-time" id="header-time"></div>
+      </div>
+    </header>
+
+    <div class="monitor-grid">
+      <!-- Node Identity Card -->
+      <section class="card card-identity" id="card-identity">
+        <div class="card-header">
+          <span class="card-icon">&#9670;</span>
+          <span>Node Identity</span>
+        </div>
+        <div class="identity-body">
+          <div class="identity-name" id="node-name">--</div>
+          <div class="identity-meta">
+            <span class="tag tag-vertical" id="node-vertical">--</span>
+            <span class="tag tag-project" id="node-project">--</span>
+          </div>
+          <div class="identity-details">
+            <div class="detail-row"><span class="detail-label">Owner</span><span class="detail-value" id="node-owner">--</span></div>
+            <div class="detail-row"><span class="detail-label">Node ID</span><span class="detail-value mono" id="node-id">--</span></div>
+            <div class="detail-row"><span class="detail-label">Mode</span><span class="detail-value" id="node-mode">--</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Network Vitals -->
+      <section class="card card-vitals">
+        <div class="card-header">
+          <span class="card-icon">&#9678;</span>
+          <span>Network Vitals</span>
+        </div>
+        <div class="vitals-grid">
+          <div class="vital">
+            <div class="vital-value" id="v-peers">0</div>
+            <div class="vital-label">Peers</div>
+            <div class="vital-bar"><div class="vital-bar-fill" id="v-peers-bar" style="width:0%"></div></div>
+          </div>
+          <div class="vital">
+            <div class="vital-value" id="v-items">0</div>
+            <div class="vital-label">Items</div>
+            <div class="vital-bar"><div class="vital-bar-fill" id="v-items-bar" style="width:0%"></div></div>
+          </div>
+          <div class="vital">
+            <div class="vital-value" id="v-traces">0</div>
+            <div class="vital-label">Traces</div>
+            <div class="vital-bar"><div class="vital-bar-fill" id="v-traces-bar" style="width:0%"></div></div>
+          </div>
+          <div class="vital">
+            <div class="vital-value" id="v-outbox">0</div>
+            <div class="vital-label">Outbox</div>
+            <div class="vital-bar"><div class="vital-bar-fill outbox" id="v-outbox-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Audit Health -->
+      <section class="card card-audit">
+        <div class="card-header">
+          <span class="card-icon">&#9673;</span>
+          <span>Audit Health</span>
+        </div>
+        <div class="audit-body" id="audit-body">
+          <div class="audit-ring-container">
+            <svg class="audit-ring" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border-subtle)" stroke-width="8" />
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--proven)" stroke-width="8"
+                      stroke-dasharray="326.7" stroke-dashoffset="326.7" stroke-linecap="round"
+                      id="audit-ring-fill" class="audit-ring-animated" />
+            </svg>
+            <div class="audit-ring-label">
+              <span class="audit-score" id="audit-score">--</span>
+              <span class="audit-score-sub">health</span>
+            </div>
+          </div>
+          <div class="audit-breakdown">
+            <div class="audit-row"><span class="dot dot-proven"></span><span>Proven</span><span class="audit-count" id="a-proven">0</span></div>
+            <div class="audit-row"><span class="dot dot-unverified"></span><span>Unverified</span><span class="audit-count" id="a-unverified">0</span></div>
+            <div class="audit-row"><span class="dot dot-suspect"></span><span>Suspect</span><span class="audit-count" id="a-suspect">0</span></div>
+            <div class="audit-row"><span class="dot dot-broke"></span><span>Broken</span><span class="audit-count" id="a-broke">0</span></div>
+            <div class="audit-row orphan"><span class="dot dot-orphan"></span><span>Orphans</span><span class="audit-count" id="a-orphans">0</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Peers -->
+      <section class="card card-peers">
+        <div class="card-header">
+          <span class="card-icon">&#9672;</span>
+          <span>Peers</span>
+        </div>
+        <div class="peers-list" id="peers-list">
+          <div class="empty-state">No peers connected</div>
+        </div>
+      </section>
+
+      <!-- Activity Feed -->
+      <section class="card card-activity">
+        <div class="card-header">
+          <span class="card-icon">&#9656;</span>
+          <span>Activity</span>
+          <span class="activity-badge" id="activity-count" style="display:none">0</span>
+        </div>
+        <div class="activity-feed" id="activity-feed">
+          <div class="empty-state">No recent activity</div>
+        </div>
+      </section>
+
+      <!-- Governance -->
+      <section class="card card-governance">
+        <div class="card-header">
+          <span class="card-icon">&#9671;</span>
+          <span>Governance</span>
+        </div>
+        <div class="governance-body">
+          <div class="gov-stat">
+            <div class="gov-value" id="g-proposals">0</div>
+            <div class="gov-label">Proposals</div>
+          </div>
+          <div class="gov-stat">
+            <div class="gov-value" id="g-challenges">0</div>
+            <div class="gov-label">Challenges</div>
+          </div>
+          <div class="gov-stat">
+            <div class="gov-value" id="g-reputation">+0</div>
+            <div class="gov-label">Reputation</div>
+          </div>
+        </div>
+        <div class="gov-items" id="gov-items"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    import '../scripts/monitor.ts';
+  </script>
+</Base>
+
+<style>
+  .monitor {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem;
+    min-height: 100vh;
+  }
+
+  /* ---- Header ---- */
+  .monitor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .sigil {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--proven);
+    border-radius: 50%;
+    position: relative;
+    animation: sigilPulse 3s ease-in-out infinite;
+  }
+
+  .sigil::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid var(--proven-glow);
+    border-radius: 50%;
+    animation: sigilInner 3s ease-in-out infinite reverse;
+  }
+
+  @keyframes sigilPulse {
+    0%, 100% { box-shadow: 0 0 8px oklch(0.75 0.14 80 / 0.3); }
+    50% { box-shadow: 0 0 20px oklch(0.75 0.14 80 / 0.6); }
+  }
+
+  @keyframes sigilInner {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .header-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+  }
+
+  .header-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+  }
+
+  .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--suspect);
+    animation: connPulse 1.5s ease-in-out infinite;
+  }
+
+  .connection-status.online .conn-dot {
+    background: var(--proven);
+  }
+
+  .connection-status.offline .conn-dot {
+    background: var(--broke);
+    animation: none;
+  }
+
+  @keyframes connPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .header-time {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* ---- Grid ---- */
+  .monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto auto;
+    gap: 1rem;
+  }
+
+  .card-identity { grid-column: 1; grid-row: 1; }
+  .card-vitals { grid-column: 2; grid-row: 1; }
+  .card-audit { grid-column: 3; grid-row: 1; }
+  .card-peers { grid-column: 1; grid-row: 2; }
+  .card-activity { grid-column: 2 / 4; grid-row: 2; }
+  .card-governance { grid-column: 1 / 4; grid-row: 3; }
+
+  /* ---- Cards ---- */
+  .card {
+    background: oklch(0.14 0.02 65 / 0.85);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 1.25rem;
+    backdrop-filter: blur(12px);
+    animation: cardEnter 0.6s ease-out both;
+  }
+
+  .card:nth-child(1) { animation-delay: 0s; }
+  .card:nth-child(2) { animation-delay: 0.08s; }
+  .card:nth-child(3) { animation-delay: 0.16s; }
+  .card:nth-child(4) { animation-delay: 0.24s; }
+  .card:nth-child(5) { animation-delay: 0.32s; }
+  .card:nth-child(6) { animation-delay: 0.40s; }
+
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid oklch(0.25 0.02 65 / 0.5);
+  }
+
+  .card-icon {
+    color: var(--proven);
+    font-size: 0.9rem;
+  }
+
+  /* ---- Identity Card ---- */
+  .identity-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .identity-meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .tag-vertical {
+    background: oklch(0.75 0.14 80 / 0.15);
+    color: var(--proven);
+    border: 1px solid oklch(0.75 0.14 80 / 0.25);
+  }
+
+  .tag-project {
+    background: oklch(0.55 0.10 70 / 0.12);
+    color: var(--trace-active);
+    border: 1px solid oklch(0.55 0.10 70 / 0.2);
+  }
+
+  .identity-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+  }
+
+  .detail-label {
+    color: var(--text-muted);
+  }
+
+  .detail-value {
+    color: var(--text-secondary);
+  }
+
+  .detail-value.mono {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+  }
+
+  /* ---- Vitals ---- */
+  .vitals-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .vital-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    line-height: 1;
+  }
+
+  .vital-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0.25rem 0;
+  }
+
+  .vital-bar {
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .vital-bar-fill {
+    height: 100%;
+    background: var(--proven);
+    border-radius: 2px;
+    transition: width 0.8s ease-out;
+  }
+
+  .vital-bar-fill.outbox {
+    background: var(--suspect);
+  }
+
+  /* ---- Audit Ring ---- */
+  .audit-body {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .audit-ring-container {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+  }
+
+  .audit-ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .audit-ring-animated {
+    transition: stroke-dashoffset 1.2s ease-out;
+  }
+
+  .audit-ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .audit-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+  }
+
+  .audit-score-sub {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .audit-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+  }
+
+  .audit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .audit-row .audit-count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-proven { background: var(--proven); }
+  .dot-unverified { background: var(--unverified); }
+  .dot-suspect { background: var(--suspect); }
+  .dot-broke { background: var(--broke); }
+  .dot-orphan { background: var(--text-muted); }
+
+  /* ---- Peers ---- */
+  .peers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .peers-list::-webkit-scrollbar { width: 4px; }
+  .peers-list::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+
+  /* ---- Activity Feed ---- */
+  .activity-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .activity-feed::-webkit-scrollbar { width: 4px; }
+  .activity-feed::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+
+  .activity-badge {
+    margin-left: auto;
+    background: var(--proven);
+    color: var(--bg-deep);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 8px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* ---- Governance ---- */
+  .governance-body {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .gov-stat { text-align: center; }
+
+  .gov-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .gov-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 0.25rem;
+  }
+
+  .gov-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  /* ---- Empty State ---- */
+  .empty-state {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 1.5rem 0;
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 900px) {
+    .monitor-grid {
+      grid-template-columns: 1fr;
+    }
+    .card-identity, .card-vitals, .card-audit,
+    .card-peers, .card-activity, .card-governance {
+      grid-column: 1;
+      grid-row: auto;
+    }
+  }
+</style>

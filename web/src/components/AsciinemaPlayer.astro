@@ -1,0 +1,109 @@
+---
+interface Props {
+  src: string;
+  title?: string;
+  rows?: number;
+  cols?: number;
+  speed?: number;
+  loop?: boolean;
+  autoPlay?: boolean;
+  idleTimeLimit?: number;
+  fit?: 'width' | 'height' | 'both' | 'none';
+}
+
+const {
+  src,
+  title,
+  rows = 32,
+  cols = 92,
+  speed = 1.5,
+  loop = true,
+  autoPlay = true,
+  idleTimeLimit = 2,
+  fit = 'width',
+} = Astro.props;
+
+const playerId = `player-${src.replace(/[^a-z0-9]/gi, '-')}`;
+---
+
+<div class="cast-player" id={playerId}
+  data-src={src}
+  data-rows={rows}
+  data-cols={cols}
+  data-speed={speed}
+  data-loop={loop}
+  data-autoplay={autoPlay}
+  data-idle-time-limit={idleTimeLimit}
+  data-fit={fit}
+>
+  {title && <div class="cast-label">{title}</div>}
+  <div class="cast-container"></div>
+</div>
+
+<style>
+  .cast-player {
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+
+  .cast-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+  }
+
+  .cast-container {
+    padding: 0.5rem;
+  }
+
+  /* Override asciinema-player theme to match Dune palette */
+  .cast-container :global(.ap-wrapper) {
+    background: transparent !important;
+  }
+
+  .cast-container :global(.ap-terminal) {
+    background: transparent !important;
+    font-family: var(--font-mono) !important;
+  }
+
+  .cast-container :global(.ap-control-bar) {
+    background: var(--bg-surface) !important;
+    border-top: 1px solid var(--border-subtle) !important;
+  }
+
+  .cast-container :global(.ap-progressbar .ap-gutter-bar) {
+    background: var(--border-subtle) !important;
+  }
+
+  .cast-container :global(.ap-progressbar .ap-buffer-bar) {
+    background: var(--trace-line) !important;
+  }
+
+  .cast-container :global(.ap-progressbar .ap-progress-bar) {
+    background: var(--signal-pulse) !important;
+  }
+
+  .cast-container :global(.ap-play-btn),
+  .cast-container :global(.ap-fullscreen-btn),
+  .cast-container :global(.ap-timer) {
+    color: var(--text-muted) !important;
+  }
+
+  .cast-container :global(.ap-start-prompt) {
+    background: color-mix(in oklch, var(--bg-deep) 85%, transparent) !important;
+  }
+
+  .cast-container :global(.ap-play-btn svg) {
+    fill: var(--signal-pulse) !important;
+  }
+</style>

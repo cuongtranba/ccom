@@ -1,0 +1,25 @@
+{
+  "name": "@tini-works/ccom",
+  "version": "0.1.0",
+  "bin": {
+    "ccom": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outdir=dist --entry-naming=cli.js --external=@modelcontextprotocol/sdk && echo '#!/usr/bin/env bun' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && chmod +x dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cuongtranba/ccom.git",
+    "directory": "packages/node"
+  }
+}

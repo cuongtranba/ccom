@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#1f1a14"/>
+  <!-- Trace lines -->
+  <line x1="16" y1="8" x2="8" y2="20" stroke="#4a3d2e" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="16" y1="8" x2="24" y2="20" stroke="#4a3d2e" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="8" y1="20" x2="24" y2="20" stroke="#4a3d2e" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Nodes -->
+  <circle cx="16" cy="8" r="3.5" fill="#c8952a" opacity="0.15" stroke="#c8952a" stroke-width="1.2"/>
+  <circle cx="8" cy="20" r="3" fill="#c8952a" opacity="0.15" stroke="#c8952a" stroke-width="1"/>
+  <circle cx="24" cy="20" r="3" fill="#c8952a" opacity="0.15" stroke="#c8952a" stroke-width="1"/>
+  <!-- Signal dot flowing down-left trace -->
+  <circle cx="12" cy="14" r="1.5" fill="#d4a030" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>

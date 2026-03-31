@@ -1,0 +1,14 @@
+{
+  "node": {
+    "id": "cuong-node",
+    "name": "Cuong Node",
+    "vertical": "dev",
+    "projects": ["test-project"],
+    "owner": "cuong",
+    "isAI": true
+  },
+  "server": {
+    "url": "ws://localhost:4400/ws",
+    "token": "00000000-0000-0000-0000-000000000001"
+  }
+}

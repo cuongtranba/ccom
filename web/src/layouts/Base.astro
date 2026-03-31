@@ -1,0 +1,63 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ccom — Real-time communication for Claude Code instances. Each instance registers as a node. Nodes find each other, send messages, and receive replies." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <canvas id="network-canvas" aria-hidden="true"></canvas>
+    <main id="content" class="content-layer">
+      <slot />
+    </main>
+    <script>
+      import '../scripts/sand-flow.ts';
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: var(--bg-surface);
+    color: var(--signal-pulse);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    border: 1px solid var(--signal-pulse);
+    border-radius: 4px;
+    text-decoration: none;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+
+  #network-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .content-layer {
+    position: relative;
+    z-index: 1;
+  }
+</style>

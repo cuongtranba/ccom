@@ -1,0 +1,60 @@
+@import './demo-shared.css';
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: oklch(0.12 0.02 65);
+  --bg-surface: oklch(0.17 0.02 65);
+  --bg-elevated: oklch(0.22 0.025 65);
+  --border-subtle: oklch(0.28 0.02 65);
+  --border-hover: oklch(0.40 0.03 70);
+
+  --text-primary: oklch(0.90 0.02 75);
+  --text-secondary: oklch(0.60 0.03 70);
+  --text-muted: oklch(0.42 0.02 65);
+
+  --proven: oklch(0.75 0.14 80);
+  --proven-glow: oklch(0.65 0.17 80);
+  --suspect: oklch(0.62 0.16 45);
+  --suspect-glow: oklch(0.52 0.20 45);
+  --broke: oklch(0.55 0.20 25);
+  --unverified: oklch(0.55 0.04 70);
+  --unverified-glow: oklch(0.45 0.06 70);
+
+  --signal-pulse: oklch(0.78 0.16 65);
+  --trace-line: oklch(0.30 0.03 65);
+  --trace-active: oklch(0.55 0.10 70);
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-display);
+  background:
+    radial-gradient(ellipse 140% 50% at 50% 105%, oklch(0.20 0.07 55 / 0.7) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 50% at 85% 15%, oklch(0.16 0.05 50 / 0.3) 0%, transparent 100%),
+    linear-gradient(175deg, oklch(0.10 0.025 55) 0%, oklch(0.15 0.045 58) 100%);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-fill-mode: forwards !important;
+  }
+
+  .hero-eyebrow, .hero-title, .hero-sub {
+    opacity: 1 !important;
+  }
+}
