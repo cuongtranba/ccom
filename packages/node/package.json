@@ -1,6 +1,6 @@
 {
   "name": "@tini-works/ccom",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "bin": {
     "ccom": "./dist/cli.js"
   },
