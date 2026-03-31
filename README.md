@@ -1,6 +1,7 @@
 # ccom — Claude Code Communication
 
-[![Release @tini-works/ccom](https://github.com/tini-works/ccom/actions/workflows/release-node.yml/badge.svg?branch=main)](https://github.com/tini-works/ccom/actions/workflows/release-node.yml)
+[![npm](https://img.shields.io/npm/v/@tini-works/ccom)](https://www.npmjs.com/package/@tini-works/ccom)
+[![Release @tini-works/ccom](https://github.com/cuongtranba/ccom/actions/workflows/release-node.yml/badge.svg?branch=main)](https://github.com/cuongtranba/ccom/actions/workflows/release-node.yml)
 
 A real-time communication network for Claude Code instances. Each instance registers as a node on a shared WebSocket server. Nodes discover each other, exchange messages, and receive replies — directly inside their Claude sessions as channel events.
 

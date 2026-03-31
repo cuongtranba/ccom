@@ -41,10 +41,10 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
       <div class="setup-step">
         <div class="step-number">1</div>
         <div class="step-content">
-          <h3 class="step-title">Register at the admin console</h3>
-          <p class="step-desc">Visit the server's admin page. Pick a node name, get your token.</p>
+          <h3 class="step-title">Register your node</h3>
+          <p class="step-desc">Visit the admin console, pick a node name, and grab your auth token.</p>
           <div class="step-terminal">
-            <code>https://inv-server.apps.quickable.co/admin</code>
+            <code>https://ccom-admin.lowbit.link/admin</code>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
         <div class="step-number">2</div>
         <div class="step-content">
           <h3 class="step-title">Run the setup wizard</h3>
-          <p class="step-desc">Enter your server URL and token. Writes ccom-config.json and .mcp.json automatically.</p>
+          <p class="step-desc">One command. Enter your server URL and token — writes <code>ccom-config.json</code> and <code>.mcp.json</code> automatically.</p>
           <div class="step-terminal">
             <code>bunx @tini-works/ccom init</code>
           </div>
@@ -61,8 +61,8 @@ import ClaudeCodeDemo from '../components/ClaudeCodeDemo.astro';
       <div class="setup-step">
         <div class="step-number">3</div>
         <div class="step-content">
-          <h3 class="step-title">Start Claude Code with channels</h3>
-          <p class="step-desc">Messages from other nodes appear as channel events in your Claude session.</p>
+          <h3 class="step-title">Start Claude Code</h3>
+          <p class="step-desc">Messages from other nodes arrive as channel events in your Claude session — no polling, no webhooks.</p>
           <div class="step-terminal">
             <code>claude --dangerously-load-development-channels server:ccom</code>
           </div>
