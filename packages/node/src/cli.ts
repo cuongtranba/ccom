@@ -1,6 +1,5 @@
 import * as readline from "readline";
 import { writeFileSync, existsSync, readFileSync } from "fs";
-import { slugify } from "@inv/shared";
 
 // ── Config Generators (exported for testing) ────────────────────────
 
@@ -11,13 +10,11 @@ interface WizardInput {
   owner: string;
   serverUrl: string;
   token: string;
-  dbPath: string;
 }
 
-interface InvConfig {
+interface CcomConfig {
   node: { name: string; vertical: string; projects: string[]; owner: string };
   server: { url: string; token: string };
-  database: { path: string };
 }
 
 interface McpServerEntry {
@@ -29,7 +26,7 @@ interface McpConfig {
   mcpServers: Record<string, McpServerEntry>;
 }
 
-export function generateInvConfig(input: WizardInput): InvConfig {
+export function generateCcomConfig(input: WizardInput): CcomConfig {
   return {
     node: {
       name: input.name,
@@ -41,18 +38,15 @@ export function generateInvConfig(input: WizardInput): InvConfig {
       url: input.serverUrl,
       token: input.token,
     },
-    database: {
-      path: input.dbPath,
-    },
   };
 }
 
 export function generateMcpConfig(configPath: string): McpConfig {
   return {
     mcpServers: {
-      inventory: {
+      ccom: {
         command: "bunx",
-        args: ["@tini-works/inv-node@latest", "serve", configPath],
+        args: ["@tini-works/ccom@latest", "serve", configPath],
       },
     },
   };
@@ -85,8 +79,8 @@ export async function fetchTokenInfo(
 
 // ── Existing Files Detection ────────────────────────────────────────
 
-export function detectExistingFiles(dbPath = "./inventory.db"): string[] {
-  const candidates = ["./inv-config.json", "./.mcp.json", dbPath];
+export function detectExistingFiles(): string[] {
+  const candidates = ["./ccom-config.json", "./.mcp.json"];
   return candidates.filter((f) => existsSync(f));
 }
 
@@ -108,8 +102,8 @@ export async function runWizard(): Promise<void> {
   });
 
   console.log("");
-  console.log("Inventory Node Setup");
-  console.log("────────────────────");
+  console.log("ccom Node Setup");
+  console.log("───────────────");
   console.log("");
 
   // Check for existing files
@@ -126,7 +120,7 @@ export async function runWizard(): Promise<void> {
       console.log("Reusing existing configuration. No changes made.");
       console.log("");
       console.log("Start Claude Code:");
-      console.log("  claude --dangerously-load-development-channels server:inventory");
+      console.log("  claude --dangerously-load-development-channels server:ccom");
       console.log("");
       rl.close();
       return;
@@ -136,7 +130,6 @@ export async function runWizard(): Promise<void> {
 
   const serverUrl = await ask(rl, "Server URL", "ws://localhost:8080/ws");
   const token = await ask(rl, "Auth token");
-  const dbPath = await ask(rl, "Database path", "./inventory.db");
 
   console.log("");
   console.log("Fetching node info from server...");
@@ -158,20 +151,19 @@ export async function runWizard(): Promise<void> {
 
   rl.close();
 
-  const invConfig = generateInvConfig({
+  const ccomConfig = generateCcomConfig({
     name: info.name,
     vertical: info.vertical,
     projects: info.projects.map((p) => p.name),
     owner: info.owner,
     serverUrl,
     token,
-    dbPath,
   });
-  const mcpConfig = generateMcpConfig("./inv-config.json");
+  const mcpConfig = generateMcpConfig("./ccom-config.json");
 
-  const invConfigPath = "./inv-config.json";
-  writeFileSync(invConfigPath, JSON.stringify(invConfig, null, 2) + "\n");
-  console.log(`Writing ${invConfigPath}... ✓`);
+  const ccomConfigPath = "./ccom-config.json";
+  writeFileSync(ccomConfigPath, JSON.stringify(ccomConfig, null, 2) + "\n");
+  console.log(`Writing ${ccomConfigPath}... ✓`);
 
   const mcpConfigPath = "./.mcp.json";
   let finalMcpConfig = mcpConfig;
@@ -191,6 +183,6 @@ export async function runWizard(): Promise<void> {
 
   console.log("");
   console.log("Setup complete! Start Claude Code:");
-  console.log("  claude --dangerously-load-development-channels server:inventory");
+  console.log("  claude --dangerously-load-development-channels server:ccom");
   console.log("");
 }
