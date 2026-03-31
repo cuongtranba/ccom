@@ -1,10 +1,8 @@
-import type { Vertical } from "@inv/shared";
-
 export interface NodeConfig {
   node: {
     id: string;
     name: string;
-    vertical: Vertical;
+    vertical: string;
     projects: string[];
     owner: string;
     isAI: boolean;
@@ -12,13 +10,6 @@ export interface NodeConfig {
   server: {
     url: string;
     token: string;
-  };
-  database: {
-    path: string;
-  };
-  autonomy: {
-    auto: string[];
-    approval: string[];
   };
 }
 
@@ -35,13 +26,6 @@ export function defaultConfig(): NodeConfig {
     server: {
       url: "ws://localhost:8080/ws",
       token: "",
-    },
-    database: {
-      path: "./inventory.db",
-    },
-    autonomy: {
-      auto: ["signal_change", "trace_resolve_request", "sweep", "query_respond"],
-      approval: ["proposal_vote", "challenge_respond", "pair_invite", "cr_create"],
     },
   };
 }

@@ -14,25 +14,6 @@ describe("defaultConfig", () => {
 
     expect(cfg.server.url).toBe("ws://localhost:8080/ws");
     expect(cfg.server.token).toBe("");
-
-    expect(cfg.database.path).toBe("./inventory.db");
-  });
-
-  test("returns default autonomy settings with auto and approval arrays", () => {
-    const cfg = defaultConfig();
-
-    expect(cfg.autonomy.auto).toEqual([
-      "signal_change",
-      "trace_resolve_request",
-      "sweep",
-      "query_respond",
-    ]);
-    expect(cfg.autonomy.approval).toEqual([
-      "proposal_vote",
-      "challenge_respond",
-      "pair_invite",
-      "cr_create",
-    ]);
   });
 
   test("returns a fresh object each call (no shared mutable state)", () => {
@@ -63,34 +44,19 @@ describe("loadConfig", () => {
 
     // other sections untouched
     expect(cfg.server.url).toBe("ws://localhost:8080/ws");
-    expect(cfg.database.path).toBe("./inventory.db");
   });
 
   test("handles nested partial overrides", () => {
     const cfg = loadConfig({
       server: { url: "wss://prod.example.com/ws" },
-      database: { path: "/data/inventory.db" },
     });
 
     // overridden
     expect(cfg.server.url).toBe("wss://prod.example.com/ws");
-    expect(cfg.database.path).toBe("/data/inventory.db");
 
     // nested defaults preserved
     expect(cfg.server.token).toBe("");
     expect(cfg.node.vertical).toBe("dev");
-  });
-
-  test("arrays in partial replace default arrays (not merge)", () => {
-    const cfg = loadConfig({
-      autonomy: {
-        auto: ["sweep"],
-        approval: [],
-      },
-    });
-
-    expect(cfg.autonomy.auto).toEqual(["sweep"]);
-    expect(cfg.autonomy.approval).toEqual([]);
   });
 
   test("empty partial returns defaults", () => {
