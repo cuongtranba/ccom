@@ -1,4 +1,4 @@
-name: Release @tini-works/inv-node
+name: Release @tini-works/ccom
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -24,10 +24,7 @@ jobs:
           bun-version: "1.3.11"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: cd packages/server && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" bunx prisma generate
+        run: bun install
 
       - name: Run tests
         run: bun test
@@ -43,7 +40,7 @@ jobs:
   release:
     needs: test
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
@@ -57,7 +54,7 @@ jobs:
           bun-version: "1.3.11"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Build @tini-works/inv-node
         run: bun run build:node
@@ -65,17 +62,17 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Get latest inv-node@ tag, default to 0.0.0 if none exists
-          LATEST_TAG=$(git tag -l 'inv-node@*' --sort=-v:refname | head -1)
+          # Get latest ccom@ tag, default to 0.0.0 if none exists
+          LATEST_TAG=$(git tag -l 'ccom@*' --sort=-v:refname | head -1)
           if [ -z "$LATEST_TAG" ]; then
             NEXT_VERSION="0.1.0"
           else
-            CURRENT_VERSION="${LATEST_TAG#inv-node@}"
+            CURRENT_VERSION="${LATEST_TAG#ccom@}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
             NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
           echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=inv-node@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=ccom@$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "Next version: $NEXT_VERSION"
 
       - name: Update package.json version
@@ -102,5 +99,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "@tini-works/inv-node ${{ steps.version.outputs.version }}"
+          name: "@tini-works/ccom ${{ steps.version.outputs.version }}"
           generate_release_notes: true
