@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable, type Column } from "@/components/data-table";
 import { useTokens } from "@/hooks/queries";
+import { revealToken } from "@/lib/api";
 import type { TokenInfo } from "@/lib/api";
 
 interface NodesTableProps {
@@ -98,32 +99,42 @@ export function NodesTable({ adminKey }: NodesTableProps) {
       header: "Token",
       accessor: (row) => {
         const isVisible = visibleTokens[row.id];
-        if (!row.secret) {
-          return <span className="font-mono text-xs text-muted-foreground">••••••••...</span>;
-        }
+        const secret = secrets[row.id];
         return (
           <div className="flex items-center gap-1">
-            <span className="font-mono text-xs text-foreground">
-              {isVisible ? row.secret : `${row.secret.substring(0, 8)}...`}
+            <span className="font-mono text-xs text-foreground select-all">
+              {isVisible && secret ? secret : "••••••••"}
             </span>
             <button
               className="text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setVisibleTokens((prev) => ({ ...prev, [row.id]: !isVisible }))}
-              title={isVisible ? "Hide token" : "Show full token"}
+              onClick={async () => {
+                if (isVisible) {
+                  setVisibleTokens((prev) => ({ ...prev, [row.id]: false }));
+                } else {
+                  if (!secrets[row.id]) {
+                    const s = await revealToken(adminKey, row.nodeId);
+                    setSecrets((prev) => ({ ...prev, [row.id]: s }));
+                  }
+                  setVisibleTokens((prev) => ({ ...prev, [row.id]: true }));
+                }
+              }}
+              title={isVisible ? "Hide token" : "Show token"}
             >
               {isVisible ? <EyeOff size={13} /> : <Eye size={13} />}
             </button>
-            <button
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => handleCopy(row.id)}
-              title="Copy token"
-            >
-              {copiedId === row.id ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-            </button>
+            {secret && (
+              <button
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => handleCopy(row.id)}
+                title="Copy token"
+              >
+                {copiedId === row.id ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+              </button>
+            )}
           </div>
         );
       },
-      className: "w-[160px]",
+      className: "w-[200px]",
     },
     {
       header: "Actions",

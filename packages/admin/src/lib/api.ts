@@ -145,6 +145,14 @@ export async function listAllTokens(adminKey: string): Promise<TokenInfo[]> {
   return data.tokens;
 }
 
+export async function revealToken(adminKey: string, nodeId: string): Promise<string> {
+  const res = await fetch(`${BASE}/api/token/reveal/${encodeURIComponent(nodeId)}`, {
+    headers: authHeaders(adminKey),
+  });
+  const data = await handleResponse<{ secret: string }>(res);
+  return data.secret;
+}
+
 export async function revokeTokenByNodeId(adminKey: string, nodeId: string): Promise<void> {
   const res = await fetch(`${BASE}/api/token/revoke`, {
     method: "POST",

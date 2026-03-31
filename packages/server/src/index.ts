@@ -297,6 +297,16 @@ export function startServer(options: { port: number; redisUrl: string }): void {
         return Response.json({ error: "Missing token or nodeId" }, { status: 400 });
       }
 
+      const revealMatch = url.pathname.match(/^\/api\/token\/reveal\/(.+)$/);
+      if (revealMatch && req.method === "GET") {
+        const denied = requireAdmin(req);
+        if (denied) return denied;
+        const nodeId = decodeURIComponent(revealMatch[1]);
+        const token = await repos.tokens.findByNodeId(nodeId);
+        if (!token) return Response.json({ error: "Token not found" }, { status: 404 });
+        return Response.json({ secret: token.secret });
+      }
+
       if (url.pathname === "/api/nodes" && req.method === "GET") {
         const denied = requireAdmin(req);
         if (denied) return denied;

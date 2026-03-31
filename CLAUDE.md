@@ -13,7 +13,8 @@ bun test packages/node                      # node tests only
 bun run server          # start central WebSocket server
 bun run node serve      # start node MCP channel server
 bun run init            # interactive config wizard
-docker-compose up -d    # Redis + server
+docker-compose up -d    # Postgres + Redis (ports exposed via override for local dev)
+DATABASE_URL="postgresql://inv:inv@localhost:5432/inv" ADMIN_KEY=admin bun run packages/server/src/index.ts start  # local server
 
 # Build & Publish
 bun run build:node      # bundles packages/node + shared → dist/cli.js
@@ -88,6 +89,7 @@ All deployments are triggered by **push to `main`** — never publish or deploy 
 - **Config**: `.dokploy.json` in `packages/server/`
 - **Port**: 4400, requires `ADMIN_KEY` env var and Redis
 - **Admin UI sections**: Metrics → Projects → Nodes → Signal Flow (React Flow graph) → Server Logs (with live peers sidebar)
+- **Token reveal**: Admin can click the eye icon on any node row to reveal its token via `GET /api/token/reveal/:nodeId` (admin-key protected)
 
 ### Dashboard (packages/dashboard)
 - **Framework**: Astro SSR with `@astrojs/node` adapter (standalone mode)
