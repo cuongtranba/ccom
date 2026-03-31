@@ -1,8 +1,8 @@
 {
-  "name": "@tini-works/inv-node",
+  "name": "@tini-works/ccom",
   "version": "0.1.18",
   "bin": {
-    "inv-node": "./dist/cli.js"
+    "ccom": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tini-works/my-inventory.git",
+    "url": "https://github.com/tini-works/ccom.git",
     "directory": "packages/node"
   }
 }
