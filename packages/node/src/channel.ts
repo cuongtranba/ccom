@@ -104,7 +104,7 @@ async function fetchOnlineNodes(
 // ── Tool Handler Builder ──────────────────────────────────────────────
 
 interface ToolCallArgs {
-  [key: string]: string | boolean | undefined;
+  [key: string]: string | undefined;
 }
 
 interface ToolResult {
@@ -293,7 +293,7 @@ Use the ccom_ask, ccom_reply, and ccom_online_nodes tools to communicate with ot
 // ── Entry Point ────────────────────────────────────────────────────────
 
 if (import.meta.main) {
-  const configPath = process.argv[2] ?? "./inv-config.json";
+  const configPath = process.argv[2] ?? "./ccom-config.json";
   const log = new Logger("channel-server");
   startChannelServer(configPath).catch((err) => {
     log.error("Channel server fatal error", { error: String(err) });
