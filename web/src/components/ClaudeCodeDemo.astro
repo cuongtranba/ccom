@@ -47,6 +47,8 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
 </div>
 
 <script>
+  import { loadPlayerAssets, initPlayer } from '../scripts/asciinema-init.ts';
+
   const tabs = document.querySelectorAll<HTMLButtonElement>('.cast-tab');
   const panels = document.querySelectorAll<HTMLElement>('.cast-panel');
 
@@ -57,13 +59,15 @@ import AsciinemaPlayer from './AsciinemaPlayer.astro';
       panels.forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
       const panel = document.querySelector<HTMLElement>(`.cast-panel[data-panel="${target}"]`);
-      if (panel) panel.classList.add('active');
+      if (panel) {
+        panel.classList.add('active');
+        // Initialize any players in this panel that weren't visible before
+        panel.querySelectorAll<HTMLElement>('.cast-player').forEach(player => {
+          loadPlayerAssets().then(() => initPlayer(player));
+        });
+      }
     });
   });
-</script>
-
-<script>
-  import '../scripts/asciinema-init.ts';
 </script>
 
 <style>

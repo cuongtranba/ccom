@@ -7,7 +7,7 @@ const PLAYER_CSS = 'https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bun
 let loaded = false;
 let loadPromise: Promise<void> | null = null;
 
-function loadPlayerAssets(): Promise<void> {
+export function loadPlayerAssets(): Promise<void> {
   if (loaded) return Promise.resolve();
   if (loadPromise) return loadPromise;
 
@@ -29,7 +29,7 @@ function loadPlayerAssets(): Promise<void> {
   return loadPromise;
 }
 
-function initPlayer(el: HTMLElement): void {
+export function initPlayer(el: HTMLElement): void {
   const container = el.querySelector('.cast-container') as HTMLElement;
   if (!container || container.children.length > 0) return;
 
