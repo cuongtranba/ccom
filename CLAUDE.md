@@ -18,7 +18,7 @@ docker-compose up -d    # Redis + server
 # Build & Publish
 bun run build:node      # bundles packages/node + shared → dist/cli.js
 bun run build:admin     # builds admin React SPA → packages/admin/dist/
-bun run publish:node    # publish @tini-works/inv-node to npm (prefer CI)
+bun run publish:node    # publish @tini-works/ccom to npm (prefer CI)
 ```
 
 ## Architecture
