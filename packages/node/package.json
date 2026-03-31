@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tini-works/ccom.git",
+    "url": "https://github.com/cuongtranba/ccom.git",
     "directory": "packages/node"
   }
 }
