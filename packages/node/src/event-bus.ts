@@ -1,19 +1,4 @@
-export type EventType =
-	| "signal_change"
-	| "sweep"
-	| "trace_resolve_request"
-	| "trace_resolve_response"
-	| "query_ask"
-	| "query_respond"
-	| "ack"
-	| "error"
-	| "permission_request"
-	| "permission_verdict"
-	| "proposal_create"
-	| "proposal_vote"
-	| "proposal_result"
-	| "challenge_create"
-	| "checklist_update";
+export type EventType = "query_ask" | "query_respond" | "ack" | "error";
 
 type EventHandler = (data: unknown) => void;
 
