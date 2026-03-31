@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defaultConfig, loadConfig, type NodeConfig } from "../src/config";
+import { defaultConfig, loadConfig } from "../src/config";
 
 describe("defaultConfig", () => {
   test("returns valid config with expected defaults", () => {
